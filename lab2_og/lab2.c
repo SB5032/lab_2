@@ -146,7 +146,7 @@ int main()
 			col = 0;
 			row++;
 			}
-			if (row > 22)
+			if (row > 23)
 			{
 				row = 21;
 				fbclear_txtbox();
