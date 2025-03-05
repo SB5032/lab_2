@@ -153,7 +153,7 @@ int main()
 	for (int i = 0; i < 128; i++) {
 		printf( "BUFFER - %d ", buffer[i]);  // Set each element explicitly
 	}
-	
+	printf("size %d \n", sizeof(buffer));
 	if (packet.keycode[0] == 0x28) { /* Enter pressed? */
 		write (sockfd, buffer, sizeof(buffer));
 		fbclear_half();
@@ -207,8 +207,10 @@ char *key_trans(char * keyid)
 		i++;
 	}
 	
-printf("%d %d %d \n ", num[0], num[1],num[2]);
-	if(num[0] == 2) { num[1] += 61; }
+	printf("%d %d %d \n ", num[0], num[1],num[2]);
+	if(num[0] == 2) { 
+		num[1] += 61; 
+	}
 	else { num[1] += 93;}        
 
 
