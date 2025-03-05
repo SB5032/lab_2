@@ -34,9 +34,7 @@
 
 int sockfd; /* Socket file descriptor */
 int inc = 0;
-int cursor = 0;
-int row = 21;
-int buffer[128];
+int row = 12;
 struct libusb_device_handle *keyboard;
 uint8_t endpoint_address;
 
@@ -65,9 +63,8 @@ int main()
   /* Draw rows of asterisks across the top and bottom of the screen */
   for (col = 0 ; col < 64 ; col++) {
     fbputchar('*', 0, col);
-    fbputchar('*', 20, col);	
     fbputchar('*', 23, col);
-    fbputchar('-', 11, col);	
+    fbputchar('-', 11, col);	// Devided line *
   }
 
   fbputs("Hello CSEE 4840 World!", 4, 10);
@@ -104,12 +101,8 @@ int main()
 
   /* Look for and handle keypresses */
   for (;;) {
-        if (cursor > inc){
-                fbputs(" ", row, cursor);}
 
-        cursor = inc;
-    fbputs("|", row, cursor);
-      //fbputs("|", row, inc);
+      fbputs("|", row, inc);
     libusb_interrupt_transfer(keyboard, endpoint_address,
 			      (unsigned char *) &packet, sizeof(packet),
 			      &transferred, 0);
@@ -123,13 +116,13 @@ int main()
 			
       printf("before func 00 bla %s\n", keystate);
 
-//      fbputs(keystate, 21, 0);
+      fbputs(keystate, 21, 0);
       keyvalue = key_trans(keystate);
     if (inc == 63) { 
 	inc = 0;
-	if (row == 23) {
-		//fbclear_half();
-		row = 22;
+	if (row == 22) {
+		fbclear_half();
+		row = 12;
 	}
 	else {
 	row = row + 1;
@@ -138,7 +131,6 @@ int main()
 
 if (*keyvalue!=93 && *keyvalue != 61 && *keyvalue!=135)  {   //count to 64
       fbputs(keyvalue, row, inc);
-	buffer[inc] = *keyvalue;
       inc = inc + 1;
 printf ("inc normal %d \n \n ",inc);
 }
@@ -146,19 +138,13 @@ printf ("inc normal %d \n \n ",inc);
 if (*keyvalue == 135 && inc >= 0) {
 	inc = inc - 1;
       fbputs(" ", row, inc);
-	buffer[inc] = *keyvalue;
 printf ("inc bs  %d \n \n",inc);
-}
-	
-if (packet.keycode[0] == 0x28) { /* Enter pressed? */
-	write (sockfd, "buffer", sizeof(buffer));
 }
 
         if (packet.keycode[0] == 0x29) { /* ESC pressed? */
 	break;
       }
     }
-printf ("ibuff = %d",buffer[0]);
   }
 
   /* Terminate the network thread */

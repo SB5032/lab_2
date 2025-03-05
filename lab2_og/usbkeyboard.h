@@ -27,3 +27,4 @@ struct usb_keyboard_packet {
 extern struct libusb_device_handle *openkeyboard(uint8_t *);
 
 #endif
+

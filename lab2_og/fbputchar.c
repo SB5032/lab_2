@@ -17,9 +17,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
-
 #include <linux/fb.h>
-
+#include <stdio.h>
 #define FBDEV "/dev/fb0"
 
 #define FONT_WIDTH 8
@@ -109,7 +108,29 @@ void fbputchar(char c, int row, int col)
 void fbputs(const char *s, int row, int col)
 {
   char c;
-  while ((c = *s++) != 0) fbputchar(c, row, col++);
+  while ((c = *s++) != 0){
+  fbputchar(c, row, col++);
+}
+}
+
+// Clear screen *
+void fbclear()
+{
+	int row, col;
+	for (row = 0; row < 24; row++) {
+		for (col = 0; col < 64; col++) {
+			fbputchar(' ', row, col);
+		}
+	}
+}
+void fbclear_half()
+{
+	int row, col;
+	for (row = 12; row < 23; row++) {
+		for (col = 0; col < 64; col++) {
+			fbputchar(' ', row, col);
+		}
+	}
 }
 
 /* 8 X 16 console font from /lib/kbd/consolefonts/lat0-16.psfu.gz
