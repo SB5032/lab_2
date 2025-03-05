@@ -151,7 +151,7 @@ printf ("inc bs  %d \n \n",inc);
 }
 	
 if (packet.keycode[0] == 0x28) { /* Enter pressed? */
-	write (sockfd, "buffer", sizeof(buffer));
+	write (sockfd, "buffer", 128);
 }
 
         if (packet.keycode[0] == 0x29) { /* ESC pressed? */
