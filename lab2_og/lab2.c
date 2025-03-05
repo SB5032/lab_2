@@ -42,7 +42,7 @@ uint8_t endpoint_address;
 pthread_t network_thread;
 void *network_thread_f(void *);
 
-char HID_to_ASCII(char keycode, char modifier); 
+char hex_to_ascii(char keycode, char modifier); 
 
 int main()
 {
@@ -53,31 +53,28 @@ int main()
   struct usb_keyboard_packet packet;
   int transferred;
   char keystate[12];
-  char message[128];
+  char message[BUFFER_SIZE];
   int i = -1;
   int j = 0;
-  char curr_char;
+  char current_keystroke;
   int rows;
   int cols;
 
   for (int k = 0; k < 128; k++) message[k] = ' ';
 
-  void string_handle() {
+  void update_screen_message() {
     rows = 20;
     cols = 0;
+    
     for (j = 0; j < 128; j++) {
-      cols = j % 64;
-      if (cols == 0) rows += 1;
-      fbputchar(' ', rows, cols);
+        cols = j % 64;
+        if (cols == 0 && j != 0) rows += 1; // Avoid incrementing on first iteration
+        
+        fbputchar(' ', rows, cols);  // Clear previous character
+        fbputchar(message[j], rows, cols);  // Write new character
     }
-    rows = 20;
-    cols = 0;
-    for (j = 0; j < 128; j++) {
-      cols = j % 64;
-      if (cols == 0) rows += 1;
-      fbputchar(message[j], rows, cols);
-    }
-   }
+}
+
 
   if ((err = fbopen()) != 0) {
     fprintf(stderr, "Error: Could not open framebuffer: %d\n", err);
@@ -131,75 +128,65 @@ int main()
     if (transferred == sizeof(packet)) {
       sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
 	      packet.keycode[1]);
-      curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
+      current_keystroke = hex_to_ascii(packet.keycode[0], packet.modifiers);
 
       switch (packet.keycode[0]) {
         case 0x28:  // Enter key
-          // Sends the message over the socket
           if (write(sockfd, message, 128) < 0) {
             fprintf(stderr, "Error: write() failed. Is the server running?\n");
             exit(1);
           }
-          // Resets the message buffer with spaces
-          memset(message, ' ', 128);
-          // Updates the display to clear the message
-          string_handle();
-          // Resets cursor position
-          i = -1;
+          memset(message, ' ', 128); // Clear buffer
+          update_screen_message(); //clear scrn
+          i = -1; // Reset cursor
           break;
       
         case 0x2a:  // Backspace
         case 0x4c:  // Delete
           if (i >= 0) {
-            // Removes the last character and updates the display
             message[i--] = ' ';
-            string_handle();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            update_screen_message();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  
           }
           break;
       
         case 0x50:  // Left Arrow
           if (i >= 0) {
-            // Moves cursor left if possible and updates the display
-            string_handle();
+            update_screen_message();
             i--;
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  
           }
           break;
       
         case 0x4f:  // Right Arrow
           if (i < 127) {
-            // Moves cursor right if possible and updates the display
             i++;
-            string_handle();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            update_screen_message();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  
           }
           break;
       
         case 0x52:  // Up Arrow
           if (i > 63) {
-            // Moves cursor up one line if possible and updates the display
             i -= 64;
-            string_handle();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            update_screen_message();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  
           }
           break;
       
         case 0x51:  // Down Arrow
           if (i < 64) {
-            // Moves cursor down one line if possible and updates the display
             i += 64;
-            string_handle();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            update_screen_message();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  
           }
           break;
       
         default:
-          if (curr_char != 0 && i < 127) {
-            // Handles printable characters by adding them to the message buffer
-            message[++i] = curr_char;
-            string_handle();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+          if (current_keystroke != 0 && i < 127) {
+            message[++i] = current_keystroke;
+            update_screen_message();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  
           }
           break;
       }
@@ -221,7 +208,7 @@ int main()
   return 0;
 }
 
-void clear_top() {
+void fbclear_rx() {
   for (int k = 0; k < 64 * 19; k++) {
       fbputchar(' ', k / 64, k % 64);
   }
@@ -240,46 +227,45 @@ void *network_thread_f(void *ignored) {
       for (int k = 0; k < n; k++) {
           int r_col = k % 64;
           if (r_row >= 19) {
-              clear_top();
+              fbclear_rx();
               r_row = 1;
           }
           fbputchar(recvBuf[k], r_row, r_col);
-          if (r_col == 63) r_row++;  // Move to the next row at the end of a line
+          if (r_col == 63) r_row++; 
       }
-      r_row++;  // Move to next row after the loop
+      r_row++;  // Move to next row
   }
   return NULL;
 }
 
 
-char HID_to_ASCII(char keycode, char modifier) {
-    static bool caps_en;
-    if (keycode == 0x39) caps_en ^= 1;
+char hex_to_ascii(char keycode, char modifier) {
+    static bool capslock_on;
+    if (keycode == 0x39) capslock_on ^= 1;
 
     // Define character mapping for printable keys
     if (keycode >= 0x04 && keycode <= 0x1D) { // a-z or A-Z
-        return (caps_en || modifier == 0x20 || modifier == 0x02) ? ('A' + keycode - 0x04) : ('a' + keycode - 0x04);
+        return (capslock_on || modifier == 0x20 || modifier == 0x02) ? ('A' + keycode - 0x04) : ('a' + keycode - 0x04);
     }
     if (keycode >= 0x1E && keycode <= 0x27) { // 1-0
         const char nums[] = "1234567890";
-        return (caps_en || modifier == 0x20 || modifier == 0x02) ? "!@#$%^&*()"[keycode - 0x1E] : nums[keycode - 0x1E];
+        return (capslock_on || modifier == 0x20 || modifier == 0x02) ? "!@#$%^&*()"[keycode - 0x1E] : nums[keycode - 0x1E];
     }
-
     // Special symbols
     switch (keycode) {
         case 0x28: return '\n';
         case 0x2C: return ' ';
-        case 0x2D: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '_' : '-';
-        case 0x2E: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '+' : '=';
-        case 0x2F: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '{' : '[';
-        case 0x30: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '}' : ']';
-        case 0x31: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '|' : '\\';
-        case 0x33: return (caps_en || modifier == 0x20 || modifier == 0x02) ? ':' : ';';
-        case 0x34: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '"' : '\'';
-        case 0x35: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '~' : '`';
-        case 0x36: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '<' : ',';
-        case 0x37: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '>' : '.';
-        case 0x38: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '?' : '/';
+        case 0x2D: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '_' : '-';
+        case 0x2E: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '+' : '=';
+        case 0x2F: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '{' : '[';
+        case 0x30: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '}' : ']';
+        case 0x31: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '|' : '\\';
+        case 0x33: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? ':' : ';';
+        case 0x34: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '"' : '\'';
+        case 0x35: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '~' : '`';
+        case 0x36: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '<' : ',';
+        case 0x37: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '>' : '.';
+        case 0x38: return (capslock_on || modifier == 0x20 || modifier == 0x02) ? '?' : '/';
         default: return 0;
     }
 }
