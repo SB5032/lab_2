@@ -125,7 +125,7 @@ int main()
         ptr = 0; //point to start of msg block
         //clear buffer after enter
         for (int i = 0; i < BUFFER_SIZE; i++)
-        message[i] = '\0';
+        buffer[i] = '\0';
 
         col = 0;
         row = 21;
