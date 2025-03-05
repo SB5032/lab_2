@@ -219,6 +219,6 @@ char *hex_to_ascii(char * keyid)
   }        
 
   input[1] = '\0';  // Null-terminate the string
-  printf ("input val = %d", input[1]);
+  printf ("input val = %d", input[0]);
 	return input;
 } 
