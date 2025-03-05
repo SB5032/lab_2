@@ -42,6 +42,8 @@ uint8_t endpoint_address;
 pthread_t network_thread;
 void *network_thread_f(void *);
 
+char HID_to_ASCII(char keycode, char modifier); 
+
 int main()
 {
   int err, col;
@@ -88,7 +90,7 @@ int main()
   for (col = 0 ; col < 64 ; col++) {
     fbputchar('*', 0, col);
     fbputchar('*', 23, col);
-    fbputchar('_', 10, col)
+    fbputchar('_', 10, col);
   }
 
   /* Open the keyboard */
