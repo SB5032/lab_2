@@ -34,7 +34,9 @@
 
 int sockfd; /* Socket file descriptor */
 int inc = 0;
-int row = 12;
+int cursor = 0;
+int row = 21;
+int buffer[128];
 struct libusb_device_handle *keyboard;
 uint8_t endpoint_address;
 
@@ -63,11 +65,12 @@ int main()
   /* Draw rows of asterisks across the top and bottom of the screen */
   for (col = 0 ; col < 64 ; col++) {
     fbputchar('*', 0, col);
+    fbputchar('*', 20, col);	
     fbputchar('*', 23, col);
-    fbputchar('-', 11, col);	// Devided line *
+    fbputchar('-', 11, col);	
   }
 
-  fbputs("Hello CSEE 4840 World!", 4, 10);
+  //fbputs("Hello CSEE 4840 World!", 4, 10);
 
   /* Open the keyboard */
   if ( (keyboard = openkeyboard(&endpoint_address)) == NULL ) {
@@ -101,8 +104,12 @@ int main()
 
   /* Look for and handle keypresses */
   for (;;) {
+    if (cursor > inc){ //backspace cursor removal
+        fbputs(" ", row, cursor);
+	}
+    cursor = inc;
+    fbputs("|", row, cursor); //maintain cursor
 
-      fbputs("|", row, inc);
     libusb_interrupt_transfer(keyboard, endpoint_address,
 			      (unsigned char *) &packet, sizeof(packet),
 			      &transferred, 0);
@@ -116,36 +123,52 @@ int main()
 			
       printf("before func 00 bla %s\n", keystate);
 
-      fbputs(keystate, 21, 0);
+//      fbputs(keystate, 21, 0);
       keyvalue = key_trans(keystate);
-    if (inc == 63) { 
-	inc = 0;
-	if (row == 22) {
-		fbclear_half();
-		row = 12;
+    if (inc == 63) { //go to next line
+		inc = 0;
+		if (row == 23) { //text box full
+			fbclear_half();
+			row = 22;
+		}
+		else {
+			row = row + 1;
+		} 
 	}
-	else {
-	row = row + 1;
-	} 
-}
 
-if (*keyvalue!=93 && *keyvalue != 61 && *keyvalue!=135)  {   //count to 64
-      fbputs(keyvalue, row, inc);
-      inc = inc + 1;
-printf ("inc normal %d \n \n ",inc);
-}
+	if (*keyvalue!=93 && *keyvalue != 61 && *keyvalue!=135)  {   // differentiate between ], =, backspace
+    	fbputs(keyvalue, row, inc); //print char in textbox
+		buffer[inc] = *keyvalue;
+      	inc = inc + 1;
+		printf ("inc normal %d \n \n ",inc);
+	}
 
-if (*keyvalue == 135 && inc >= 0) {
-	inc = inc - 1;
-      fbputs(" ", row, inc);
-printf ("inc bs  %d \n \n",inc);
-}
+	if (*keyvalue == 135 && inc >= 0) { //if backspace
+		inc = inc - 1;
+      	fbputs(" ", row, inc);
+		buffer[inc] = *keyvalue;
+		printf ("inc bs  %d \n \n",inc);
+	}
+//PRINTING BUFFER
+	for (int i = 0; i < 128; i++) {
+		printf( "BUFFER - %d ", buffer[i]);  // Set each element explicitly
+	}
+	printf("size %d \n", sizeof(buffer));
+	if (packet.keycode[0] == 0x28) { /* Enter pressed? */
+		write (sockfd, buffer, 127);
+		fbclear_half();
+		for (int i = 0; i < 128; i++) {
+			buffer[i] = NULL;  // Set each element explicitly
+		}
+		inc = 0;
+	}
 
-        if (packet.keycode[0] == 0x29) { /* ESC pressed? */
-	break;
-      }
+    if (packet.keycode[0] == 0x29) { /* ESC pressed? */
+		break;
     }
-  }
+}
+printf ("ibuff = %d \n",buffer[0]);
+}
 
   /* Terminate the network thread */
   pthread_cancel(network_thread);
@@ -178,21 +201,23 @@ char *key_trans(char * keyid)
 	char * token = strtok(keyid, " ");
 	
 
-while (token != NULL) {
+	while (token != NULL) {
 		num[i] = (int)strtol(token, NULL, 16);
 		token = strtok(NULL, " ");
 		i++;
 	}
 	
-printf("%d %d %d \n ", num[0], num[1],num[2]);
-	if(num[0] == 2) { num[1] += 61; }
+	printf("%d %d %d \n ", num[0], num[1],num[2]);
+	if(num[0] == 2) { 
+		num[1] += 61; 
+	}
 	else { num[1] += 93;}        
 
 
 	if (num[1] > 92 || num[1] <123) {
-	          symbol = (char *)malloc(2); 	
-                  symbol[0] = (char)num[1];
-                  symbol[1] = '\0';
+		symbol = (char *)malloc(2); 	
+        symbol[0] = (char)num[1];
+        symbol[1] = '\0';
 }
 	return symbol;
 } 
