@@ -217,7 +217,7 @@ int main()
         // fbputchar(' ', inputRow, inputColumn - 1);
         // printf("\nInput Column: %d", inputColumn);
         // printf("\nInput Row: %d", inputRow);
-        fbclear_input();
+        fbclear_half();
 
         write(sockfd, message, BUFFER_SIZE - 1);
         // Clear the buffer here...
@@ -333,7 +333,7 @@ int main()
         if (inputRow > 22)
         {
           inputRow = 21;
-          fbclear_input();
+          fbclear_half();
         }
       }
 
@@ -372,7 +372,7 @@ void *network_thread_f(void *ignored)
     if (recvRow > 18)
     {
       recvRow = 1;
-      fbclear_display(); // Special version of fbclear where incoming messages are cleared and starts from top again.
+      fbclear_half(); // Special version of fbclear where incoming messages are cleared and starts from top again.
     }
   }
   return NULL;
