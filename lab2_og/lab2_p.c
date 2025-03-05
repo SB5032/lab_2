@@ -235,30 +235,7 @@ int main()
       else if (packet.keycode[0] == 0x50 && packet.keycode[1] == 0x00 && packet.modifiers == 0x00)
       {
         printf("\n Left Arrow Pressed.\n");
-        // inputColumn++;
-        // inputRow--;
-        // fbputchar(' ', inputRow, inputColumn - 1);
-        // printf("\nInput Column: %d", inputColumn);
-        // printf("\nInput Row: %d", inputRow);
-        // fbclear_input();
 
-        // write(sockfd, message, BUFFER_SIZE - 1);
-        // message_pointer=0;
-        // if (inputColumn == 0)
-        // {
-        //   // inputColumn--;
-        //   continue;
-        // }
-        // else if (inputColumn == 0 && inputRow == 22)
-        // {
-        //   inputColumn = 63;
-        //   inputRow--;
-        // }
-        // else
-        // {
-        //   inputColumn--;
-        // }
-        // inputRow = 21;
          if (inputColumn > 0){
           fbputchar(message[message_pointer], inputRow, inputColumn);
           inputColumn--;

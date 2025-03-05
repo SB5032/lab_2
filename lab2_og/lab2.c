@@ -62,9 +62,10 @@ int main()
   for (col = 0 ; col < 64 ; col++) {
     fbputchar('*', 0, col);
     fbputchar('*', 23, col);
+    fbputchar('-', 20, col); //create text box
   }
 
-  fbputs("Hello CSEE 4840 World!", 4, 10);
+  //fbputs("Hello CSEE 4840 World!", 4, 10);
 
   /* Open the keyboard */
   if ( (keyboard = openkeyboard(&endpoint_address)) == NULL ) {
@@ -101,31 +102,54 @@ int main()
     libusb_interrupt_transfer(keyboard, endpoint_address,
 			      (unsigned char *) &packet, sizeof(packet),
 			      &transferred, 0);
+
     if (transferred == sizeof(packet)) {
       sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
-	      packet.keycode[1]);
-      printf("%s\n", keystate);
-      fbputs(keystate, 6, 0);
-	if (packet.modifiers == 0x02) { /* with modifier */
-		keyvalue[0] = packet.keycode[0] + 61;
-	}
-	else{ // no modifier
-		keyvalue[0] = packet.keycode[0] + 93;
-	}
-	//backspace
-	if (packet.keycode[0] >= 0x04 && packet.keycode[0] <= 0x30){
-		if (row == 22 && col == 0){
-			fbputs(" ", row, col);
-			col = 63;
-			row = row - 1;
-			buffer[ptr] = NULL;
-			ptr--;
-		}
-		
-		keyvalue[0] = packet.keycode[0] + 61;
-	}
+	      packet.keycode[1]); //input
+      //printf("%s\n", keystate);
+      //fbputs(keystate, 6, 0);
+      char *output_char = hex_to_ascii(keystate);
+      printf("Output_char = %s\n", output_char);
+      
+      if (packet.modifiers == 0x00 && packet.keycode[0] == 0x00 && packet.keycode[1] == 0x00)
+      {
+        // printf("Null Key!!");
+        continue;
+      }
+      else if (packet.keycode[0] == 0x28 && packet.keycode[1] == 0x00 && packet.modifiers == 0x00)
+      {
+        fbclear_half();
+
+        write(sockfd, buffer, BUFFER_SIZE - 1);
+        ptr = 0; //point to start of msg block
+        //clear buffer after enter
+        for (int i = 0; i < BUFFER_SIZE; i++)
+        message[i] = '\0';
+
+        col = 0;
+        row = 21;
+      }
+      else
+      {
+        buffer[ptr] = *output_char;
+        ptr++;
+        fbputs(output_char, row, col); 
+        col++;
+        
+        if (col == 63)
+        {
+          col = 0;
+          row++;
+        }
+        if (row > 22)
+        {
+          row = 21;
+          fbclear_half();
+        }
+      }
+      
       if (packet.keycode[0] == 0x29) { /* ESC pressed? */
-	break;
+	      break;
       }
     }
   }
@@ -153,3 +177,45 @@ void *network_thread_f(void *ignored)
   return NULL;
 }
 
+char *hex_to_ascii(char * keyid)
+{
+	static char input[2];
+  int val[3];
+  int i =0;
+
+	char *token = strtok(keyid, " ");
+
+	while (token != NULL) 
+  {
+		val[i] = (int)strtol(token, NULL, 16);
+		token = strtok(NULL, " ");
+		i++;
+	}
+	
+	//printf("%d %d %d \n ", num[0], num[1],num[2]);
+  if (num[0] == 0x02 || num[0] == 0x20) //shift key pressed
+  {
+  if (num[1] >= 0x04 && num[1] <= 0x1d)
+    {
+      // Adjust keycode to represent uppercase letters
+      input[0] = 61 + num[1]; //convert to uppercase
+    }
+    else if (num[1] >= 0x1e && num[1] <= 0x27)
+    {
+      input[0] = num[1] + 19; //handle numbers
+    }
+	}
+	else {
+    if (num[1] >= 0x04 && num[1] <= 0x1d) 
+    {
+      num[1] += 93; //lower case
+    }
+    else if (num[1] >= 0x1e && num[1] <= 0x27)
+    {
+      input[0] = num[1] + 19; //handle numbers
+    }
+  }        
+
+  input[1] = '\0';  // Null-terminate the string
+	return input;
+} 
