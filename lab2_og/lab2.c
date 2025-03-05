@@ -155,7 +155,7 @@ int main()
 	}
 	printf("size %d \n", sizeof(buffer));
 	if (packet.keycode[0] == 0x28) { /* Enter pressed? */
-		write (sockfd, buffer, sizeof(buffer));
+		write (sockfd, buffer, inc);
 		fbclear_half();
 		for (int i = 0; i < 128; i++) {
 			buffer[i] = NULL;  // Set each element explicitly
