@@ -90,7 +90,7 @@ int main()
   for (col = 0 ; col < 64 ; col++) {
     fbputchar('*', 0, col);
     fbputchar('*', 23, col);
-    fbputchar('_', 21, col);
+    fbputchar('_', 20, col);
   }
 
   /* Open the keyboard */
