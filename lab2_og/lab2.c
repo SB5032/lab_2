@@ -33,7 +33,8 @@
  */
 
 int sockfd; /* Socket file descriptor */
-int row, col, cursor, ptr;
+int row = 21;
+int col, cursor, ptr;
 int rowput = 3;
 int buffer[BUFFER_SIZE];
 
@@ -68,7 +69,7 @@ int main()
     fbputchar('-', 20, col); //create text box
   }
 
-  //fbputs("Hello CSEE 4840 World!", 4, 10);
+  fbputs("Hello CSEE 4840 World!", 2, 10);
 
   /* Open the keyboard */
   if ( (keyboard = openkeyboard(&endpoint_address)) == NULL ) {
