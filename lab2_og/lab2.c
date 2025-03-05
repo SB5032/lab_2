@@ -62,7 +62,7 @@ int main()
 
   for (int k = 0; k < 128; k++) message[k] = ' ';
 
-  void string_handle() {
+  void update_screen_message() {
     rows = 20;
     cols = 0;
     for (j = 0; j < 128; j++) {
@@ -143,7 +143,7 @@ int main()
           // Resets the message buffer with spaces
           memset(message, ' ', 128);
           // Updates the display to clear the message
-          string_handle();
+          update_screen_message();
           // Resets cursor position
           i = -1;
           break;
@@ -153,7 +153,7 @@ int main()
           if (i >= 0) {
             // Removes the last character and updates the display
             message[i--] = ' ';
-            string_handle();
+            update_screen_message();
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
@@ -161,7 +161,7 @@ int main()
         case 0x50:  // Left Arrow
           if (i >= 0) {
             // Moves cursor left if possible and updates the display
-            string_handle();
+            update_screen_message();
             i--;
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
@@ -171,7 +171,7 @@ int main()
           if (i < 127) {
             // Moves cursor right if possible and updates the display
             i++;
-            string_handle();
+            update_screen_message();
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
@@ -180,7 +180,7 @@ int main()
           if (i > 63) {
             // Moves cursor up one line if possible and updates the display
             i -= 64;
-            string_handle();
+            update_screen_message();
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
@@ -189,7 +189,7 @@ int main()
           if (i < 64) {
             // Moves cursor down one line if possible and updates the display
             i += 64;
-            string_handle();
+            update_screen_message();
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
@@ -198,7 +198,7 @@ int main()
           if (curr_char != 0 && i < 127) {
             // Handles printable characters by adding them to the message buffer
             message[++i] = curr_char;
-            string_handle();
+            update_screen_message();
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
@@ -221,7 +221,7 @@ int main()
   return 0;
 }
 
-void clear_top() {
+void fbclear_rx() {
   for (int k = 0; k < 64 * 19; k++) {
       fbputchar(' ', k / 64, k % 64);
   }
@@ -240,13 +240,13 @@ void *network_thread_f(void *ignored) {
       for (int k = 0; k < n; k++) {
           int r_col = k % 64;
           if (r_row >= 19) {
-              clear_top();
+              fbclear_rx();
               r_row = 1;
           }
           fbputchar(recvBuf[k], r_row, r_col);
           if (r_col == 63) r_row++;  // Move to the next row at the end of a line
       }
-      r_row++;  // Move to next row after the loop
+      //r_row++;  // Move to next row after the loop
   }
   return NULL;
 }
