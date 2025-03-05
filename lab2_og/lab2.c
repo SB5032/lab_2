@@ -33,6 +33,8 @@
  */
 
 int sockfd; /* Socket file descriptor */
+int row, col, cursor, ptr;
+int buffer[BUFFER_SIZE];
 
 struct libusb_device_handle *keyboard;
 uint8_t endpoint_address;
@@ -49,7 +51,8 @@ int main()
   struct usb_keyboard_packet packet;
   int transferred;
   char keystate[12];
-
+  int keyvalue[2];
+  keyvalue[1] = '\0';
   if ((err = fbopen()) != 0) {
     fprintf(stderr, "Error: Could not open framebuffer: %d\n", err);
     exit(1);
@@ -103,6 +106,24 @@ int main()
 	      packet.keycode[1]);
       printf("%s\n", keystate);
       fbputs(keystate, 6, 0);
+	if (packet.modifiers == 0x02) { /* with modifier */
+		keyvalue[0] = packet.keycode[0] + 61;
+	}
+	else{ // no modifier
+		keyvalue[0] = packet.keycode[0] + 93;
+	}
+	//backspace
+	if (packet.keycode[0] >= 0x04 && packet.keycode[0] <= 0x30){
+		if (row == 22 && col == 0){
+			fbputs(" ", row, col);
+			col = 63;
+			row = row - 1;
+			buffer[ptr] = NULL;
+			ptr--;
+		}
+		
+		keyvalue[0] = packet.keycode[0] + 61;
+	}
       if (packet.keycode[0] == 0x29) { /* ESC pressed? */
 	break;
       }
