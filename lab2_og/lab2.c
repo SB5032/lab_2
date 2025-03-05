@@ -153,7 +153,7 @@ int main()
 	if (packet.keycode[0] == 0x28) { /* Enter pressed? */
 		write (sockfd, buffer, sizeof(buffer));
 		fbclear_half();
-		buffer[] = {};
+		buffer[0:127] = {};
 	}
 
     if (packet.keycode[0] == 0x29) { /* ESC pressed? */
