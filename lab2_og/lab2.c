@@ -181,44 +181,169 @@ void *network_thread_f(void *ignored)
 
 char *hex_to_ascii(char * keyid)
 {
-	static char input[2];
-  int val[3];
-  int i =0;
+   // Maps hex keycodes to ASCII characters.
+   static char symbol[2]; // Use static to return a string to caller
+   int num[3];
+   int i = 0;
+ 
+   // Tokenize the input string of key codes (e.g., "02 04 00").
+   char *token = strtok(keyid, " ");
+   while (token != NULL)
+   {
+     num[i] = (int)strtol(token, NULL, 16);
+     printf("%d", num[i]);
+     token = strtok(NULL, " ");
+     i++;
+   }
+ 
+   // Check the modifier state (Shift, Control, etc.)
+   int modifiers = num[0];
+ 
+   // Check the keycode (actual key pressed)
+   int keycode = num[1];
+   // Handle Backspace Input
+   if (keycode == 0x2a)
+   {
+     symbol[0] = keycode - 34;
+   }
+ 
+   // Handle Enter Key;
+   else if (keycode == 0x28)
+   {
+     symbol[0] = keycode - 30;
+   }
+   // Handle Spacebar Input.
+   else if (keycode == 0x2c)
+   {
+     symbol[0] = keycode - 12;
+   }
+   // Handle commas
+   else if (keycode == 0x36)
+   {
+     symbol[0] = keycode - 10;
+   }
+   // Left Arrow key
+   else if (keycode == 0x50)
+   {
+     symbol[0] = keycode - 80+32;
+   }
+   // Right Arrow
+   else if (keycode == 0x4f)
+   {
+     symbol[0] = keycode - 80+32;
+   }
+   // Handle Apostrophe
+   else if (keycode == 0x34)
+   {
+     symbol[0] = keycode - 13;
+   }
+   // Shift key behavior: if Shift is pressed, transform to uppercase
+   else if (modifiers & 0x02 || modifiers & 0x20)
+   { // 0x02 corresponds to the left Shift key
+     if (keycode >= 0x04 && keycode <= 0x1d)
+     {
+       // Adjust keycode to represent uppercase letters
+       symbol[0] = keycode + 61; // Convert to uppercase (A=0x04 -> A)
+     }
+     else if (keycode == 0x37)
+     {
+       symbol[0] = keycode + 7;
+     }
+     // Question Mark handling.
+     else if (keycode == 0x38)
+     {
+       symbol[0] = keycode + 7;
+     }
+     // Map to number symbols
+     else if (keycode >= 0x1e && keycode <= 0x27)
+     {
+       symbol[0] = keycode + 19; // Convert to lowercase (a=0x04 -> a)
+     }
+     else
+     {
+       symbol[0] = keycode; // For other characters, keep as is
+     }
+     // else
+     // {
+     //   symbol[0] = keycode; // For other characters, keep as is
+     // }
+   }
+   else
+   {
+     // Without Shift, just map keycode to lowercase/regular symbol
+     if (keycode >= 0x04 && keycode <= 0x1d)
+     {
+       symbol[0] = keycode + 93; // Convert to lowercase (a=0x04 -> a)
+     }
+     else if (keycode >= 0x1e && keycode <= 0x26)
+     {
+       symbol[0] = keycode + 19; // Convert to lowercase (a=0x04 -> a)
+     }
+     else if (keycode == 0x27)
+     {
+       symbol[0] = keycode + 9;
+     }
+     else if (keycode == 0x37)
+     {
+       symbol[0] = keycode - 9;
+     }
+     // Square Bracket Keypress
+     else if (keycode == 0x30)
+     {
+       symbol[0] = keycode + 45;
+     }
+     else
+     {
+       // Handle other keycodes as regular symbols
+       symbol[0] = keycode;
+     }
+     // else
+     // {
+     //   // Handle other keycodes as regular symbols
+     //   symbol[0] = keycode;
+     // }
+   }
+ 
+   symbol[1] = '\0'; // Null-terminate the string
+   return symbol;
+	// static char input[2];
+  // int val[3];
+  // int i =0;
 
-	char *token = strtok(keyid, " ");
+	// char *token = strtok(keyid, " ");
 
-	while (token != NULL) 
-  {
-		val[i] = (int)strtol(token, NULL, 16);
-		token = strtok(NULL, " ");
-		i++;
-	}
+	// while (token != NULL) 
+  // {
+	// 	val[i] = (int)strtol(token, NULL, 16);
+	// 	token = strtok(NULL, " ");
+	// 	i++;
+	// }
 	
-	//printf("%d %d %d \n ", num[0], num[1],num[2]);
-  if (val[0] & 0x02 || val[0] & 0x20) //shift key pressed
-  {
-  if (val[1] >= 0x04 && val[1] <= 0x1d)
-    {
-      // Adjust keycode to represent uppercase letters
-      input[0] = 61 + val[1]; //convert to uppercase
-    }
-    else if (val[1] >= 0x1e && val[1] <= 0x27)
-    {
-      input[0] = val[1] + 19; //handle numbers
-    }
-	}
-	else {
-    if (val[1] >= 0x04 && val[1] <= 0x1d) 
-    {
-      val[1] += 93; //lower case
-    }
-    else if (val[1] >= 0x1e && val[1] <= 0x27)
-    {
-      input[0] = val[1] + 19; //handle numbers
-    }
-  }        
+	// //printf("%d %d %d \n ", num[0], num[1],num[2]);
+  // if (val[0] & 0x02 || val[0] & 0x20) //shift key pressed
+  // {
+  // if (val[1] >= 0x04 && val[1] <= 0x1d)
+  //   {
+  //     // Adjust keycode to represent uppercase letters
+  //     input[0] = 61 + val[1]; //convert to uppercase
+  //   }
+  //   else if (val[1] >= 0x1e && val[1] <= 0x27)
+  //   {
+  //     input[0] = val[1] + 19; //handle numbers
+  //   }
+	// }
+	// else {
+  //   if (val[1] >= 0x04 && val[1] <= 0x1d) 
+  //   {
+  //     val[1] += 93; //lower case
+  //   }
+  //   else if (val[1] >= 0x1e && val[1] <= 0x27)
+  //   {
+  //     input[0] = val[1] + 19; //handle numbers
+  //   }
+  // }        
 
-  input[1] = '\0';  // Null-terminate the string
-  printf ("input val = %d", input[0]);
-	return input;
+  // input[1] = '\0';  // Null-terminate the string
+  // printf ("input val = %d", input[0]);
+	// return input;
 } 
