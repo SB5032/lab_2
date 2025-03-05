@@ -193,26 +193,26 @@ char *hex_to_ascii(char * keyid)
 	}
 	
 	//printf("%d %d %d \n ", num[0], num[1],num[2]);
-  if (num[0] == 0x02 || num[0] == 0x20) //shift key pressed
+  if (val[0] == 0x02 || val[0] == 0x20) //shift key pressed
   {
-  if (num[1] >= 0x04 && num[1] <= 0x1d)
+  if (val[1] >= 0x04 && val[1] <= 0x1d)
     {
       // Adjust keycode to represent uppercase letters
-      input[0] = 61 + num[1]; //convert to uppercase
+      input[0] = 61 + val[1]; //convert to uppercase
     }
-    else if (num[1] >= 0x1e && num[1] <= 0x27)
+    else if (val[1] >= 0x1e && val[1] <= 0x27)
     {
-      input[0] = num[1] + 19; //handle numbers
+      input[0] = val[1] + 19; //handle numbers
     }
 	}
 	else {
-    if (num[1] >= 0x04 && num[1] <= 0x1d) 
+    if (val[1] >= 0x04 && val[1] <= 0x1d) 
     {
-      num[1] += 93; //lower case
+      val[1] += 93; //lower case
     }
-    else if (num[1] >= 0x1e && num[1] <= 0x27)
+    else if (val[1] >= 0x1e && val[1] <= 0x27)
     {
-      input[0] = num[1] + 19; //handle numbers
+      input[0] = val[1] + 19; //handle numbers
     }
   }        
 
