@@ -34,9 +34,10 @@
 
 int sockfd; /* Socket file descriptor */
 int row = 21;
-int col, cursor, ptr;
+int col, cursor;
+int ptr = 0;
 int rowput = 5;
-int buffer[BUFFER_SIZE];
+char buffer[BUFFER_SIZE];
 
 struct libusb_device_handle *keyboard;
 uint8_t endpoint_address;
@@ -127,8 +128,8 @@ int main()
 			ptr = 0; //reset buffer ptr
 			//clearing buffer after enter
 			for (int i = 0; i < 23; i++)
-				printf("\nMessage-%d = %d", i, buffer[i]);
-				
+				printf("\nMessage-%d = %s", i, buffer[i]);
+
 			for (int i = 0; i < BUFFER_SIZE; i++)
 				buffer[i] = '\0';
 
