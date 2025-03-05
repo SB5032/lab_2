@@ -34,6 +34,7 @@
 
 int sockfd; /* Socket file descriptor */
 int row, col, cursor, ptr;
+int rowput = 3;
 int buffer[BUFFER_SIZE];
 
 struct libusb_device_handle *keyboard;
@@ -106,53 +107,52 @@ int main()
 			      &transferred, 0);
 
     if (transferred == sizeof(packet)) {
-      sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
-	      packet.keycode[1]); //input
-      //printf("%s\n", keystate);
-      fbputs(keystate, 6, 0);
-      char *output_char = hex_to_ascii(keystate);
-      printf("Output_char = %s\n", output_char);
+		sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
+			packet.keycode[1]); //input
+		fbputs(keystate, 19, 0);
+		char *output_char = hex_to_ascii(keystate);
+		printf("Output_char = %s\n", output_char);
       
-      if (packet.modifiers == 0x00 && packet.keycode[0] == 0x00 && packet.keycode[1] == 0x00)
-      {
-        // printf("Null Key!!");
-        continue;
-      }
-      else if (packet.keycode[0] == 0x28 && packet.keycode[1] == 0x00 && packet.modifiers == 0x00)
-      {
-        fbclear_half();
+		if (packet.modifiers == 0x00 && packet.keycode[0] == 0x00 && packet.keycode[1] == 0x00)
+		{
+			continue;
+		}
+		//enter key
+		else if (packet.keycode[0] == 0x28 && packet.keycode[1] == 0x00 && packet.modifiers == 0x00)
+		{
+			fbclear_txtbox();
 
-        write(sockfd, buffer, BUFFER_SIZE - 1);
-        ptr = 0; //point to start of msg block
-        //clear buffer after enter
-        for (int i = 0; i < BUFFER_SIZE; i++)
-        buffer[i] = '\0';
+			write(sockfd, buffer, BUFFER_SIZE - 1);
+			ptr = 0; //reset buffer ptr
+			//clearing buffer after enter
+			for (int i = 0; i < BUFFER_SIZE; i++)
+				buffer[i] = '\0';
 
-        col = 0;
-        row = 21;
-      }
-      else
-      {
-        buffer[ptr] = *output_char;
-        ptr++;
-        fbputs(output_char, row, col); 
-        col++;
-        
-        if (col == 63)
-        {
-          col = 0;
-          row++;
-        }
-        if (row > 22)
-        {
-          row = 21;
-          fbclear_half();
-        }
-      }
-      
-      if (packet.keycode[0] == 0x29) { /* ESC pressed? */
-	      break;
-      }
+			col = 0;
+			row = 21;
+		}
+		else
+		{
+			buffer[ptr] = *output_char;
+			ptr++;
+			fbputs(output_char, row, col); 
+			col++;
+			
+			// if (col == 63)
+			// {
+			// col = 0;
+			// row++;
+			// }
+			if (row > 22)
+			{
+				row = 21;
+				fbclear_txtbox();
+			}
+		}
+			
+		if (packet.keycode[0] == 0x29) { /* ESC pressed? */
+			break;
+		}
     }
   }
 
@@ -174,6 +174,12 @@ void *network_thread_f(void *ignored)
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
     fbputs(recvBuf, 8, 0);
+	rowput++; // sending on next row
+	if (rowput > 18)
+	{
+		rowput = 3;
+		fbclear_half();
+	}
   }
 
   return NULL;
@@ -190,10 +196,10 @@ char *hex_to_ascii(char * keyid)
    char *token = strtok(keyid, " ");
    while (token != NULL)
    {
-     num[i] = (int)strtol(token, NULL, 16);
-     printf("%d", num[i]);
-     token = strtok(NULL, " ");
-     i++;
+		num[i] = (int)strtol(token, NULL, 16);
+		printf("%d", num[i]);
+		token = strtok(NULL, " ");
+		i++;
    }
  
    // Check the modifier state (Shift, Control, etc.)
@@ -201,12 +207,12 @@ char *hex_to_ascii(char * keyid)
  
    // Check the keycode (actual key pressed)
    int keycode = num[1];
+
    // Handle Backspace Input
    if (keycode == 0x2a)
    {
      symbol[0] = keycode - 34;
    }
- 
    // Handle Enter Key;
    else if (keycode == 0x28)
    {
@@ -237,9 +243,9 @@ char *hex_to_ascii(char * keyid)
    {
      symbol[0] = keycode - 13;
    }
-   // Shift key behavior: if Shift is pressed, transform to uppercase
+   // Both shift key behavior: if Shift is pressed, transform to uppercase
    else if (modifiers & 0x02 || modifiers & 0x20)
-   { // 0x02 corresponds to the left Shift key
+   { 
      if (keycode >= 0x04 && keycode <= 0x1d)
      {
        // Adjust keycode to represent uppercase letters
@@ -263,87 +269,37 @@ char *hex_to_ascii(char * keyid)
      {
        symbol[0] = keycode; // For other characters, keep as is
      }
-     // else
-     // {
-     //   symbol[0] = keycode; // For other characters, keep as is
-     // }
    }
    else
    {
-     // Without Shift, just map keycode to lowercase/regular symbol
+     // Without modifier -> lowercase/regular symbols
      if (keycode >= 0x04 && keycode <= 0x1d)
      {
-       symbol[0] = keycode + 93; // Convert to lowercase (a=0x04 -> a)
+       symbol[0] = keycode + 93; // a -> z
      }
      else if (keycode >= 0x1e && keycode <= 0x26)
      {
-       symbol[0] = keycode + 19; // Convert to lowercase (a=0x04 -> a)
+       symbol[0] = keycode + 19; // 1 -> 9
      }
      else if (keycode == 0x27)
      {
-       symbol[0] = keycode + 9;
+       symbol[0] = keycode + 9; // 0
      }
      else if (keycode == 0x37)
      {
-       symbol[0] = keycode - 9;
+       symbol[0] = keycode - 9; // .
      }
-     // Square Bracket Keypress
      else if (keycode == 0x30)
      {
-       symbol[0] = keycode + 45;
+       symbol[0] = keycode + 45; // ]
      }
      else
      {
        // Handle other keycodes as regular symbols
        symbol[0] = keycode;
      }
-     // else
-     // {
-     //   // Handle other keycodes as regular symbols
-     //   symbol[0] = keycode;
-     // }
    }
  
-   symbol[1] = '\0'; // Null-terminate the string
+   symbol[1] = '\0'; // Terminating the string
    return symbol;
-	// static char input[2];
-  // int val[3];
-  // int i =0;
-
-	// char *token = strtok(keyid, " ");
-
-	// while (token != NULL) 
-  // {
-	// 	val[i] = (int)strtol(token, NULL, 16);
-	// 	token = strtok(NULL, " ");
-	// 	i++;
-	// }
-	
-	// //printf("%d %d %d \n ", num[0], num[1],num[2]);
-  // if (val[0] & 0x02 || val[0] & 0x20) //shift key pressed
-  // {
-  // if (val[1] >= 0x04 && val[1] <= 0x1d)
-  //   {
-  //     // Adjust keycode to represent uppercase letters
-  //     input[0] = 61 + val[1]; //convert to uppercase
-  //   }
-  //   else if (val[1] >= 0x1e && val[1] <= 0x27)
-  //   {
-  //     input[0] = val[1] + 19; //handle numbers
-  //   }
-	// }
-	// else {
-  //   if (val[1] >= 0x04 && val[1] <= 0x1d) 
-  //   {
-  //     val[1] += 93; //lower case
-  //   }
-  //   else if (val[1] >= 0x1e && val[1] <= 0x27)
-  //   {
-  //     input[0] = val[1] + 19; //handle numbers
-  //   }
-  // }        
-
-  // input[1] = '\0';  // Null-terminate the string
-  // printf ("input val = %d", input[0]);
-	// return input;
 } 

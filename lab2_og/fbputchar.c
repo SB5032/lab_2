@@ -130,6 +130,16 @@ void fbclear()
 void fbclear_half()
 {
 	int row, col;
+	for (row = 3; row < 19; row++) {
+		for (col = 0; col < 64; col++) {
+			fbputchar(' ', row, col);
+		}
+	}
+}
+
+void fbclear_txtbox()
+{
+	int row, col;
 	for (row = 21; row < 23; row++) {
 		for (col = 0; col < 64; col++) {
 			fbputchar(' ', row, col);
