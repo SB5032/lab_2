@@ -41,6 +41,7 @@ uint8_t endpoint_address;
 
 pthread_t network_thread;
 void *network_thread_f(void *);
+char *hex_to_ascii(char *keyid);
 
 int main()
 {
