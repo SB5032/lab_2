@@ -211,97 +211,90 @@ char *hex_to_ascii(char * keyid)
    // Check the keycode (actual key pressed)
    int keycode = num[1];
 
-   // Handle Backspace Input
-   if (keycode == 0x2a)
-   {
-     symbol[0] = keycode - 34;
-   }
-   // Handle Enter Key;
-   else if (keycode == 0x28)
-   {
-     symbol[0] = keycode - 30;
-   }
-   // Handle Spacebar Input.
-   else if (keycode == 0x2c)
-   {
-     symbol[0] = keycode - 12;
-   }
-   // Handle commas
-   else if (keycode == 0x36)
-   {
-     symbol[0] = keycode - 10;
-   }
-   // Left Arrow key
-   else if (keycode == 0x50)
-   {
-     symbol[0] = keycode - 80+32;
-   }
-   // Right Arrow
-   else if (keycode == 0x4f)
-   {
-     symbol[0] = keycode - 80+32;
-   }
-   // Handle Apostrophe
-   else if (keycode == 0x34)
-   {
-     symbol[0] = keycode - 13;
-   }
-   // Both shift key behavior: if Shift is pressed, transform to uppercase
-   else if (modifiers & 0x02 || modifiers & 0x20)
-   { 
-     if (keycode >= 0x04 && keycode <= 0x1d)
-     {
-       // Adjust keycode to represent uppercase letters
-       symbol[0] = keycode + 61; // Convert to uppercase (A=0x04 -> A)
-     }
-     else if (keycode == 0x37)
-     {
-       symbol[0] = keycode + 7;
-     }
-     // Question Mark handling.
-     else if (keycode == 0x38)
-     {
-       symbol[0] = keycode + 7;
-     }
-     // Map to number symbols
-     else if (keycode >= 0x1e && keycode <= 0x27)
-     {
-       symbol[0] = keycode + 19; // Convert to lowercase (a=0x04 -> a)
-     }
-     else
-     {
-       symbol[0] = keycode; // For other characters, keep as is
-     }
-   }
-   else
-   {
-     // Without modifier -> lowercase/regular symbols
-     if (keycode >= 0x04 && keycode <= 0x1d)
-     {
-       symbol[0] = keycode + 93; // a -> z
-     }
-     else if (keycode >= 0x1e && keycode <= 0x26)
-     {
-       symbol[0] = keycode + 19; // 1 -> 9
-     }
-     else if (keycode == 0x27)
-     {
-       symbol[0] = keycode + 9; // 0
-     }
-     else if (keycode == 0x37)
-     {
-       symbol[0] = keycode - 9; // .
-     }
-     else if (keycode == 0x30)
-     {
-       symbol[0] = keycode + 45; // ]
-     }
-     else
-     {
-       // Handle other keycodes as regular symbols
-       symbol[0] = keycode;
-     }
-   }
+
+//    
+
+switch (keycode) {
+    // Handle Backspace Input
+    case 0x2a:
+        symbol[0] = keycode - 34;
+        break;
+
+    // Handle Enter Key
+    case 0x28:
+        symbol[0] = keycode - 30;
+        break;
+
+    // Handle Spacebar Input
+    case 0x2c:
+        symbol[0] = keycode - 12;
+        break;
+
+    // Handle commas
+    case 0x36:
+        symbol[0] = keycode - 10;
+        break;
+
+    // Left Arrow key
+    case 0x50:
+        symbol[0] = keycode - 80 + 32;
+        break;
+
+    // Right Arrow
+    case 0x4f:
+        symbol[0] = keycode - 80 + 32;
+        break;
+
+    // Handle Apostrophe
+    case 0x34:
+        symbol[0] = keycode - 13;
+        break;
+
+    // Both shift key behavior: if Shift is pressed, transform to uppercase
+    default:
+        if (modifiers & 0x02 || modifiers & 0x20) { 
+            switch (keycode) {
+                case 0x04 ... 0x1d:  // Uppercase A-Z
+                    symbol[0] = keycode + 61;
+                    break;
+                case 0x37:
+                case 0x38:  // Question Mark handling
+                    symbol[0] = keycode + 7;
+                    break;
+                case 0x1e ... 0x27:  // Number symbols
+                    symbol[0] = keycode + 19;
+                    break;
+                default:
+                    symbol[0] = keycode;  // Keep other characters as is
+                    break;
+            }
+        } else {  
+            // Without modifier -> lowercase/regular symbols
+            switch (keycode) {
+                case 0x04 ... 0x1d:  // a -> z
+                    symbol[0] = keycode + 93;
+                    break;
+                case 0x1e ... 0x26:  // 1 -> 9
+                    symbol[0] = keycode + 19;
+                    break;
+                case 0x27:  // 0
+                    symbol[0] = keycode + 9;
+                    break;
+                case 0x37:  // .
+                    symbol[0] = keycode - 9;
+                    break;
+                case 0x30:  // ]
+                    symbol[0] = keycode + 45;
+                    break;
+                default:
+                    // Handle other keycodes as regular symbols
+                    symbol[0] = keycode;
+                    break;
+            }
+        }
+        break;
+}
+
  
    symbol[1] = '\0'; // Terminating the string
    return symbol;
