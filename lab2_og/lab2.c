@@ -55,8 +55,6 @@ int main()
   struct usb_keyboard_packet packet;
   int transferred;
   char keystate[12];
-  int keyvalue[2];
-  keyvalue[1] = '\0';
   if ((err = fbopen()) != 0) {
     fprintf(stderr, "Error: Could not open framebuffer: %d\n", err);
     exit(1);
@@ -127,8 +125,8 @@ int main()
 			write(sockfd, buffer, BUFFER_SIZE - 1);
 			ptr = 0; //reset buffer ptr
 			//clearing buffer after enter
-			for (int i = 0; i < 23; i++)
-				printf("\nMessage-%d = %d", i, buffer[i]);
+			// for (int i = 0; i < 23; i++)
+			// 	printf("\nMessage-%d = %d", i, buffer[i]);
 
 			for (int i = 0; i < BUFFER_SIZE; i++)
 				buffer[i] = '\0';
