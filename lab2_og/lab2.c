@@ -138,6 +138,8 @@ int main()
 		{
 			buffer[ptr] = *output_char;
 			ptr++;
+		 for (int i = 0; i < 23; i++)
+		printf("\nMessage-%d = %d", i, buffer[i]);
 			fbputs(buffer, row, 0); 
 			// col++;
 			
