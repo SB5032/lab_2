@@ -128,7 +128,7 @@ int main()
 			ptr = 0; //reset buffer ptr
 			//clearing buffer after enter
 			for (int i = 0; i < 23; i++)
-				printf("\nMessage-%d = %s", i, buffer[i]);
+				printf("\nMessage-%d = %d", i, buffer[i]);
 
 			for (int i = 0; i < BUFFER_SIZE; i++)
 				buffer[i] = '\0';
