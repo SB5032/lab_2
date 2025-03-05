@@ -138,14 +138,14 @@ int main()
 		{
 			buffer[ptr] = *output_char;
 			ptr++;
-			fbputs(output_char, row, col); 
-			col++;
+			fbputs(buffer, row, 0); 
+			// col++;
 			
-			if (col == 63)
-			{
-			col = 0;
-			row++;
-			}
+			// if (col == 63)
+			// {
+			// col = 0;
+			// row++;
+			// }
 			if (row > 23)
 			{
 				row = 21;
