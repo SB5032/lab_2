@@ -126,7 +126,7 @@ void fbclear()
 void fbclear_half()
 {
 	int row, col;
-	for (row = 12; row < 23; row++) {
+	for (row = 21; row < 23; row++) {
 		for (col = 0; col < 64; col++) {
 			fbputchar(' ', row, col);
 		}

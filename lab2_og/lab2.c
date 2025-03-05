@@ -104,12 +104,12 @@ int main()
 
   /* Look for and handle keypresses */
   for (;;) {
-        if (cursor > inc){
-                fbputs(" ", row, cursor);}
-
+    if (cursor > inc){ //backspace cursor removal
+        fbputs(" ", row, cursor);
+	}
         cursor = inc;
-    fbputs("|", row, cursor);
-      //fbputs("|", row, inc);
+    	fbputs("|", row, cursor); //maintain cursor
+
     libusb_interrupt_transfer(keyboard, endpoint_address,
 			      (unsigned char *) &packet, sizeof(packet),
 			      &transferred, 0);
@@ -125,41 +125,43 @@ int main()
 
 //      fbputs(keystate, 21, 0);
       keyvalue = key_trans(keystate);
-    if (inc == 63) { 
-	inc = 0;
-	if (row == 23) {
-		//fbclear_half();
-		row = 22;
+    if (inc == 63) { //go to next line
+		inc = 0;
+		if (row == 23) { //text box full
+			fbclear_half();
+			row = 22;
+		}
+		else {
+			row = row + 1;
+		} 
 	}
-	else {
-	row = row + 1;
-	} 
-}
 
-if (*keyvalue!=93 && *keyvalue != 61 && *keyvalue!=135)  {   //count to 64
-      fbputs(keyvalue, row, inc);
-	buffer[inc] = *keyvalue;
-      inc = inc + 1;
-printf ("inc normal %d \n \n ",inc);
-}
+	if (*keyvalue!=93 && *keyvalue != 61 && *keyvalue!=135)  {   // differentiate between ], =, backspace
+    	fbputs(keyvalue, row, inc); //print char in textbox
+		buffer[inc] = *keyvalue;
+      	inc = inc + 1;
+		printf ("inc normal %d \n \n ",inc);
+	}
 
-if (*keyvalue == 135 && inc >= 0) {
-	inc = inc - 1;
-      fbputs(" ", row, inc);
-	buffer[inc] = *keyvalue;
-printf ("inc bs  %d \n \n",inc);
-}
+	if (*keyvalue == 135 && inc >= 0) { //if backspace
+		inc = inc - 1;
+      	fbputs(" ", row, inc);
+		buffer[inc] = *keyvalue;
+		printf ("inc bs  %d \n \n",inc);
+	}
 	
-if (packet.keycode[0] == 0x28) { /* Enter pressed? */
-	write (sockfd, buffer, 128);
-}
+	if (packet.keycode[0] == 0x28) { /* Enter pressed? */
+		write (sockfd, buffer, sizeof(buffer));
+		fbclear_half();
+		buffer[] = {};
+	}
 
-        if (packet.keycode[0] == 0x29) { /* ESC pressed? */
-	break;
-      }
+    if (packet.keycode[0] == 0x29) { /* ESC pressed? */
+		break;
     }
-printf ("ibuff = %d",buffer[0]);
-  }
+}
+printf ("ibuff = %d \n",buffer[0]);
+}
 
   /* Terminate the network thread */
   pthread_cancel(network_thread);
@@ -192,7 +194,7 @@ char *key_trans(char * keyid)
 	char * token = strtok(keyid, " ");
 	
 
-while (token != NULL) {
+	while (token != NULL) {
 		num[i] = (int)strtol(token, NULL, 16);
 		token = strtok(NULL, " ");
 		i++;
