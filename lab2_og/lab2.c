@@ -90,7 +90,7 @@ int main()
   for (col = 0 ; col < 64 ; col++) {
     fbputchar('*', 0, col);
     fbputchar('*', 23, col);
-    fbputchar('_', 10, col);
+    fbputchar('_', 20, col);
   }
 
   /* Open the keyboard */
@@ -221,37 +221,36 @@ int main()
   return 0;
 }
 
-void *network_thread_f(void *ignored)
-{
-  void clear_top() {
-      int cl_row = 0;
-      int cl_col = 0;
-      for (int k = 0; k < 640; k++) {
-        cl_col = k % 64;
-        if (cl_col == 0) cl_row += 1;
-        fbputchar(' ', cl_row, cl_col);
-      }
-  } 
+void clear_top() {
+  for (int k = 0; k < 64 * 19; k++) {
+      fbputchar(' ', k / 64, k % 64);
+  }
+}
+
+void *network_thread_f(void *ignored) {
   char recvBuf[BUFFER_SIZE];
   int n;
   int r_row = 1;
+
   /* Receive data */
-  while ((n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0) {
-    recvBuf[n] = '\0';
-    printf("%s\n", recvBuf);
-    for (int k = 0; k < n; k++) {
-      int r_col = k % 64;
-      if (r_row >= 9) {
-        clear_top();
-        r_row = 1;
+  while ((n = read(sockfd, recvBuf, BUFFER_SIZE - 1)) > 0) {
+      recvBuf[n] = '\0';
+      printf("%s\n", recvBuf);
+
+      for (int k = 0; k < n; k++) {
+          int r_col = k % 64;
+          if (r_row >= 19) {
+              clear_top();
+              r_row = 1;
+          }
+          fbputchar(recvBuf[k], r_row, r_col);
+          if (r_col == 63) r_row++;  // Move to the next row at the end of a line
       }
-      else if (k != 0 && r_col == 0) r_row += 1;;
-      fbputchar(recvBuf[k], r_row, r_col);
-    }
-    r_row += 1;
+      r_row++;  // Move to next row after the loop
   }
   return NULL;
 }
+
 
 char HID_to_ASCII(char keycode, char modifier) {
     static bool caps_en;
