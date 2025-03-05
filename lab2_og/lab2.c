@@ -139,7 +139,7 @@ int main()
 			buffer[ptr] = *output_char;
 			ptr++;
 			fbputs(output_char, row, col); 
-			col++;
+			//col++;
 			
 			// if (col == 63)
 			// {

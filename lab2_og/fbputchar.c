@@ -109,11 +109,11 @@ void fbputs(const char *s, int row, int col)
 {
   char c;
   while ((c = *s++) != 0){
-  fbputchar(c, row, col++);
-  if(col == 63){
-	col = 0;
-	row++; 
-}
+	fbputchar(c, row, col++);
+	if(col == 63){
+		col = 0;
+		row++; 
+	}
 }
 }
 
