@@ -155,7 +155,7 @@ int main()
 	}
 	printf("size %d \n", sizeof(buffer));
 	if (packet.keycode[0] == 0x28) { /* Enter pressed? */
-		write (sockfd, buffer, inc);
+		write (sockfd, buffer, 127);
 		fbclear_half();
 		for (int i = 0; i < 128; i++) {
 			buffer[i] = NULL;  // Set each element explicitly
@@ -215,9 +215,9 @@ char *key_trans(char * keyid)
 
 
 	if (num[1] > 92 || num[1] <123) {
-	          symbol = (char *)malloc(2); 	
-                  symbol[0] = (char)num[1];
-                  symbol[1] = '\0';
+		symbol = (char *)malloc(2); 	
+        symbol[0] = (char)num[1];
+        symbol[1] = '\0';
 }
 	return symbol;
 } 
