@@ -12,5 +12,6 @@ extern void fbputchar(char, int, int);
 extern void fbputs(const char *, int, int);
 extern void fbclear(void);
 extern void fbclear_half(void);
+extern void fbclear_txtbox(void);
 
 #endif
