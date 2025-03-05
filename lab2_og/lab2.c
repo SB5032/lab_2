@@ -195,7 +195,7 @@ char *hex_to_ascii(char * keyid)
 	}
 	
 	//printf("%d %d %d \n ", num[0], num[1],num[2]);
-  if (val[0] == 0x02 || val[0] == 0x20) //shift key pressed
+  if (val[0] & 0x02 || val[0] & 0x20) //shift key pressed
   {
   if (val[1] >= 0x04 && val[1] <= 0x1d)
     {
