@@ -70,7 +70,7 @@ int main()
     fbputchar('-', 11, col);	
   }
 
-  fbputs("Hello CSEE 4840 World!", 4, 10);
+  //fbputs("Hello CSEE 4840 World!", 4, 10);
 
   /* Open the keyboard */
   if ( (keyboard = openkeyboard(&endpoint_address)) == NULL ) {
@@ -107,8 +107,8 @@ int main()
     if (cursor > inc){ //backspace cursor removal
         fbputs(" ", row, cursor);
 	}
-        cursor = inc;
-    	fbputs("|", row, cursor); //maintain cursor
+    cursor = inc;
+    fbputs("|", row, cursor); //maintain cursor
 
     libusb_interrupt_transfer(keyboard, endpoint_address,
 			      (unsigned char *) &packet, sizeof(packet),
@@ -149,6 +149,10 @@ int main()
 		buffer[inc] = *keyvalue;
 		printf ("inc bs  %d \n \n",inc);
 	}
+//PRINTING BUFFER
+	for (int i = 0; i < 128; i++) {
+		printf( "BUFFER - %d ", buffer[i]);  // Set each element explicitly
+	}
 	
 	if (packet.keycode[0] == 0x28) { /* Enter pressed? */
 		write (sockfd, buffer, sizeof(buffer));
@@ -156,6 +160,7 @@ int main()
 		for (int i = 0; i < 128; i++) {
 			buffer[i] = NULL;  // Set each element explicitly
 		}
+		inc = 0;
 	}
 
     if (packet.keycode[0] == 0x29) { /* ESC pressed? */
