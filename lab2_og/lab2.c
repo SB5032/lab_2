@@ -2,7 +2,7 @@
  *
  * CSEE 4840 Lab 2 for 2019
  *
- * Name/UNI: Please Changeto Yourname (pcy2301)
+ * Name/UNI: , , 
  */
 #include "fbputchar.h"
 #include <stdio.h>
@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include "usbkeyboard.h"
 #include <pthread.h>
+#include <stdbool.h>
+
 
 /* Update SERVER_HOST to be the IP address of
  * the chat server you are connecting to
@@ -33,18 +35,12 @@
  */
 
 int sockfd; /* Socket file descriptor */
-int row = 21;
-int col, cursor;
-int ptr = 0;
-int rowput = 5;
-char buffer[BUFFER_SIZE];
 
 struct libusb_device_handle *keyboard;
 uint8_t endpoint_address;
 
 pthread_t network_thread;
 void *network_thread_f(void *);
-char *hex_to_ascii(char *keyid);
 
 int main()
 {
@@ -55,20 +51,45 @@ int main()
   struct usb_keyboard_packet packet;
   int transferred;
   char keystate[12];
+  char message[128];
+  int i = -1;
+  int j = 0;
+  char curr_char;
+  int rows;
+  int cols;
+
+  for (int k = 0; k < 128; k++) message[k] = ' ';
+
+  void string_handle() {
+    rows = 20;
+    cols = 0;
+    for (j = 0; j < 128; j++) {
+      cols = j % 64;
+      if (cols == 0) rows += 1;
+      fbputchar(' ', rows, cols);
+    }
+    rows = 20;
+    cols = 0;
+    for (j = 0; j < 128; j++) {
+      cols = j % 64;
+      if (cols == 0) rows += 1;
+      fbputchar(message[j], rows, cols);
+    }
+   }
+
   if ((err = fbopen()) != 0) {
     fprintf(stderr, "Error: Could not open framebuffer: %d\n", err);
     exit(1);
   }
+
   fbclear();
 
   /* Draw rows of asterisks across the top and bottom of the screen */
   for (col = 0 ; col < 64 ; col++) {
     fbputchar('*', 0, col);
     fbputchar('*', 23, col);
-    fbputchar('-', 20, col); //create text box
+    fbputchar('_', 10, col)
   }
-
-  fbputs("Hello CSEE 4840 World!", 2, 10);
 
   /* Open the keyboard */
   if ( (keyboard = openkeyboard(&endpoint_address)) == NULL ) {
@@ -99,63 +120,93 @@ int main()
 
   /* Start the network thread */
   pthread_create(&network_thread, NULL, network_thread_f, NULL);
-
+ 
   /* Look for and handle keypresses */
-  for (;;) {
+  for (;;) { 
     libusb_interrupt_transfer(keyboard, endpoint_address,
 			      (unsigned char *) &packet, sizeof(packet),
 			      &transferred, 0);
-
     if (transferred == sizeof(packet)) {
-		sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
-			packet.keycode[1]); //input
-		fbputs(keystate, 19, 0);
-		char *output_char = hex_to_ascii(keystate);
-		printf("Output_char = %s\n", output_char);
+      sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
+	      packet.keycode[1]);
+      curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
+
+      switch (packet.keycode[0]) {
+        case 0x28:  // Enter key
+          // Sends the message over the socket
+          if (write(sockfd, message, 128) < 0) {
+            fprintf(stderr, "Error: write() failed. Is the server running?\n");
+            exit(1);
+          }
+          // Resets the message buffer with spaces
+          memset(message, ' ', 128);
+          // Updates the display to clear the message
+          string_handle();
+          // Resets cursor position
+          i = -1;
+          break;
       
-		if (packet.modifiers == 0x00 && packet.keycode[0] == 0x00 && packet.keycode[1] == 0x00)
-		{
-			continue;
-		}
-		//enter key
-		else if (packet.keycode[0] == 0x28 && packet.keycode[1] == 0x00 && packet.modifiers == 0x00)
-		{
-			fbclear_txtbox();
-
-			write(sockfd, buffer, BUFFER_SIZE - 1);
-			ptr = 0; //reset buffer ptr
-			//clearing buffer after enter
-			// for (int i = 0; i < 23; i++)
-			// 	printf("\nMessage-%d = %d", i, buffer[i]);
-
-			for (int i = 0; i < BUFFER_SIZE; i++)
-				buffer[i] = '\0';
-
-			col = 0;
-			row = 21;
-		}
-		else
-		{
-			buffer[ptr] = *output_char;
-			ptr++;
-			fbputs(buffer, row, 0); 
-			// col++;
-			
-			// if (col == 63)
-			// {
-			// col = 0;
-			// row++;
-			// }
-			if (row > 23)
-			{
-				row = 21;
-				fbclear_txtbox();
-			}
-		}
-			
-		if (packet.keycode[0] == 0x29) { /* ESC pressed? */
-			break;
-		}
+        case 0x2a:  // Backspace
+        case 0x4c:  // Delete
+          if (i >= 0) {
+            // Removes the last character and updates the display
+            message[i--] = ' ';
+            string_handle();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+          }
+          break;
+      
+        case 0x50:  // Left Arrow
+          if (i >= 0) {
+            // Moves cursor left if possible and updates the display
+            string_handle();
+            i--;
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+          }
+          break;
+      
+        case 0x4f:  // Right Arrow
+          if (i < 127) {
+            // Moves cursor right if possible and updates the display
+            i++;
+            string_handle();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+          }
+          break;
+      
+        case 0x52:  // Up Arrow
+          if (i > 63) {
+            // Moves cursor up one line if possible and updates the display
+            i -= 64;
+            string_handle();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+          }
+          break;
+      
+        case 0x51:  // Down Arrow
+          if (i < 64) {
+            // Moves cursor down one line if possible and updates the display
+            i += 64;
+            string_handle();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+          }
+          break;
+      
+        default:
+          if (curr_char != 0 && i < 127) {
+            // Handles printable characters by adding them to the message buffer
+            message[++i] = curr_char;
+            string_handle();
+            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+          }
+          break;
+      }
+      
+      // Terminates input loop if ESC key is pressed
+      if (packet.keycode[0] == 0x29) {  // ESC key
+        break;
+      }
+      
     }
   }
 
@@ -170,139 +221,64 @@ int main()
 
 void *network_thread_f(void *ignored)
 {
+  void clear_top() {
+      int cl_row = 0;
+      int cl_col = 0;
+      for (int k = 0; k < 640; k++) {
+        cl_col = k % 64;
+        if (cl_col == 0) cl_row += 1;
+        fbputchar(' ', cl_row, cl_col);
+      }
+  } 
   char recvBuf[BUFFER_SIZE];
   int n;
+  int r_row = 1;
   /* Receive data */
-  while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
+  while ((n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0) {
     recvBuf[n] = '\0';
-    printf("%s", recvBuf);
-    fbputs(recvBuf, rowput, 0);
-	rowput++; // sending on next row
-	if (rowput > 18)
-	{
-		rowput = 3;
-		fbclear_half();
-	}
+    printf("%s\n", recvBuf);
+    for (int k = 0; k < n; k++) {
+      int r_col = k % 64;
+      if (r_row >= 9) {
+        clear_top();
+        r_row = 1;
+      }
+      else if (k != 0 && r_col == 0) r_row += 1;;
+      fbputchar(recvBuf[k], r_row, r_col);
+    }
+    r_row += 1;
   }
-
   return NULL;
 }
 
-char *hex_to_ascii(char * keyid)
-{
-   // Maps hex keycodes to ASCII characters.
-   static char symbol[2]; // Use static to return a string to caller
-   int num[3];
-   int i = 0;
- 
-   // Tokenize the input string of key codes (e.g., "02 04 00").
-   char *token = strtok(keyid, " ");
-   while (token != NULL)
-   {
-		num[i] = (int)strtol(token, NULL, 16);
-		printf("%d", num[i]);
-		token = strtok(NULL, " ");
-		i++;
-   }
- 
-   // Check the modifier state (Shift, Control, etc.)
-   int modifiers = num[0];
- 
-   // Check the keycode (actual key pressed)
-   int keycode = num[1];
+char HID_to_ASCII(char keycode, char modifier) {
+    static bool caps_en;
+    if (keycode == 0x39) caps_en ^= 1;
 
-   // Handle Backspace Input
-   if (keycode == 0x2a)
-   {
-     symbol[0] = keycode - 34;
-   }
-   // Handle Enter Key;
-   else if (keycode == 0x28)
-   {
-     symbol[0] = keycode - 30;
-   }
-   // Handle Spacebar Input.
-   else if (keycode == 0x2c)
-   {
-     symbol[0] = keycode - 12;
-   }
-   // Handle commas
-   else if (keycode == 0x36)
-   {
-     symbol[0] = keycode - 10;
-   }
-   // Left Arrow key
-   else if (keycode == 0x50)
-   {
-     symbol[0] = keycode - 80+32;
-   }
-   // Right Arrow
-   else if (keycode == 0x4f)
-   {
-     symbol[0] = keycode - 80+32;
-   }
-   // Handle Apostrophe
-   else if (keycode == 0x34)
-   {
-     symbol[0] = keycode - 13;
-   }
-   // Both shift key behavior: if Shift is pressed, transform to uppercase
-   else if (modifiers & 0x02 || modifiers & 0x20)
-   { 
-     if (keycode >= 0x04 && keycode <= 0x1d)
-     {
-       // Adjust keycode to represent uppercase letters
-       symbol[0] = keycode + 61; // Convert to uppercase (A=0x04 -> A)
-     }
-     else if (keycode == 0x37)
-     {
-       symbol[0] = keycode + 7;
-     }
-     // Question Mark handling.
-     else if (keycode == 0x38)
-     {
-       symbol[0] = keycode + 7;
-     }
-     // Map to number symbols
-     else if (keycode >= 0x1e && keycode <= 0x27)
-     {
-       symbol[0] = keycode + 19; // Convert to lowercase (a=0x04 -> a)
-     }
-     else
-     {
-       symbol[0] = keycode; // For other characters, keep as is
-     }
-   }
-   else
-   {
-     // Without modifier -> lowercase/regular symbols
-     if (keycode >= 0x04 && keycode <= 0x1d)
-     {
-       symbol[0] = keycode + 93; // a -> z
-     }
-     else if (keycode >= 0x1e && keycode <= 0x26)
-     {
-       symbol[0] = keycode + 19; // 1 -> 9
-     }
-     else if (keycode == 0x27)
-     {
-       symbol[0] = keycode + 9; // 0
-     }
-     else if (keycode == 0x37)
-     {
-       symbol[0] = keycode - 9; // .
-     }
-     else if (keycode == 0x30)
-     {
-       symbol[0] = keycode + 45; // ]
-     }
-     else
-     {
-       // Handle other keycodes as regular symbols
-       symbol[0] = keycode;
-     }
-   }
- 
-   symbol[1] = '\0'; // Terminating the string
-   return symbol;
-} 
+    // Define character mapping for printable keys
+    if (keycode >= 0x04 && keycode <= 0x1D) { // a-z or A-Z
+        return (caps_en || modifier == 0x20 || modifier == 0x02) ? ('A' + keycode - 0x04) : ('a' + keycode - 0x04);
+    }
+    if (keycode >= 0x1E && keycode <= 0x27) { // 1-0
+        const char nums[] = "1234567890";
+        return (caps_en || modifier == 0x20 || modifier == 0x02) ? "!@#$%^&*()"[keycode - 0x1E] : nums[keycode - 0x1E];
+    }
+
+    // Special symbols
+    switch (keycode) {
+        case 0x28: return '\n';
+        case 0x2C: return ' ';
+        case 0x2D: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '_' : '-';
+        case 0x2E: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '+' : '=';
+        case 0x2F: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '{' : '[';
+        case 0x30: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '}' : ']';
+        case 0x31: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '|' : '\\';
+        case 0x33: return (caps_en || modifier == 0x20 || modifier == 0x02) ? ':' : ';';
+        case 0x34: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '"' : '\'';
+        case 0x35: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '~' : '`';
+        case 0x36: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '<' : ',';
+        case 0x37: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '>' : '.';
+        case 0x38: return (caps_en || modifier == 0x20 || modifier == 0x02) ? '?' : '/';
+        default: return 0;
+    }
+}
