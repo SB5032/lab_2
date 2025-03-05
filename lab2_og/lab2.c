@@ -109,7 +109,7 @@ int main()
       sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
 	      packet.keycode[1]); //input
       //printf("%s\n", keystate);
-      //fbputs(keystate, 6, 0);
+      fbputs(keystate, 6, 0);
       char *output_char = hex_to_ascii(keystate);
       printf("Output_char = %s\n", output_char);
       
