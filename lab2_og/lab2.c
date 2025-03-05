@@ -35,7 +35,7 @@
 int sockfd; /* Socket file descriptor */
 int row = 21;
 int col, cursor, ptr;
-int rowput = 3;
+int rowput = 5;
 int buffer[BUFFER_SIZE];
 
 struct libusb_device_handle *keyboard;
@@ -174,7 +174,7 @@ void *network_thread_f(void *ignored)
   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
-    fbputs(recvBuf, 8, 0);
+    fbputs(recvBuf, rowput, 0);
 	rowput++; // sending on next row
 	if (rowput > 18)
 	{
