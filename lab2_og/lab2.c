@@ -79,6 +79,11 @@ int main()
     }
    }
 
+   void clear_chat_box() {
+    for (int k = 0; k < 128; k++) message[k] = ' ';
+    update_screen_message();
+    i = -1;
+  }
 
 
   if ((err = fbopen()) != 0) {
@@ -134,7 +139,10 @@ int main()
       sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
 	      packet.keycode[1]);
       curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
-
+    
+      if (i >= 127) {
+        clear_chat_box();
+      }
       switch (packet.keycode[0]) {
         case 0x28:  // Enter key
           // Sends the message over the socket
@@ -248,7 +256,7 @@ void *network_thread_f(void *ignored) {
           fbputchar(recvBuf[k], r_row, r_col);
           if (r_col == 63) r_row++;  // Move to the next row at the end of a line
       }
-      //r_row++;  // Move to next row after the loop
+      r_row++;  // Move to next row after the loop
   }
   return NULL;
 }
