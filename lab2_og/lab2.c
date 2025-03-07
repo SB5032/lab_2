@@ -250,29 +250,52 @@ case 0x4c:  // Delete (delete character at cursor position)
           }
           break;
       
-        case 0x52:  // Up Arrow
-          if (i > 63 && message[i + 1] != ' ') {
-            // Moves cursor up one line if possible and updates the display
-            i -= 64;
-            update_screen_message();
-			if (i<127)
-			{
-				fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-			}
-          }
-          break;
+        // case 0x52:  // Up Arrow
+        //   if (i > 63 && message[i + 1] != ' ') {
+        //     // Moves cursor up one line if possible and updates the display
+        //     i -= 64;
+        //     update_screen_message();
+		// 	if (i<127)
+		// 	{
+		// 		fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+		// 	}
+        //   }
+        //   break;
+		case 0x52:  // Up Arrow
+  if (i >= 64) {  // Ensure we don't move beyond the first row
+    int new_pos = i - 64;
+    if (message[new_pos] != ' ') {  // Move only if there's text
+      i = new_pos;
+      update_screen_message();
+      fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+    }
+  }
+  break;
+
       
-        case 0x51:  // Down Arrow
-          if (i < 64 && message[i + 1] != ' ') {
-            // Moves cursor down one line if possible and updates the display
-            i += 64;
-            update_screen_message();
-			if (i<127)
-			{
-				fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-			}
-		          }
-          break;
+        // case 0x51:  // Down Arrow
+        //   if (i < 64 && message[i + 1] != ' ') {
+        //     // Moves cursor down one line if possible and updates the display
+        //     i += 64;
+        //     update_screen_message();
+		// 	if (i<127)
+		// 	{
+		// 		fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+		// 	}
+		//           }
+        //   break;
+
+		case 0x51:  // Down Arrow
+  if (i + 64 <= 127) {  // Ensure we don't move beyond the buffer
+    int new_pos = i + 64;
+    if (message[new_pos] != ' ') {  // Move only if there's text
+      i = new_pos;
+      update_screen_message();
+      fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+    }
+  }
+  break;
+
       
         // default:
         //   if (curr_char != 0 && i < 127) {
