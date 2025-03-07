@@ -138,14 +138,26 @@ int main()
     if (transferred == sizeof(packet)) {
       sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
 	      packet.keycode[1]);
-
-	if (packet.keycode[1] == 0x00)
+	if (flag == 0)
 	{
-		curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
+		if (packet.keycode[1] == 0x00)
+		{
+			curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
+			if (packet.keycode[0] == 0x00) {flag = 0;}
+			else {flag=1;}
+		}
+		else
+		{
+			curr_char = HID_to_ASCII(packet.keycode[1], packet.modifiers);
+			if (packet.keycode[0] == 0x00) {flag = 0;}
+			else {flag=1;}
+		}
 	}
 	else
 	{
 		curr_char = HID_to_ASCII(packet.keycode[1], packet.modifiers);
+		if (packet.keycode[0] == 0x00) {flag = 0;}
+		else {flag=1;}
 	}
     //   curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
     
