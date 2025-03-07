@@ -81,10 +81,11 @@ int main()
   void update_screen_message() {
     rows = 20;
     cols = 0;
-      // Clear only the input box area
-      for (j = 0; j < 128; j++) {
+    
+    // Clear only the input box area
+    for (j = 0; j < 128; j++) {
         cols = j % 64;
-        if (cols == 0) rows += 1;
+        if (cols == 0 && j != 0) rows += 1;
         fbputchar(' ', rows, cols);
     }
     
@@ -100,9 +101,12 @@ int main()
         fbputchar(message[j], rows, cols);
     }
     
-    // Ensure the cursor is at the right position
-    fbputchar('|', (i < 63) ? 21 : 22, (i - start_index + 1) % 64);
+    // Ensure the cursor is at the correct position
+    int cursor_row = 20 + ((i - start_index + 1) / 64);
+    int cursor_col = (i - start_index + 1) % 64;
+    fbputchar('|', cursor_row, cursor_col);
 }
+
 
 
   if ((err = fbopen()) != 0) {
