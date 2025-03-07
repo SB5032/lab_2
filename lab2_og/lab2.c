@@ -193,8 +193,9 @@ int main()
         case 0x50:  // Left Arrow
           if (i >= 0) {
             // Moves cursor left if possible and updates the display
+			i--;
             update_screen_message();
-            i--;
+            // i--;
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
