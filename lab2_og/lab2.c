@@ -67,7 +67,7 @@ int main()
     cols = 0;
     for (j = 0; j < 128; j++) {
       cols = j % 64;
-      if (cols == 0) rows += 1;`
+      if (cols == 0) rows += 1;
       fbputchar(' ', rows, cols);
     }
     rows = 20;
