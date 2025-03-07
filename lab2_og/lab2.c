@@ -62,22 +62,48 @@ int main()
 
   for (int k = 0; k < 128; k++) message[k] = ' ';
 
+  // void update_screen_message() {
+  //   rows = 20;
+  //   cols = 0;
+  //   for (j = 0; j < 128; j++) {
+  //     cols = j % 64;
+  //     if (cols == 0) rows += 1;`
+  //     fbputchar(' ', rows, cols);
+  //   }
+  //   rows = 20;
+  //   cols = 0;
+  //   for (j = 0; j < 128; j++) {
+  //     cols = j % 64;
+  //     if (cols == 0) rows += 1;
+  //     fbputchar(message[j], rows, cols);
+  //   }
+  //  }
   void update_screen_message() {
     rows = 20;
     cols = 0;
-    for (j = 0; j < 128; j++) {
-      cols = j % 64;
-      if (cols == 0) rows += 1;
-      fbputchar(' ', rows, cols);
+      // Clear only the input box area
+      for (j = 0; j < 128; j++) {
+        cols = j % 64;
+        if (cols == 0) rows += 1;
+        fbputchar(' ', rows, cols);
     }
+    
+    // Determine the starting point for scrolling
+    int start_index = (i < 127) ? 0 : (i - 127);
+    
+    // Print the last 128 characters only
     rows = 20;
     cols = 0;
-    for (j = 0; j < 128; j++) {
-      cols = j % 64;
-      if (cols == 0) rows += 1;
-      fbputchar(message[j], rows, cols);
+    for (j = start_index; j <= i; j++) {
+        cols = (j - start_index) % 64;
+        if (cols == 0 && j != start_index) rows += 1;
+        fbputchar(message[j], rows, cols);
     }
-   }
+    
+    // Ensure the cursor is at the right position
+    fbputchar('|', (i < 63) ? 21 : 22, (i - start_index + 1) % 64);
+}
+
 
   if ((err = fbopen()) != 0) {
     fprintf(stderr, "Error: Could not open framebuffer: %d\n", err);
