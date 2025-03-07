@@ -1,8 +1,8 @@
 /*
  *
- * CSEE 4840 Lab 2 for 2019
+ * CSEE 4840 Lab 2 for 2025
  *
- * Name/UNI: , , 
+ * Name/UNI: kv2446, sb5032 
  */
 #include "fbputchar.h"
 #include <stdio.h>
@@ -160,71 +160,51 @@ int main()
 		if (packet.keycode[0] == 0x00) {flag = 0;}
 		else {flag=1;}
 	}
-    //   curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
     
     if (i >= 127) {
 		fbputchar('|', 22, 127);
-    //     clear_chat_box();
     }
       switch (packet.keycode[0]) {
         case 0x28:  // Enter key
-          // Sends the message over the socket
           if (write(sockfd, message, 128) < 0) {
             fprintf(stderr, "Error: write() failed. Is the server running?\n");
             exit(1);
           }
-          // Resets the message buffer with spaces
           memset(message, ' ', 128);
-          // Updates the display to clear the message
           update_screen_message();
-          // Resets cursor position
           i = -1;
           break;
-      
-        // case 0x2a:  // Backspace
-        // case 0x4c:  // Delete
-        //   if (i >= 0) {
-        //     // Removes the last character and updates the display
-        //     message[i--] = ' ';
-        //     update_screen_message();
-		// 	if (i<127)
-		// 	{
-		// 		fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-		// 	}
-        //   }
-        //   break;
 
 		case 0x2a:  // Backspace (delete character to the left)
-  if (i >= 0) {
-    // Shift all characters left to remove the character at i
-    for (int k = i; k < 127; k++) {
-      message[k] = message[k + 1];
-    }
-    message[127] = ' '; // Ensure the last character is a space
+			if (i >= 0) {
+				// Shift all characters left to remove the character at i
+				for (int k = i; k < 127; k++) {
+				message[k] = message[k + 1];
+				}
+				message[127] = ' '; // Ensure the last character is a space
 
-    // Move cursor back
-    i--;
+				// Move cursor back
+				i--;
 
-    // Update display
-    update_screen_message();
-    fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
-  }
-  break;
+				// Update display
+				update_screen_message();
+				fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+			}
+			break;
 
-case 0x4c:  // Delete (delete character at cursor position)
-  if (i >= 0 && i < 127) {
-    // Shift all characters left to remove the character at i+1
-    for (int k = i + 1; k < 127; k++) {
-      message[k] = message[k + 1];
-    }
-    message[127] = ' '; // Ensure the last character is a space
+		case 0x4c:  // Delete (delete character at cursor position)
+			if (i >= 0 && i < 127) {
+				// Shift all characters left to remove the character at i+1
+				for (int k = i + 1; k < 127; k++) {
+				message[k] = message[k + 1];
+				}
+				message[127] = ' '; // Ensure the last character is a space
 
-    // Update display
-    update_screen_message();
-    fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
-  }
-  break;
-
+				// Update display
+				update_screen_message();
+				fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+			}
+			break;
       
         case 0x50:  // Left Arrow
           if (i >= 0 && message[i - 1] != ' ') {
@@ -250,82 +230,49 @@ case 0x4c:  // Delete (delete character at cursor position)
           }
           break;
       
-        // case 0x52:  // Up Arrow
-        //   if (i > 63 && message[i + 1] != ' ') {
-        //     // Moves cursor up one line if possible and updates the display
-        //     i -= 64;
-        //     update_screen_message();
-		// 	if (i<127)
-		// 	{
-		// 		fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-		// 	}
-        //   }
-        //   break;
 		case 0x52:  // Up Arrow
-  if (i >= 64) {  // Ensure we don't move beyond the first row
-    int new_pos = i - 64;
-    if (message[new_pos] != ' ') {  // Move only if there's text
-      i = new_pos;
-      update_screen_message();
-      fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
-    }
-  }
-  break;
-
-      
-        // case 0x51:  // Down Arrow
-        //   if (i < 64 && message[i + 1] != ' ') {
-        //     // Moves cursor down one line if possible and updates the display
-        //     i += 64;
-        //     update_screen_message();
-		// 	if (i<127)
-		// 	{
-		// 		fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-		// 	}
-		//           }
-        //   break;
+			if (i >= 64) {  // Ensure we don't move beyond the first row
+				int new_pos = i - 64;
+				if (message[new_pos] != ' ') {  // Move only if there's text
+				i = new_pos;
+				update_screen_message();
+				fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+				}
+			}
+			break;
 
 		case 0x51:  // Down Arrow
-  if (i + 64 <= 127) {  // Ensure we don't move beyond the buffer
-    int new_pos = i + 64;
-    if (message[new_pos] != ' ') {  // Move only if there's text
-      i = new_pos;
-      update_screen_message();
-      fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
-    }
-  }
-  break;
+			if (i + 64 <= 127) {  // Ensure we don't move beyond the buffer
+				int new_pos = i + 64;
+				if (message[new_pos] != ' ') {  // Move only if there's text
+				i = new_pos;
+				update_screen_message();
+				fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+				}
+			}
+			break;
 
-      
-        // default:
-        //   if (curr_char != 0 && i < 127) {
-        //     // Handles printable characters by adding them to the message buffer
-        //     message[++i] = curr_char;
-        //     update_screen_message();
-        //     fbputchar('|', (i <=63 && i < 126 ) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-        //   }
-        //   break;
 		default:
-  if (curr_char != 0 && i < 127) {
-    // Shift all characters to the right
-    for (int k = 127; k > i; k--) {
-      message[k] = message[k - 1];
-    }
-    // Insert the new character at the current cursor position
-    message[i + 1] = curr_char;
+			if (curr_char != 0 && i < 127) {
+				// Shift all characters to the right
+				for (int k = 127; k > i; k--) {
+				message[k] = message[k - 1];
+				}
+				// Insert the new character at the current cursor position
+				message[i + 1] = curr_char;
 
-    // Move cursor forward
-    i++;
+				// Move cursor forward
+				i++;
 
-    // Update the display
-    update_screen_message();
-	if (i<127)
-	{
-		fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-	}
+				// Update the display
+				update_screen_message();
+				if (i<127)
+				{
+					fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+				}
 
-  }
-  break;
+			}
+			break;
 
       }
       
