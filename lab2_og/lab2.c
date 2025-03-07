@@ -193,9 +193,8 @@ int main()
         case 0x50:  // Left Arrow
           if (i >= 0) {
             // Moves cursor left if possible and updates the display
-			i--;
             update_screen_message();
-            // i--;
+            i--;
             fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
@@ -227,14 +226,32 @@ int main()
           }
           break;
       
-        default:
-          if (curr_char != 0 && i < 127) {
-            // Handles printable characters by adding them to the message buffer
-            message[++i] = curr_char;
-            update_screen_message();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-          }
-          break;
+        // default:
+        //   if (curr_char != 0 && i < 127) {
+        //     // Handles printable characters by adding them to the message buffer
+        //     message[++i] = curr_char;
+        //     update_screen_message();
+        //     fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+        //   }
+        //   break;
+		default:
+  if (curr_char != 0 && i < 127) {
+    // Shift all characters to the right
+    for (int k = 127; k > i; k--) {
+      message[k] = message[k - 1];
+    }
+    // Insert the new character at the current cursor position
+    message[i + 1] = curr_char;
+
+    // Move cursor forward
+    i++;
+
+    // Update the display
+    update_screen_message();
+    fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+  }
+  break;
+
       }
       
       // Terminates input loop if ESC key is pressed
