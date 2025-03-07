@@ -227,7 +227,7 @@ case 0x4c:  // Delete (delete character at cursor position)
 
       
         case 0x50:  // Left Arrow
-          if (i >= 0 && message[i + 1] != ' ') {
+          if (i >= 0 && message[i - 1] != ' ') {
             // Moves cursor left if possible and updates the display
             update_screen_message();
             i--;
