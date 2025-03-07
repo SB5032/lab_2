@@ -227,7 +227,7 @@ case 0x4c:  // Delete (delete character at cursor position)
 
       
         case 0x50:  // Left Arrow
-          if (i >= 0) {
+          if (i >= 0 && message[i + 1] != ' ') {
             // Moves cursor left if possible and updates the display
             update_screen_message();
             i--;
@@ -239,7 +239,7 @@ case 0x4c:  // Delete (delete character at cursor position)
           break;
       
         case 0x4f:  // Right Arrow
-          if (i < 127) {
+          if (i < 127 && message[i + 1] != ' ') {
             // Moves cursor right if possible and updates the display
             i++;
             update_screen_message();
@@ -251,7 +251,7 @@ case 0x4c:  // Delete (delete character at cursor position)
           break;
       
         case 0x52:  // Up Arrow
-          if (i > 63) {
+          if (i > 63 && message[i + 1] != ' ') {
             // Moves cursor up one line if possible and updates the display
             i -= 64;
             update_screen_message();
@@ -263,7 +263,7 @@ case 0x4c:  // Delete (delete character at cursor position)
           break;
       
         case 0x51:  // Down Arrow
-          if (i < 64) {
+          if (i < 64 && message[i + 1] != ' ') {
             // Moves cursor down one line if possible and updates the display
             i += 64;
             update_screen_message();
