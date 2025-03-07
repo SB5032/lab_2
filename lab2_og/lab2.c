@@ -186,7 +186,7 @@ int main()
             // Removes the last character and updates the display
             message[i--] = ' ';
             update_screen_message();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
       
@@ -195,7 +195,7 @@ int main()
             // Moves cursor left if possible and updates the display
             update_screen_message();
             i--;
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
       
@@ -204,7 +204,7 @@ int main()
             // Moves cursor right if possible and updates the display
             i++;
             update_screen_message();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
       
@@ -213,7 +213,7 @@ int main()
             // Moves cursor up one line if possible and updates the display
             i -= 64;
             update_screen_message();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
       
@@ -222,7 +222,7 @@ int main()
             // Moves cursor down one line if possible and updates the display
             i += 64;
             update_screen_message();
-            fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+            fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
           }
           break;
       
@@ -231,7 +231,7 @@ int main()
         //     // Handles printable characters by adding them to the message buffer
         //     message[++i] = curr_char;
         //     update_screen_message();
-        //     fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+        //     fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
         //   }
         //   break;
 		default:
@@ -248,7 +248,7 @@ int main()
 
     // Update the display
     update_screen_message();
-    fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+    fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
   }
   break;
 
