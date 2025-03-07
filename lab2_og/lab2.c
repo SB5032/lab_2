@@ -138,7 +138,16 @@ int main()
     if (transferred == sizeof(packet)) {
       sprintf(keystate, "%02x %02x %02x", packet.modifiers, packet.keycode[0],
 	      packet.keycode[1]);
-      curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
+
+	if (packet.keycode[1] == 0x00)
+	{
+		curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
+	}
+	else
+	{
+		curr_char = HID_to_ASCII(packet.keycode[1], packet.modifiers);
+	}
+    //   curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
     
       if (i >= 127) {
         clear_chat_box();
