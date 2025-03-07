@@ -162,9 +162,10 @@ int main()
 	}
     //   curr_char = HID_to_ASCII(packet.keycode[0], packet.modifiers);
     
-    //   if (i >= 127) {
+    if (i >= 127) {
+		fbputchar('|', 22, 127);
     //     clear_chat_box();
-    //   }
+    }
       switch (packet.keycode[0]) {
         case 0x28:  // Enter key
           // Sends the message over the socket
