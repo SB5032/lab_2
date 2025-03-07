@@ -181,18 +181,50 @@ int main()
           i = -1;
           break;
       
-        case 0x2a:  // Backspace
-        case 0x4c:  // Delete
-          if (i >= 0) {
-            // Removes the last character and updates the display
-            message[i--] = ' ';
-            update_screen_message();
-			if (i<127)
-			{
-				fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
-			}
-          }
-          break;
+        // case 0x2a:  // Backspace
+        // case 0x4c:  // Delete
+        //   if (i >= 0) {
+        //     // Removes the last character and updates the display
+        //     message[i--] = ' ';
+        //     update_screen_message();
+		// 	if (i<127)
+		// 	{
+		// 		fbputchar('|', (i <=63) ? 21 : 22, (i + 1) % 64);  // Blinking cursor
+		// 	}
+        //   }
+        //   break;
+
+		case 0x2a:  // Backspace (delete character to the left)
+  if (i >= 0) {
+    // Shift all characters left to remove the character at i
+    for (int k = i; k < 127; k++) {
+      message[k] = message[k + 1];
+    }
+    message[127] = ' '; // Ensure the last character is a space
+
+    // Move cursor back
+    i--;
+
+    // Update display
+    update_screen_message();
+    fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+  }
+  break;
+
+case 0x4c:  // Delete (delete character at cursor position)
+  if (i >= 0 && i < 127) {
+    // Shift all characters left to remove the character at i+1
+    for (int k = i + 1; k < 127; k++) {
+      message[k] = message[k + 1];
+    }
+    message[127] = ' '; // Ensure the last character is a space
+
+    // Update display
+    update_screen_message();
+    fbputchar('|', (i < 63) ? 21 : 22, (i + 1) % 64);
+  }
+  break;
+
       
         case 0x50:  // Left Arrow
           if (i >= 0) {
