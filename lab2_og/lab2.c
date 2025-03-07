@@ -59,6 +59,7 @@ int main()
   char curr_char;
   int rows;
   int cols;
+  int flag;
 
   for (int k = 0; k < 128; k++) message[k] = ' ';
 
