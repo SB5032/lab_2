@@ -1,5 +1,5 @@
 /*
- * Submitted by Sharwari Bhosale (sb5032) & Kamala Vennela Vasireddy (kv2446)
+* Submitted by Sharwari Bhosale (sb5032) & Kamala Vennela Vasireddy (kv2446)
 */
 
 #ifndef VGA_BALL_H
@@ -12,8 +12,8 @@ typedef struct {
 } vga_ball_color_t;
 
 typedef struct {
-  unsigned int ball_x, ball_y;
-} vga_ball_location;
+  unsigned int b_x, b_y;
+} vga_ball_loc;
   
 
 typedef struct {
@@ -21,7 +21,7 @@ typedef struct {
 } vga_ball_arg_t;
 
 typedef struct {
-  vga_ball_location location;
+  vga_ball_loc loc;
 } vga_ball_arg_l;
 
 #define VGA_BALL_MAGIC 'q'
