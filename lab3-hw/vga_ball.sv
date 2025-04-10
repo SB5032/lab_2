@@ -4,54 +4,79 @@
  * Stephen A. Edwards
  * Columbia University
  *
+ * Submitted by Sharwari Bhosale (sb5032) & Kamala Vennela Vasireddy (kv2446)
+ *
  * Register map:
- * 
- * Byte Offset  7 ... 0   Meaning
- *        0    |  Red  |  Red component of background color (0-255)
- *        1    | Green |  Green component
- *        2    | Blue  |  Blue component
+ * Byte Offset  32 ... 0   Meaning
+ *        0    |   b_x    |  x-coordinate of the ball
+ *        1    |   b_y    |  y-coordinate of the ball
+ *        2    |   Red    |  Red component
+ *        3    |   Green  |  Green component
+ *        4    |   Blue   |  Blue Component
  */
 
-module vga_ball(input logic        clk,
+module vga_ball(
+          input logic        clk,
 	        input logic 	   reset,
-		input logic [7:0]  writedata,
-		input logic 	   write,
-		input 		   chipselect,
-		input logic [2:0]  address,
-
-		output logic [7:0] VGA_R, VGA_G, VGA_B,
-		output logic 	   VGA_CLK, VGA_HS, VGA_VS,
-		                   VGA_BLANK_n,
-		output logic 	   VGA_SYNC_n);
+          input logic [31:0]  writedata,
+          input logic 	   write,
+          input 		   chipselect,
+          input logic [2:0]  address,
+          output logic [31:0] VGA_R, VGA_G, VGA_B,
+          output logic 	   VGA_CLK, VGA_HS, VGA_VS,
+                            VGA_BLANK_n,
+          output logic 	   VGA_SYNC_n
+          );
 
    logic [10:0]	   hcount;
    logic [9:0]     vcount;
 
-   logic [7:0] 	   background_r, background_g, background_b;
+   logic [31:0] 	   background_r, background_g, background_b;
+   logic [31:0] b_x;
+   logic [31:0] b_y;
+   logic [7:0] b_r;
 	
    vga_counters counters(.clk50(clk), .*);
 
    always_ff @(posedge clk)
      if (reset) begin
-	background_r <= 8'h0;
-	background_g <= 8'h0;
-	background_b <= 8'h80;
+        background_r <= 32'h00;
+        background_g <= 32'h00;
+        background_b <= 32'h00;
+        b_x <= 32'd200;      // horizontal position
+        b_y <= 32'd200;      // vertical position
+        b_r <= 8'd10;        // Radius
      end else if (chipselect && write)
        case (address)
-	 3'h0 : background_r <= writedata;
-	 3'h1 : background_g <= writedata;
-	 3'h2 : background_b <= writedata;
+          
+          3'h0 : b_x <= writedata; 
+          3'h1 : b_y <= writedata; 
+	      3'h2 : background_r <= writedata;
+          3'h3 : background_g <= writedata;
+          3'h4 : background_b <= writedata;
        endcase
 
    always_comb begin
-      {VGA_R, VGA_G, VGA_B} = {8'h0, 8'h0, 8'h0};
-      if (VGA_BLANK_n )
-	if (hcount[10:6] == 5'd3 &&
-	    vcount[9:5] == 5'd3)
-	  {VGA_R, VGA_G, VGA_B} = {8'hff, 8'hff, 8'hff};
-	else
-	  {VGA_R, VGA_G, VGA_B} =
-             {background_r, background_g, background_b};
+      {VGA_R, VGA_G, VGA_B} = {32'h0, 32'h0, 32'h0};
+      if (VGA_BLANK_n) begin
+        logic [15:0] dx;
+        logic [15:0] dy;
+        logic [21:0] dist_squared;
+
+	    // Calculating horizontal and vertical distances
+        dx = (hcount[10:1] > b_x) ? (hcount[10:1] - b_x) : (b_x - hcount[10:1]);
+        dy = (vcount > b_y) ? (vcount - b_y) : (b_y - vcount);
+
+	    // Calculating squared distances
+        dist_squared = (dx * dx) + (dy * dy);
+
+        if (dist_squared <= (b_r * b_r)) begin
+          {VGA_R, VGA_G, VGA_B} = {32'hff, 32'hff, 32'hff};
+        end 
+		else begin
+          {VGA_R, VGA_G, VGA_B} = {background_r, background_g, background_b};
+        end
+      end
    end
 	       
 endmodule
