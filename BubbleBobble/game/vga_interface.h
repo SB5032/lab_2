@@ -16,8 +16,8 @@
 #define SCORE_COORD_C 20
 #define SCORE_MAX_LENGTH 4
 
-#define SKY_TILE   8
-#define GRASS_TILE 9
+#define SKY_TILE   25
+#define GRASS_TILE 26
 #define ROWS       30    // your screen is 30 tiles tall
 #define COLS       40    // your screen is 40 tiles wide
 
@@ -41,6 +41,8 @@ void write_text(unsigned char *text, unsigned int length, unsigned int row, unsi
 // for writinng text at a specific coordinate, the coordinate of the text is the start of the text on the left
 
 void cleartiles(); // for setting all tiles to empty
+
+void fill_sky_and_grass();
 
 void clearSprites();
 
