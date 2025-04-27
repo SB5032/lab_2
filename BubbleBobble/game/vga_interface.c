@@ -60,14 +60,14 @@ void cleartiles()
   }
 }
 
-void fill_sky_and_grass() {
-  unsigned char r, c, tile;
-  for (r = 0; r < ROWS; r++) {
-    tile = (r < (ROWS*2/3)) ? SKY_TILE : GRASS_TILE;
-    for (c = 0; c < COLS; c++) {
-      write_tile_to_kernel(r, c, tile);
+void fill_sky_and_grass(void) {
+    unsigned char r, c, tile;
+    for (r = 0; r < ROWS; r++) {
+        tile = (r < (ROWS * 2 / 3)) ? SKY_TILE : GRASS_TILE;
+        for (c = 0; c < COLS; c++) {
+            write_tile_to_kernel(r, c, tile);
+        }
     }
-  }
 }
 
 void clearSprites(){
