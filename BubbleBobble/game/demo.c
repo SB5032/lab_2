@@ -487,7 +487,7 @@ void loadNextLevel(Character *character, Enemy *enemies, Wall *walls)
     character->x = 64;
     character->y = WIDTH - character->height - 16;
     sleep(2);
-    cleartiles();
+    fill_sky_and_grass();
     switch (level)
     {
     case 1:
@@ -716,7 +716,7 @@ int main(int argc, char *argv[])
     while (true)
     {
         play_sfx(5);
-        cleartiles();
+        fill_sky_and_grass();
         clearSprites();
         int index = 8;
         write_text("bubble", 6, 14, 13);
@@ -757,7 +757,7 @@ int main(int argc, char *argv[])
         }
         usleep(500);
         bgm_startstop(1);
-        cleartiles();
+        fill_sky_and_grass();
         clearSprites();
         srand(time(NULL));
 
@@ -827,7 +827,7 @@ int main(int argc, char *argv[])
             if (numEnemy == 0 && numOfReward == 0)
             {
                 // draw wall; 37-44
-                cleartiles();
+                fill_sky_and_grass();
                 wallSequence++;
                 if (wallSequence == 45)
                 {
@@ -1030,7 +1030,7 @@ int main(int argc, char *argv[])
             }
             usleep(50000);
         }
-        cleartiles();
+        fill_sky_and_grass();
         clearSprites();
         if (life >= 1)
         {
