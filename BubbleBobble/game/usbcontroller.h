@@ -19,7 +19,10 @@
 #define LEFT 1
 #define RIGHT -1
 
-
+#define SKY_TILE   8
+#define GRASS_TILE 9
+#define ROWS       30    // your screen is 30 tiles tall
+#define COLS       40    // your screen is 40 tiles wide
 
 struct controller_output_packet {
     short updown; // 0 for no change, 1 for up, -1 for down
