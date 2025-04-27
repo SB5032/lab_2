@@ -16,6 +16,10 @@
 #define SCORE_COORD_C 20
 #define SCORE_MAX_LENGTH 4
 
+#define SKY_TILE   8
+#define GRASS_TILE 9
+#define ROWS       30    // your screen is 30 tiles tall
+#define COLS       40    // your screen is 40 tiles wide
 
 extern int vga_fd; // vga file descriptor, define in main file
 
