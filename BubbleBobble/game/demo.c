@@ -719,8 +719,8 @@ int main(int argc, char *argv[])
         fill_sky_and_grass();
         clearSprites();
         int index = 8;
-        write_text("bubble", 6, 14, 13);
-        write_text("bobble", 6, 14, 20);
+        write_text("scream", 6, 14, 13);
+        write_text("jump", 6, 14, 20);
         write_text("press", 5, 20, index);
         write_text("any", 3, 20, index + 6);
         write_text("key", 3, 20, index + 10);
@@ -730,31 +730,31 @@ int main(int argc, char *argv[])
         int characterRightSequence = 7;
         int enemyS = 14;
         bool initialMove = true;
-        while (true)
-        {
-            for (int i = 0; i < 648; i += 1)
-            {
-                write_sprite_to_kernel(1, 448, i, characterRightSequence, 11);
-                characterRightSequence++;
-                write_sprite_to_kernel(1, 448, i - 140, enemyS, 0); // 14-15
-                enemyS = (enemyS == 14) ? 15 : 14;
-                if (characterRightSequence == 11)
-                {
-                    characterRightSequence = 7;
-                }
+        // while (true)
+        // {
+        //     for (int i = 0; i < 648; i += 1)
+        //     {
+        //         write_sprite_to_kernel(1, 448, i, characterRightSequence, 11);
+        //         characterRightSequence++;
+        //         write_sprite_to_kernel(1, 448, i - 140, enemyS, 0); // 14-15
+        //         enemyS = (enemyS == 14) ? 15 : 14;
+        //         if (characterRightSequence == 11)
+        //         {
+        //             characterRightSequence = 7;
+        //         }
 
-                if (press())
-                {
-                    initialMove = false;
-                    break;
-                }
-                usleep(5000);
-            }
-            if (initialMove == false)
-            {
-                break;
-            }
-        }
+        //         if (press())
+        //         {
+        //             initialMove = false;
+        //             break;
+        //         }
+        //         usleep(5000);
+        //     }
+        //     if (initialMove == false)
+        //     {
+        //         break;
+        //     }
+        // }
         usleep(500);
         bgm_startstop(1);
         fill_sky_and_grass();
