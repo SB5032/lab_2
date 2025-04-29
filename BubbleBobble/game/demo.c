@@ -730,31 +730,31 @@ int main(int argc, char *argv[])
         int characterRightSequence = 7;
         int enemyS = 14;
         bool initialMove = true;
-        // while (true)
-        // {
-        //     for (int i = 0; i < 648; i += 1)
-        //     {
-        //         write_sprite_to_kernel(1, 448, i, characterRightSequence, 11);
-        //         characterRightSequence++;
-        //         write_sprite_to_kernel(1, 448, i - 140, enemyS, 0); // 14-15
-        //         enemyS = (enemyS == 14) ? 15 : 14;
-        //         if (characterRightSequence == 11)
-        //         {
-        //             characterRightSequence = 7;
-        //         }
+        while (true)
+        {
+            for (int i = 0; i < 648; i += 1)
+            {
+                write_sprite_to_kernel(1, 448, i, characterRightSequence, 11);
+                characterRightSequence++;
+                write_sprite_to_kernel(1, 448, i - 140, enemyS, 0); // 14-15
+                enemyS = (enemyS == 14) ? 15 : 14;
+                if (characterRightSequence == 11)
+                {
+                    characterRightSequence = 7;
+                }
 
-        //         if (press())
-        //         {
-        //             initialMove = false;
-        //             break;
-        //         }
-        //         usleep(5000);
-        //     }
-        //     if (initialMove == false)
-        //     {
-        //         break;
-        //     }
-        // }
+                if (press())
+                {
+                    initialMove = false;
+                    break;
+                }
+                usleep(5000);
+            }
+            if (initialMove == false)
+            {
+                break;
+            }
+        }
         usleep(500);
         bgm_startstop(1);
         fill_sky_and_grass();
