@@ -720,7 +720,7 @@ int main(int argc, char *argv[])
         clearSprites();
         int index = 8;
         write_text("scream", 6, 13, 13);
-        write_text("jump", 6, 13, 20);
+        write_text("jump", 4, 13, 20);
         write_text("press", 5, 19, index);
         write_text("any", 3, 19, index + 6);
         write_text("key", 3, 19, index + 10);
