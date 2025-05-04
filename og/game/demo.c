@@ -75,7 +75,7 @@ typedef struct
     int seq;
 } Reward;
 
-typedef struct
+typedef struct //not needed
 {
     int x, y;
     int width, height;
@@ -91,12 +91,12 @@ void initCharacter(Character *character)
     character->vx = 0;
     character->vy = 0;
     character->jumping = false;
-    character->facingRight = true;
+    character->facingRight = true; //not needed
     character->active = true;
-    character->canFire = false;
+    character->canFire = false; //not needed
 }
 
-void initEnemy(Enemy *enemy, int reg, Wall wall[])
+void initEnemy(Enemy *enemy, int reg, Wall wall[]) //modify for variable length and height (y) of platform 
 {
     enemy->width = 32;
     enemy->height = 32;
@@ -112,12 +112,14 @@ void initEnemy(Enemy *enemy, int reg, Wall wall[])
     enemy->y = wall[h].y - enemy->height;
     enemy->vx = HVEC;
     enemy->vy = 0;
-    enemy->jumping = false;
-    enemy->surrounded = false;
+    enemy->jumping = false;//not needed
+    enemy->surrounded = false;//not needed
     enemy->active = true;
-    enemy->facingRight = true;
-    enemy->type = rand() % 2;
-    enemy->reg = reg;
+    enemy->facingRight = true;//not needed
+    //modify below
+    enemy->type = rand() % 2; //selecting platform type
+    enemy->reg = reg;//stores sprite reg index for rendering
+    //below not needed
     enemy->enemyARight = 14;
     enemy->enemyALeft = 16;
     enemy->enemyBRight = 21;
@@ -136,7 +138,7 @@ void initReward(Reward *reward, int x, int y, int reg)
     reward->seq = rand() % 4 + 26;
 }
 
-void initBubble(Bubble *bubble, int x, int y, int bubbleSequence)
+void initBubble(Bubble *bubble, int x, int y, int bubbleSequence)//can use this for platform too
 {
     bubble->x = x;
     bubble->y = y;
@@ -176,6 +178,7 @@ void moveCharacter(Character *character, int dx, int dy, const Wall *walls, int 
     }
     int newX = character->x + dx;
     int newY = character->y + dy;
+    //keeping chick on screen always, not needed for now as we wont change x position
     if (newX <= WALL && dx < 0)
     {
         newX = WALL;
@@ -184,13 +187,13 @@ void moveCharacter(Character *character, int dx, int dy, const Wall *walls, int 
     {
         newX = LENGTH - character->width - WALL;
     }
-
+    //preventing from falling below floor
     if (newY >= WIDTH - character->height - WALL)
     {
         newY = WIDTH - character->height - WALL;
-        character->jumping = false;
+        character->jumping = false; // this condition can be used to flag chick as dead
     }
-
+    //preventing from moving above top of screen
     if (newY <= WALL)
     {
         newY = WALL;
@@ -198,13 +201,14 @@ void moveCharacter(Character *character, int dx, int dy, const Wall *walls, int 
 
     for (int i = 4; i < numWalls; ++i)
     {
+      //checks if character is touching any of the wall
         if (newX < walls[i].x + walls[i].width &&
             newX + character->width > walls[i].x &&
             newY < walls[i].y + walls[i].height &&
             newY + character->height > walls[i].y)
         {
 
-            if (dy > 0)
+	  if (dy > 0)//vertical collision with above wall
             {
 
                 newY = walls[i].y - character->height;
@@ -214,6 +218,7 @@ void moveCharacter(Character *character, int dx, int dy, const Wall *walls, int 
             else if (dy < 0)
             {
             }
+	  //left or right wall bump, stops chick there
             else if (dx > 0)
             {
 
@@ -715,19 +720,20 @@ int main(int argc, char *argv[])
     }
     while (true)
     {
-        play_sfx(5);
-        cleartiles();
-        clearSprites();
+        play_sfx(5); //sound, 1 beep
+        cleartiles(); //bg
+        clearSprites(); //remove all charecters
         int index = 8;
-        write_text("bubble", 6, 14, 13);
-        write_text("bobble", 6, 14, 20);
+        write_text("scream", 6, 14, 13);
+        write_text("jump", 4, 14, 20);
+
         write_text("press", 5, 20, index);
         write_text("any", 3, 20, index + 6);
         write_text("key", 3, 20, index + 10);
         write_text("to", 2, 20, index + 14);
         write_text("start", 5, 20, index + 17);
-        int characterLeftSequence = 3;
-        int characterRightSequence = 7;
+        int characterLeftSequence = 3; //movement/animation left side  4sprites (looped over)
+        int characterRightSequence = 7; //right side
         int enemyS = 14;
         bool initialMove = true;
         while (true)
@@ -736,7 +742,7 @@ int main(int argc, char *argv[])
             {
                 write_sprite_to_kernel(1, 448, i, characterRightSequence, 11);
                 characterRightSequence++;
-                write_sprite_to_kernel(1, 448, i - 140, enemyS, 0); // 14-15
+                write_sprite_to_kernel(1, 448, i - 140, enemyS, 0); // 14-15 chase after 140 pix location
                 enemyS = (enemyS == 14) ? 15 : 14;
                 if (characterRightSequence == 11)
                 {
@@ -756,15 +762,15 @@ int main(int argc, char *argv[])
             }
         }
         usleep(500);
-        bgm_startstop(1);
-        cleartiles();
-        clearSprites();
+        bgm_startstop(1); //sound beep
+        cleartiles(); //remove home page
+        clearSprites(); //remove homepage
         srand(time(NULL));
 
-        Character character;
-        initCharacter(&character);
+        Character character; //chick
+        initCharacter(&character); // x=64, y=432 
 
-        Wall walls[] = {
+        Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
             {0, 0, WALL, WIDTH},
             {LENGTH - WALL, 0, WALL, WIDTH},
@@ -774,10 +780,10 @@ int main(int argc, char *argv[])
             {400, WIDTH - WALL, 32, WALL},
             {352, WIDTH - WALL, 32, WALL}};
 
-        Enemy enemies[MAX_ENEMIES];
+        Enemy enemies[MAX_ENEMIES];  //replace with platform
         for (int i = 0; i < MAX_ENEMIES; ++i)
         {
-            initEnemy(&enemies[i], 5 + i, walls);
+	  initEnemy(&enemies[i], 5 + i, walls);// replace for platform generation
         }
 
         Bubble bubbles[MAX_BUBBLES];
@@ -792,6 +798,7 @@ int main(int argc, char *argv[])
         }
         Reward reward[MAX_ENEMIES];
         // draw wall;   37-44
+	//drawing boundary wall, not needed
         int wallSequence = 37;
         for (int i = 0; i < sizeof(walls) / sizeof(walls[0]); ++i)
         {
@@ -810,9 +817,10 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        write_tile_to_kernel(1, 20, 1);
-        while (true)
+        write_tile_to_kernel(1, 20, 1);// drawing some wall, not sure
+        while (true)//main game logic
         {
+	  //displaying top row items like level, heart, etc
             write_text("level", 5, 1, 30);
             write_tile_to_kernel(1, 36, level + 1);
             write_tile_to_kernel(1, 4, 45);
@@ -824,7 +832,8 @@ int main(int argc, char *argv[])
             write_tile_to_kernel(1, 14, 28);
             write_tile_to_kernel(1, 15, 15);
             write_tile_to_kernel(1, 16, 29);
-            if (numEnemy == 0 && numOfReward == 0)
+            if (numEnemy == 0 && numOfReward == 0)//if all enemies defeated and all rewards collected, clears screen and starts next level
+	      //we can keep or remove, do we want to do level based? i vote NO xp
             {
                 // draw wall; 37-44
                 cleartiles();
@@ -852,7 +861,7 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-
+	    //for now no need of left right movement of chick
             if (controller_state.leftright == 1)
             {
                 character.vx = -HVEC;
@@ -879,32 +888,37 @@ int main(int argc, char *argv[])
                     character.canFire = false;
                 }
             }
-
+	    //remove till here
+	    //jump needed
             if (controller_state.b == 1 && !character.jumping)
             {
                 character.vy = -13;
                 character.jumping = true;
             }
-
+	    //moves character based on vx and vy within boundary
             moveCharacter(&character, character.vx, character.vy, walls, sizeof(walls) / sizeof(walls[0]));
+	    //simulates gravity
             character.y += character.vy;
             character.vy += 1;
+	    //character at ground condition
             if (character.y >= WIDTH - character.height - WALL)
             {
-                character.y = WIDTH - character.height - WALL;
+	      character.y = WIDTH - character.height - WALL; //doesn't let it go below ground
                 character.vy = 0;
-                character.jumping = false;
+                character.jumping = false;// can add dead condition
             }
-
+	    //prevents going above screen
             if (character.y <= WALL)
             {
                 character.y = WALL;
                 character.vy = 1;
             }
-
+	    //can modify for moving platform
             for (int i = 0; i < MAX_ENEMIES; ++i)
             {
+	      //enemy movement
                 moveEnemy(&enemies[i], enemies[i].vx, enemies[i].vy, walls, sizeof(walls) / sizeof(walls[0]));
+		//enemy gravity
                 enemies[i].y += enemies[i].vy;
                 enemies[i].vy += 1;
                 if (enemies[i].y >= WIDTH - enemies->height - WALL)
@@ -920,25 +934,26 @@ int main(int argc, char *argv[])
                     enemies[i].vy = 1;
                 }
             }
-
+	    //not needed
             for (int i = 0; i < MAX_BUBBLES; ++i)
             {
                 moveBubble(&bubbles[i], enemies, MAX_ENEMIES);
             }
-
+	    //not needed
             for (int i = 0; i < MAX_ENEMIES; i++)
             {
                 moveReward(&reward[i], walls, sizeof(walls) / sizeof(walls[0]));
             }
-
+	    //character enemy collision
             handleCollisionCharcterEnemy(&character, enemies, MAX_ENEMIES, reward);
             if (life == 0)
             {
                 break;
                 printf("GG\n");
             }
+	    //character collecting reward
             handleCollisionCharcterReward(&character, reward);
-
+	    //parsing through character right sprites
             if (character.facingRight)
             {
                 if (character.vx == 0)
@@ -955,6 +970,7 @@ int main(int argc, char *argv[])
                     }
                 }
             }
+	    //parsing through left sprites
             else
             {
                 if (character.vx == 0)
@@ -972,17 +988,17 @@ int main(int argc, char *argv[])
                 }
             }
 
-            for (int i = 0; i < numEnemy; ++i)
+            for (int i = 0; i < numEnemy; ++i)//goes through each enemy
             {
                 if (enemies[i].surrounded)
                 {
                     // draw surrounded bubble
-                    write_sprite_to_kernel(1, enemies[i].y, enemies[i].x, 13, enemies[i].reg);
+		  write_sprite_to_kernel(1, enemies[i].y, enemies[i].x, 13, enemies[i].reg);//sprite 13 trapped state
                 }
-                // draw enemy
+                // draw normal enemy
                 else
                 {
-                    if (enemies[i].type == 0)
+		  if (enemies[i].type == 0)//first enemy
                     {
                         if (enemies[i].facingRight)
                         {
@@ -995,7 +1011,7 @@ int main(int argc, char *argv[])
                             enemies[i].enemyALeft = (enemies[i].enemyALeft == 16) ? 17 : 16;
                         }
                     }
-                    else
+		  else //second enemy
                     {
                         if (enemies[i].facingRight)
                         {
