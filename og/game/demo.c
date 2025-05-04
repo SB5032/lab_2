@@ -17,6 +17,10 @@
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define WALL 16
 #define HVEC 8
+#define NUM_SPRITES 4
+#define SPRITE_GAP   8
+#define SPRITE_W     32
+#define SPRITE_H     32
 int level = 0;
 int numEnemy = MAX_ENEMIES;
 int numOfReward = 0;
@@ -53,6 +57,9 @@ typedef struct
     int enemyBRight;
     int enemyBLeft;
 } Enemy;
+
+
+static Enemy enemies[MAX_ENEMIES];  //replace with platform
 
 typedef struct
 {
@@ -95,6 +102,93 @@ void initCharacter(Character *character)
     character->active = true;
     character->canFire = false; //not needed
 }
+
+
+
+
+void initSpriteTrain(Enemy train[], int num)
+{
+    int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+    int baseX  = (LENGTH - totalW) / 2;
+    int baseY  = (WIDTH  - SPRITE_H) / 2;
+
+    // Horizontal train: movement in X only
+    for (int i = 0; i < num; ++i) {
+        train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
+        train[i].y            = baseY;
+        train[i].vx           = 0;        // horizontal speed
+        train[i].vy           = 0;
+        train[i].reg          = 5 + i;       // sprite slots 5–8
+        train[i].enemyARight  = 14;          // fixed frame
+        train[i].active       = true;
+
+        // draw initial sprite
+        write_sprite_to_kernel(
+          /*active*/ 1,
+          /*row*/    train[i].y,
+          /*col*/    train[i].x,
+          /*n*/      train[i].enemyARight,
+          /*reg*/    train[i].reg
+        );
+    }
+}
+//void initSpriteTrain(Enemy train[], int num)
+//{
+//    // total width of the 4 sprites + gaps
+//    int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+//    int baseX  = (LENGTH - totalW) / 2;       // center horizontally
+//    int baseY  = (WIDTH  - SPRITE_H) / 2;     // center vertically
+//
+//    for (int i = 0; i < num; ++i) {
+//        train[i].x    = baseX + i * (SPRITE_W + SPRITE_GAP);
+//        train[i].y    = baseY;
+//        train[i].vx   = HVEC;          // same speed for all
+//        train[i].reg  = 5 + i;         // sprite slots 5–8
+//        train[i].active = true;
+//
+//        // Use the same right-facing sprite for all 4:
+//        train[i].enemyARight = 14;
+//
+//        // draw it once:
+//        write_sprite_to_kernel(
+//          /*active*/ 1,
+//          /*row*/    train[i].y,
+//          /*col*/    train[i].x,
+//          /*n*/      train[i].enemyARight,
+//          /*reg*/    train[i].reg
+//        );
+//    }
+//}
+
+void moveSpriteTrain(Enemy train[], int num)
+{
+    // check leader for bouncing
+    bool bounce = false;
+    if (train[0].x <= WALL ||
+        train[0].x + SPRITE_W >= LENGTH - WALL) {
+        bounce = true;
+    }
+    if (bounce) {
+      for (int i = 0; i < num; ++i)
+        train[i].vx = -train[i].vx;
+    }
+
+    for (int i = 0; i < num; ++i) {
+      train[i].x += train[i].vx;
+      write_sprite_to_kernel(
+        1,
+        train[i].y,
+        train[i].x,
+        train[i].enemyARight,  // always the same frame
+        train[i].reg
+      );
+    }
+}
+
+
+
+
+
 
 void initEnemy(Enemy *enemy, int reg, Wall wall[]) //modify for variable length and height (y) of platform 
 {
@@ -257,6 +351,18 @@ void moveReward(Reward *reward, const Wall *walls, int numWalls)
 
 void moveEnemy(Enemy *enemy, int dx, int dy, const Wall *walls, int numWalls)
 {
+
+     if (enemy->reg >= 5 && enemy->reg < 5 + MAX_ENEMIES) {
+        // Just redraw the sprite exactly where it was initialized:
+        write_sprite_to_kernel(
+            /* active */    1,
+            /* row */       enemy->y,
+            /* col */       enemy->x,
+            /* tile n */    enemy->enemyARight,
+            /* reg */       enemy->reg
+        );
+        return;
+    }
     int newX = enemy->x + enemy->vx;
     int newY = enemy->y + enemy->vy;
     if (enemy->surrounded)
@@ -723,6 +829,7 @@ int main(int argc, char *argv[])
         play_sfx(5); //sound, 1 beep
         cleartiles(); //bg
         clearSprites(); //remove all charecters
+       // initSpriteTrain(enemies, MAX_ENEMIES);
         int index = 8;
         write_text("scream", 6, 14, 13);
         write_text("jump", 4, 14, 20);
@@ -736,8 +843,10 @@ int main(int argc, char *argv[])
         int characterRightSequence = 7; //right side
         int enemyS = 14;
         bool initialMove = true;
+
         while (true)
         {
+
             for (int i = 0; i < 648; i += 1)
             {
                 write_sprite_to_kernel(1, 448, i, characterRightSequence, 11);
@@ -770,6 +879,8 @@ int main(int argc, char *argv[])
         Character character; //chick
         initCharacter(&character); // x=64, y=432 
 
+        initSpriteTrain(enemies, MAX_ENEMIES);
+        
         Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
             {0, 0, WALL, WIDTH},
@@ -779,12 +890,12 @@ int main(int argc, char *argv[])
             {560, WIDTH - WALL, 32, WALL},
             {400, WIDTH - WALL, 32, WALL},
             {352, WIDTH - WALL, 32, WALL}};
-
-        Enemy enemies[MAX_ENEMIES];  //replace with platform
-        for (int i = 0; i < MAX_ENEMIES; ++i)
-        {
-	  initEnemy(&enemies[i], 5 + i, walls);// replace for platform generation
-        }
+       
+        //for (int i = 0; i < MAX_ENEMIES; ++i)
+        //{
+	    //   initEnemy(&enemies[i], 5 + i, walls);// replace for platform generation
+        //}
+    //sleep(3);
 
         Bubble bubbles[MAX_BUBBLES];
         int bubbleSequence = 0;
@@ -818,7 +929,7 @@ int main(int argc, char *argv[])
             }
         }
         write_tile_to_kernel(1, 20, 1);// drawing some wall, not sure
-        while (true)//main game logic
+        while (true)//main_game logic
         {
 	  //displaying top row items like level, heart, etc
             write_text("level", 5, 1, 30);
