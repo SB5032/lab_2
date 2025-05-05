@@ -188,6 +188,24 @@ void initSpriteTrain(Enemy train[], int num)
 //without bounce
 void moveSpriteTrain(Enemy train[], int num)
 {
+	// Check if last sprite has fully exited the screen
+    if (train[num - 1].x + SPRITE_W < 0)
+    {
+        // Generate new train at right edge with new Y
+        int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+        int baseX  = LENGTH;  // offscreen right
+        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
+
+        for (int i = 0; i < num; ++i) {
+            train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
+            train[i].y            = baseY;
+            train[i].vx           = -HVEC;
+            train[i].vy           = 0;
+            train[i].reg          = 5 + i;
+            train[i].enemyARight  = 14;
+            train[i].active       = true;
+        }
+    }
     for (int i = 0; i < num; ++i) {
         train[i].x += train[i].vx;
         write_sprite_to_kernel(
