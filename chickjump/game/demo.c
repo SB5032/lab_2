@@ -21,10 +21,6 @@
 #define SPRITE_GAP   8
 #define SPRITE_W     32
 #define SPRITE_H     32
-
-#define MAX_TRAINS 5
-#define SPRITES_PER_TRAIN 4
-
 int level = 0;
 int numEnemy = MAX_ENEMIES;
 int numOfReward = 0;
@@ -64,10 +60,6 @@ typedef struct
 
 
 static Enemy enemies[MAX_ENEMIES];  //replace with platform
-static Enemy spriteTrains[MAX_TRAINS][SPRITES_PER_TRAIN];
-int trainCount = 3;  // initially 3 trains
-int nextRegSet = 1;  // will use reg = 5 + 4×set
-int nextSpeed = HVEC;
 
 typedef struct
 {
@@ -140,36 +132,44 @@ void initSpriteTrain(Enemy train[], int num)
         );
     }
 }
-
-void moveSpriteTrain(Enemy train[], int num, int regOffset, int *speed)
+void moveSpriteTrain(Enemy train[], int num)
 {
-    int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+    // Check if last sprite has fully exited the screen
+    if (train[num - 1].x + SPRITE_W < 0)
+    {
+        // Generate new train at right edge with new Y
+        int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+        int baseX  = LENGTH;  // offscreen right
+        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
 
-    // Check for generation trigger (175px from right)
-    if (train[num - 1].x + SPRITE_W == LENGTH - 175) {
-        // Only trigger ONCE at that position
-        // Flag or count guards should be used if needed externally
-        int newY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
-
-        int newOffset = 5 + regOffset * SPRITES_PER_TRAIN;
         for (int i = 0; i < num; ++i) {
-            spriteTrains[trainCount % MAX_TRAINS][i].x = LENGTH + i * (SPRITE_W + SPRITE_GAP);
-            spriteTrains[trainCount % MAX_TRAINS][i].y = newY;
-            spriteTrains[trainCount % MAX_TRAINS][i].vx = -(*speed);
-            spriteTrains[trainCount % MAX_TRAINS][i].reg = newOffset + i;
-            spriteTrains[trainCount % MAX_TRAINS][i].enemyARight = 14;
-            spriteTrains[trainCount % MAX_TRAINS][i].active = true;
+            train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
+            train[i].y            = baseY;
+            train[i].vx           = -HVEC;
+            train[i].vy           = 0;
+            train[i].reg          = 5 + i;
+            train[i].enemyARight  = 14;
+            train[i].active       = true;
         }
-        (*speed) += 1;        // increase speed for next train
-        trainCount++;
     }
 
-    // Move and draw
+    // Move and draw each sprite
     for (int i = 0; i < num; ++i) {
         train[i].x += train[i].vx;
-        write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
+        write_sprite_to_kernel(
+            1,
+            train[i].y,
+            train[i].x,
+            train[i].enemyARight,
+            train[i].reg
+        );
     }
 }
+
+
+
+
+
 
 
 
@@ -1007,19 +1007,16 @@ int main(int argc, char *argv[])
                 character.y = WALL;
                 character.vy = 1;
             }
-			for (int t = 0; t < MAX_TRAINS; ++t) {
-				moveSpriteTrain(spriteTrains[t], SPRITES_PER_TRAIN, t, &nextSpeed);
-			}
 	    //can modify for moving platform
             for (int i = 0; i < MAX_ENEMIES; ++i)
             {
 				// Platform train logic handled separately — skip gravity
-				// if (enemies[i].reg >= 5 && enemies[i].reg < 5 + MAX_ENEMIES)
-				// {
-				// 	// Just redraw the train sprite — no y/velocity update
-				// 	moveSpriteTrain(enemies, MAX_ENEMIES);
-				// 	break; // you can break since you handled the full train in one go
-				// }
+				if (enemies[i].reg >= 5 && enemies[i].reg < 5 + MAX_ENEMIES)
+				{
+					// Just redraw the train sprite — no y/velocity update
+					moveSpriteTrain(enemies, MAX_ENEMIES);
+					break; // you can break since you handled the full train in one go
+				}
 	      //enemy movement
                 moveEnemy(&enemies[i], enemies[i].vx, enemies[i].vy, walls, sizeof(walls) / sizeof(walls[0]));
 		//enemy gravity
