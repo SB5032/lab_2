@@ -858,7 +858,7 @@ int main(int argc, char *argv[])
                     characterRightSequence = 7;
                 }
 
-                if (press())
+                if (1) //press())
                 {
                     initialMove = false;
                     break;
@@ -973,7 +973,7 @@ int main(int argc, char *argv[])
                 }
             }
 	    //for now no need of left right movement of chick
-            if (controller_state.leftright == 1)
+            if (1) //controller_state.leftright == 1)
             {
                 character.vx = -HVEC;
                 character.facingRight = false;
