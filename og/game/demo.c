@@ -30,6 +30,8 @@ bool restart = true;
 int vga_fd;
 int audio_fd;
 
+int trainSpeed = -HVEC;
+
 typedef struct
 {
     int x, y;
@@ -188,18 +190,21 @@ void initSpriteTrain(Enemy train[], int num)
 //without bounce
 void moveSpriteTrain(Enemy train[], int num)
 {
-	// Check if last sprite has fully exited the screen
+	// If entire train has exited the screen (left side)
     if (train[num - 1].x + SPRITE_W < 0)
     {
-        // Generate new train at right edge with new Y
+        // Increase speed magnitude slightly (more negative = faster left)
+        trainSpeed -= 1;  // You can tune this increment
+
+        // Respawn train at right edge with new Y
         int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
-        int baseX  = LENGTH;  // offscreen right
-        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
+        int baseX  = LENGTH;
+        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
 
         for (int i = 0; i < num; ++i) {
             train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
             train[i].y            = baseY;
-            train[i].vx           = -HVEC;
+            train[i].vx           = trainSpeed;
             train[i].vy           = 0;
             train[i].reg          = 5 + i;
             train[i].enemyARight  = 14;
