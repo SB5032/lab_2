@@ -1027,6 +1027,13 @@ int main(int argc, char *argv[])
 	    //can modify for moving platform
             for (int i = 0; i < MAX_ENEMIES; ++i)
             {
+				// Platform train logic handled separately — skip gravity
+				if (enemies[i].reg >= 5 && enemies[i].reg < 5 + MAX_ENEMIES)
+				{
+					// Just redraw the train sprite — no y/velocity update
+					moveSpriteTrain(enemies, MAX_ENEMIES);
+					break; // you can break since you handled the full train in one go
+				}
 	      //enemy movement
                 moveEnemy(&enemies[i], enemies[i].vx, enemies[i].vy, walls, sizeof(walls) / sizeof(walls[0]));
 		//enemy gravity
