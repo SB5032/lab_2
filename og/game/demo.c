@@ -194,7 +194,7 @@ void moveSpriteTrain(Enemy train[], int num)
     if (train[num - 1].x + SPRITE_W < 0)
     {
         // Increase speed magnitude slightly (more negative = faster left)
-        trainSpeed -= 1;  // You can tune this increment
+        trainSpeed -= 4;  // You can tune this increment
 
         // Respawn train at right edge with new Y
         int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
