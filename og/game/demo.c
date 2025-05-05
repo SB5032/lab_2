@@ -160,32 +160,45 @@ void initSpriteTrain(Enemy train[], int num)
 //    }
 //}
 
+// void moveSpriteTrain(Enemy train[], int num)
+// {
+//     // check leader for bouncing
+//     bool bounce = false;
+//     if (train[0].x <= WALL ||
+//         train[0].x + SPRITE_W >= LENGTH - WALL) {
+//         bounce = true;
+//     }
+//     if (bounce) {
+//       for (int i = 0; i < num; ++i)
+//         train[i].vx = -train[i].vx;
+//     }
+
+//     for (int i = 0; i < num; ++i) {
+//       train[i].x += train[i].vx;
+//       write_sprite_to_kernel(
+//         1,
+//         train[i].y,
+//         train[i].x,
+//         train[i].enemyARight,  // always the same frame
+//         train[i].reg
+//       );
+//     }
+// }
+
+//without bounce
 void moveSpriteTrain(Enemy train[], int num)
 {
-    // check leader for bouncing
-    bool bounce = false;
-    if (train[0].x <= WALL ||
-        train[0].x + SPRITE_W >= LENGTH - WALL) {
-        bounce = true;
-    }
-    if (bounce) {
-      for (int i = 0; i < num; ++i)
-        train[i].vx = -train[i].vx;
-    }
-
     for (int i = 0; i < num; ++i) {
-      train[i].x += train[i].vx;
-      write_sprite_to_kernel(
-        1,
-        train[i].y,
-        train[i].x,
-        train[i].enemyARight,  // always the same frame
-        train[i].reg
-      );
+        train[i].x += train[i].vx;
+        write_sprite_to_kernel(
+            1,
+            train[i].y,
+            train[i].x,
+            train[i].enemyARight,
+            train[i].reg
+        );
     }
 }
-
-
 
 
 
