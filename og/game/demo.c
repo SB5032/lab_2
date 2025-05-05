@@ -1009,7 +1009,7 @@ int main(int argc, char *argv[])
                 }
             }
 	    //for now no need of left right movement of chick
-            if (controller_state.leftright == 1)
+            if (1) //controller_state.leftright == 1)
             {
                 character.vx = -HVEC;
                 character.facingRight = false;
