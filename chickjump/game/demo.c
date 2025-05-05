@@ -60,7 +60,9 @@ typedef struct
     int enemyBLeft;
 } Enemy;
 
-
+#define NUM_TRAINS 3
+Enemy trains[NUM_TRAINS][NUM_SPRITES];  // 3 trains × 4 sprites each
+int trainSpeeds[NUM_TRAINS];
 static Enemy enemies[MAX_ENEMIES];  //replace with platform
 
 typedef struct
@@ -108,30 +110,19 @@ void initCharacter(Character *character)
 
 
 
-void initSpriteTrain(Enemy train[], int num)
+void initSpriteTrain(Enemy train[], int num, int y, int speed)
 {
     int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
-    int baseX  = (LENGTH - totalW) / 2;
-    int baseY  = (WIDTH  - SPRITE_H) / 2;
+    int baseX  = LENGTH;  // start from right edge
 
-    // Horizontal train: movement in X only
     for (int i = 0; i < num; ++i) {
         train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
-        train[i].y            = baseY;
-        train[i].vx           = -HVEC;        // horizontal speed
+        train[i].y            = y;
+        train[i].vx           = speed;
         train[i].vy           = 0;
-        train[i].reg          = 5 + i;       // sprite slots 5–8
-        train[i].enemyARight  = 14;          // fixed frame
+        train[i].reg          = 5 + i;
+        train[i].enemyARight  = 14;
         train[i].active       = true;
-
-        // draw initial sprite
-        write_sprite_to_kernel(
-          /*active*/ 1,
-          /*row*/    train[i].y,
-          /*col*/    train[i].x,
-          /*n*/      train[i].enemyARight,
-          /*reg*/    train[i].reg
-        );
     }
 }
 //void initSpriteTrain(Enemy train[], int num)
@@ -188,40 +179,28 @@ void initSpriteTrain(Enemy train[], int num)
 // }
 
 //without bounce
-void moveSpriteTrain(Enemy train[], int num)
+void moveSpriteTrain(Enemy train[], int num, int *speed)
 {
-	// If entire train has exited the screen (left side)
-    if (train[num - 1].x + SPRITE_W < 0)
-    {
-        // Increase speed magnitude slightly (more negative = faster left)
-        trainSpeed -= 4;  // You can tune this increment
+    if (train[num - 1].x + SPRITE_W < 0) {
+        // Train left the screen → respawn
+        (*speed) -= 1;  // increase speed
+        if (*speed < -20) *speed = -20;  // clamp
 
-        // Respawn train at right edge with new Y
-        int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
-        int baseX  = LENGTH;
-        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
-
+        int baseX = LENGTH;
+        int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
         for (int i = 0; i < num; ++i) {
-            train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
-            train[i].y            = baseY;
-            train[i].vx           = trainSpeed;
-            train[i].vy           = 0;
-            train[i].reg          = 5 + i;
-            train[i].enemyARight  = 14;
-            train[i].active       = true;
+            train[i].x = baseX + i * (SPRITE_W + SPRITE_GAP);
+            train[i].y = baseY;
+            train[i].vx = *speed;
         }
     }
+
     for (int i = 0; i < num; ++i) {
         train[i].x += train[i].vx;
-        write_sprite_to_kernel(
-            1,
-            train[i].y,
-            train[i].x,
-            train[i].enemyARight,
-            train[i].reg
-        );
+        write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
     }
 }
+
 
 
 
@@ -894,7 +873,7 @@ int main(int argc, char *argv[])
                     characterRightSequence = 7;
                 }
 
-                if (1) //press())
+                if (press())
                 {
                     initialMove = false;
                     break;
@@ -915,7 +894,13 @@ int main(int argc, char *argv[])
         Character character; //chick
         initCharacter(&character); // x=64, y=432 
 
-        initSpriteTrain(enemies, MAX_ENEMIES);
+        // initSpriteTrain(enemies, MAX_ENEMIES);
+		for (int t = 0; t < NUM_TRAINS; ++t) {
+			int y = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
+			trainSpeeds[t] = -HVEC;  // start with base left speed
+			initSpriteTrain(trains[t], NUM_SPRITES, y, trainSpeeds[t]);
+		}
+		
         
         Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
@@ -1009,7 +994,7 @@ int main(int argc, char *argv[])
                 }
             }
 	    //for now no need of left right movement of chick
-            if (1) //controller_state.leftright == 1)
+            if (controller_state.leftright == 1)
             {
                 character.vx = -HVEC;
                 character.facingRight = false;
@@ -1064,12 +1049,16 @@ int main(int argc, char *argv[])
             for (int i = 0; i < MAX_ENEMIES; ++i)
             {	
 				// Platform train logic handled separately — skip gravity
-				if (enemies[i].reg >= 5 && enemies[i].reg < 5 + MAX_ENEMIES)
-				{
-					// Just redraw the train sprite — no y/velocity update
-					moveSpriteTrain(enemies, MAX_ENEMIES);
-					break; // you can break since you handled the full train in one go
+				// if (enemies[i].reg >= 5 && enemies[i].reg < 5 + MAX_ENEMIES)
+				// {
+				// 	// Just redraw the train sprite — no y/velocity update
+				// 	moveSpriteTrain(enemies, MAX_ENEMIES);
+				// 	break; // you can break since you handled the full train in one go
+				// }
+				for (int t = 0; t < NUM_TRAINS; ++t) {
+					moveSpriteTrain(trains[t], NUM_SPRITES, &trainSpeeds[t]);
 				}
+				
 
 	      //enemy movement
                 moveEnemy(&enemies[i], enemies[i].vx, enemies[i].vy, walls, sizeof(walls) / sizeof(walls[0]));
@@ -1255,4 +1244,3 @@ int main(int argc, char *argv[])
     printf("You exit\n");
     return 0;
 }
-//sh
