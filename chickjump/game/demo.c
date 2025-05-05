@@ -1007,6 +1007,9 @@ int main(int argc, char *argv[])
                 character.y = WALL;
                 character.vy = 1;
             }
+			for (int t = 0; t < MAX_TRAINS; ++t) {
+				moveSpriteTrain(spriteTrains[t], SPRITES_PER_TRAIN, t, &nextSpeed);
+			}
 	    //can modify for moving platform
             for (int i = 0; i < MAX_ENEMIES; ++i)
             {
@@ -1017,9 +1020,6 @@ int main(int argc, char *argv[])
 				// 	moveSpriteTrain(enemies, MAX_ENEMIES);
 				// 	break; // you can break since you handled the full train in one go
 				// }
-				for (int t = 0; t < MAX_TRAINS; ++t) {
-					moveSpriteTrain(spriteTrains[t], SPRITES_PER_TRAIN, t, &nextSpeed);
-				}
 	      //enemy movement
                 moveEnemy(&enemies[i], enemies[i].vx, enemies[i].vy, walls, sizeof(walls) / sizeof(walls[0]));
 		//enemy gravity
