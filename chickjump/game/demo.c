@@ -116,7 +116,7 @@ void initSpriteTrain(Enemy train[], int num)
     for (int i = 0; i < num; ++i) {
         train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
         train[i].y            = baseY;
-        train[i].vx           = 0;        // horizontal speed
+        train[i].vx           = -HVEC;        // horizontal speed
         train[i].vy           = 0;
         train[i].reg          = 5 + i;       // sprite slots 5–8
         train[i].enemyARight  = 14;          // fixed frame
@@ -132,58 +132,41 @@ void initSpriteTrain(Enemy train[], int num)
         );
     }
 }
-//void initSpriteTrain(Enemy train[], int num)
-//{
-//    // total width of the 4 sprites + gaps
-//    int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
-//    int baseX  = (LENGTH - totalW) / 2;       // center horizontally
-//    int baseY  = (WIDTH  - SPRITE_H) / 2;     // center vertically
-//
-//    for (int i = 0; i < num; ++i) {
-//        train[i].x    = baseX + i * (SPRITE_W + SPRITE_GAP);
-//        train[i].y    = baseY;
-//        train[i].vx   = HVEC;          // same speed for all
-//        train[i].reg  = 5 + i;         // sprite slots 5–8
-//        train[i].active = true;
-//
-//        // Use the same right-facing sprite for all 4:
-//        train[i].enemyARight = 14;
-//
-//        // draw it once:
-//        write_sprite_to_kernel(
-//          /*active*/ 1,
-//          /*row*/    train[i].y,
-//          /*col*/    train[i].x,
-//          /*n*/      train[i].enemyARight,
-//          /*reg*/    train[i].reg
-//        );
-//    }
-//}
-
 void moveSpriteTrain(Enemy train[], int num)
 {
-    // check leader for bouncing
-    bool bounce = false;
-    if (train[0].x <= WALL ||
-        train[0].x + SPRITE_W >= LENGTH - WALL) {
-        bounce = true;
-    }
-    if (bounce) {
-      for (int i = 0; i < num; ++i)
-        train[i].vx = -train[i].vx;
+    // Check if last sprite has fully exited the screen
+    if (train[num - 1].x + SPRITE_W < 0)
+    {
+        // Generate new train at right edge with new Y
+        int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+        int baseX  = LENGTH;  // offscreen right
+        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
+
+        for (int i = 0; i < num; ++i) {
+            train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
+            train[i].y            = baseY;
+            train[i].vx           = -HVEC;
+            train[i].vy           = 0;
+            train[i].reg          = 5 + i;
+            train[i].enemyARight  = 14;
+            train[i].active       = true;
+        }
     }
 
+    // Move and draw each sprite
     for (int i = 0; i < num; ++i) {
-      train[i].x += train[i].vx;
-      write_sprite_to_kernel(
-        1,
-        train[i].y,
-        train[i].x,
-        train[i].enemyARight,  // always the same frame
-        train[i].reg
-      );
+        train[i].x += train[i].vx;
+        write_sprite_to_kernel(
+            1,
+            train[i].y,
+            train[i].x,
+            train[i].enemyARight,
+            train[i].reg
+        );
     }
 }
+
+
 
 
 
