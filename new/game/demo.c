@@ -53,9 +53,9 @@
 // game settings
 #define INITIAL_LIVES   5
 
-static int vga_fd, audio_fd;
-static struct controller_output_packet controller_state;
-static bool towerEnabled = true;
+int vga_fd, audio_fd;
+struct controller_output_packet controller_state;
+bool towerEnabled = true;
 
 typedef struct {int x, y, vy; bool jumping;} Chicken;
 typedef struct {int x, y;} Platform;
