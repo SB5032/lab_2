@@ -45,6 +45,7 @@ static struct controller_output_packet controller_state;
 
 typedef struct {
     int x, y;
+    int vy;        // vertical velocity
     bool jumping;  // are we in the air?
 } Chicken;
 typedef struct {
