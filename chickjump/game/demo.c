@@ -135,6 +135,31 @@ void initCharacter(Character *character)
 
 //     trainActive[trainIdx] = true;
 // }
+// modified init to optionally take an X‐offset
+void initSpriteTrainAtX(Enemy train[], int num, int startX)
+{
+    for (int i = 0; i < num; ++i) {
+        train[i].x           = startX + i * (SPRITE_W + SPRITE_GAP);
+        train[i].y           = (WIDTH - SPRITE_H) / 2;
+        train[i].vx          = -HVEC;
+        train[i].reg         = 5 + i;
+        train[i].enemyARight = 14;
+        train[i].active      = true;
+
+        write_sprite_to_kernel(1, train[i].y, train[i].x,
+                               train[i].enemyARight, train[i].reg);
+    }
+}
+
+// call this once at level start instead of initSpriteTrain(...)
+void launchFirstTrain(void)
+{
+    int totalW = NUM_SPRITES * SPRITE_W + (NUM_SPRITES - 1) * SPRITE_GAP;
+    int baseX  = LENGTH;           // offscreen right
+    firstTrainLaunchX = baseX;     // remember this
+    initSpriteTrainAtX(enemies, NUM_SPRITES, baseX);
+    secondTrainQueued = false;     // reset for this level
+}
 
 void initSpriteTrain(Enemy train[], int num)
 {
@@ -204,32 +229,6 @@ void moveSpriteTrain(Enemy train[], int num)
             train[i].reg
         );
     }
-}
-
-// modified init to optionally take an X‐offset
-void initSpriteTrainAtX(Enemy train[], int num, int startX)
-{
-    for (int i = 0; i < num; ++i) {
-        train[i].x           = startX + i * (SPRITE_W + SPRITE_GAP);
-        train[i].y           = (WIDTH - SPRITE_H) / 2;
-        train[i].vx          = -HVEC;
-        train[i].reg         = 5 + i;
-        train[i].enemyARight = 14;
-        train[i].active      = true;
-
-        write_sprite_to_kernel(1, train[i].y, train[i].x,
-                               train[i].enemyARight, train[i].reg);
-    }
-}
-
-// call this once at level start instead of initSpriteTrain(...)
-void launchFirstTrain(void)
-{
-    int totalW = NUM_SPRITES * SPRITE_W + (NUM_SPRITES - 1) * SPRITE_GAP;
-    int baseX  = LENGTH;           // offscreen right
-    firstTrainLaunchX = baseX;     // remember this
-    initSpriteTrainAtX(enemies, NUM_SPRITES, baseX);
-    secondTrainQueued = false;     // reset for this level
 }
 
 // void updateTrains() {
