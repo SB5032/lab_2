@@ -18,15 +18,31 @@
 #define WALL 16
 #define HVEC 8
 
-#define NUM_SPRITES 4
-#define SPRITE_GAP   8
-#define SPRITE_W     32
-#define SPRITE_H     32
+//#define NUM_SPRITES 4
+//#define SPRITE_GAP   8
+//#define SPRITE_W     32
+//#define SPRITE_H     32
 // at top of file, track whether we’ve queued the “second” train
 static bool secondTrainQueued = false;
 static int  firstTrainLaunchX;  // record where the first train started
 // #define MAX_TRAINS 3
 // #define SPRITES_PER_TRAIN 4
+#define NUM_SPRITES   4
+#define NUM_WAVES     2
+#define SPRITE_GAP    8
+#define SPRITE_W      32
+#define SPRITE_H      32
+#define WAVE_OFFSET   175
+
+// Reserve regs 12–15 for wave0, 16–19 for wave1
+#define WAVE0_BASE_REG 12
+#define WAVE1_BASE_REG (WAVE0_BASE_REG + NUM_SPRITES)
+
+// storage for each wave’s sprites
+static Enemy trainWaves[NUM_WAVES][NUM_SPRITES];
+// track which waves are active
+static bool  waveActive[NUM_WAVES];
+static int   waveLaunchX[NUM_WAVES];
 
 int level = 0;
 int numEnemy = MAX_ENEMIES;
@@ -116,6 +132,23 @@ void initCharacter(Character *character)
     character->facingRight = true; //not needed
     character->active = true;
     character->canFire = false; //not needed
+}
+
+// Initialize one wave of NUM_SPRITES sprites starting at startX using regs baseReg…baseReg+3
+void initWave(int waveIdx, int startX, int baseReg) {
+    for (int i = 0; i < NUM_SPRITES; ++i) {
+        Enemy *e = &trainWaves[waveIdx][i];
+        e->x           = startX + i * (SPRITE_W + SPRITE_GAP);
+        e->y           = (WIDTH - SPRITE_H) / 2;  // or wherever vertically you like
+        e->vx          = -HVEC;
+        e->reg         = baseReg + i;
+        e->enemyARight = 14;
+        e->active      = true;
+
+        write_sprite_to_kernel(1, e->y, e->x, e->enemyARight, e->reg);
+    }
+    waveLaunchX[waveIdx] = startX;
+    waveActive[waveIdx]  = true;
 }
 
 
@@ -624,34 +657,57 @@ void handleCollisionCharcterReward(Character *character, Reward *reward)
     }
 }
 
-void handleCollisionCharcterEnemy(Character *character, Enemy *enemies, int numEnemies, Reward *reward)
+// Replace your existing handleCollisionCharcterEnemy(...) with this:
+
+void handleCollisionCharcterEnemy(Character *character,
+                                  Enemy *enemies,
+                                  int numEnemies,
+                                  Reward *reward)
 {
-    for (int i = 0; i < MAX_ENEMIES; ++i)
-    {
-        if (checkCollisionCharacterEnemy(character, &enemies[i]))
-        {
-            if (enemies[i].surrounded)
+    // Axis‐aligned bbox test
+    #define AABB(px,py,pw,ph,  sx,sy,sw,sh) \
+        ((px) < (sx)+(sw) && (px)+(pw) > (sx) && (py) < (sy)+(sh) && (py)+(ph) > (sy))
+
+    for (int i = 0; i < numEnemies; ++i) {
+        Enemy *e = &enemies[i];
+
+        // 1) Platform trains live in regs 12–15 and 16–19
+        if (e->reg >= 12 && e->reg < 12 + NUM_WAVES*NUM_SPRITES) {
+            // If character lands on top of this sprite, treat as platform
+            if (AABB(character->x,        character->y,        character->width, character->height,
+                     e->x,                e->y,                SPRITE_W,        SPRITE_H))
             {
-                enemies[i].active = false;
+                // Snap to its top
+                character->y       = e->y - character->height;
+                character->vy      = 0;
+                character->jumping = false;
+                continue;  // skip "die" logic
+            }
+        }
+
+        // 2) Otherwise, real‐enemy collision
+        if (checkCollisionCharacterEnemy(character, e)) {
+            if (e->surrounded) {
+                // spawn reward as before
                 numOfReward++;
-                initReward(&reward[numOfReward - 1], enemies[i].x, enemies[i].y, enemies[i].reg);
-                for (int j = i; j < numEnemies - 1; ++j)
-                {
-                    enemies[j] = enemies[j + 1];
+                initReward(&reward[numOfReward - 1],
+                           e->x, e->y,
+                           e->reg);
+                // remove this enemy from array
+                for (int j = i; j < numEnemies - 1; ++j) {
+                    enemies[j] = enemies[j+1];
                 }
-                enemies[numEnemies - 1] = (Enemy){0};
+                enemies[numEnemies-1].active = false;
                 numEnemies--;
                 numEnemy--;
             }
-            else
-            {
-                if (character->active)
-                {
+            else {
+                if (character->active) {
                     play_sfx(0);
                     character->active = false;
                     life--;
-                    if (life == 0)
-                    {
+                    if (life == 0) {
+                        // game‐over sequence
                         bgm_startstop(0);
                         write_tile_to_kernel(1, 6, 1);
                         clearSprites();
@@ -667,7 +723,10 @@ void handleCollisionCharcterEnemy(Character *character, Enemy *enemies, int numE
             break;
         }
     }
+
+    #undef AABB
 }
+
 
 void loadNextLevel(Character *character, Enemy *enemies, Wall *walls)
 {
@@ -842,6 +901,27 @@ void loadNextLevel(Character *character, Enemy *enemies, Wall *walls)
     write_score(grade);
 }
 
+// Step each active wave each frame
+void moveAllWaves() {
+    for (int w = 0; w < NUM_WAVES; ++w) {
+        if (!waveActive[w]) continue;
+
+        // Step every sprite in wave w
+        for (int i = 0; i < NUM_SPRITES; ++i) {
+            Enemy *e = &trainWaves[w][i];
+            e->x += e->vx;
+            write_sprite_to_kernel(1, e->y, e->x, e->enemyARight, e->reg);
+        }
+
+        // Optionally deactivate when fully off-screen left:
+        Enemy *tail = &trainWaves[w][NUM_SPRITES-1];
+        if (tail->x + SPRITE_W < 0) {
+            waveActive[w] = false;
+        }
+    }
+}
+
+
 struct controller_output_packet controller_state;
 
 void *controller_input_thread(void *arg)
@@ -966,8 +1046,12 @@ int main(int argc, char *argv[])
         initCharacter(&character); // x=64, y=432 
 
         // initSpriteTrain(enemies, MAX_ENEMIES);
-	    launchFirstTrain();
-	    sleep (5);
+	    //launchFirstTrain();
+	    // Wave 0: just off the right edge
+initWave(0, LENGTH,         WAVE0_BASE_REG);
+// Wave 1: WAVE_OFFSET px behind wave 0
+initWave(1, LENGTH + WAVE_OFFSET, WAVE1_BASE_REG);
+
         
         Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
@@ -984,6 +1068,7 @@ int main(int argc, char *argv[])
 	    //   initEnemy(&enemies[i], 5 + i, walls);// replace for platform generation
         //}
     //sleep(3);
+    moveAllWaves();
 
         Bubble bubbles[MAX_BUBBLES];
         int bubbleSequence = 0;
