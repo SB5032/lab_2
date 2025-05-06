@@ -213,104 +213,104 @@ void initSpriteTrain(Enemy train[], int num)
 //     }
 // }
 
-// #define TRAIN_SPACING 175
-
-// void moveSpriteTrain(Enemy train[], int num)
-// {
-//     static int currentTrainX = LENGTH;
-//     static int baseY;
-//     static bool launched = false;
-
-//     if (!launched || train[0].x <= LENGTH - TRAIN_SPACING) {
-//         baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
-//         for (int i = 0; i < num; ++i) {
-//             train[i].x = currentTrainX + i * (SPRITE_W + SPRITE_GAP);
-//             train[i].y = baseY;
-//             train[i].vx = -HVEC;
-//             train[i].vy = 0;
-//             train[i].reg = 5 + i;
-//             train[i].enemyARight = 14;
-//             train[i].active = true;
-//         }
-//         launched = true;
-//         currentTrainX += TRAIN_SPACING;  // queue up next train position
-//     }
-
-//     for (int i = 0; i < num; ++i) {
-//         train[i].x += train[i].vx;
-//         write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
-//     }
-// }
-
-
+#define TRAIN_SPACING 175
 
 void moveSpriteTrain(Enemy train[], int num)
 {
-    static int launchedTrains = 0;
-    static int trainStartX[NUM_TRAINS];
-    static bool trainActive[NUM_TRAINS] = {false};
-    static int trainY[NUM_TRAINS];
+    static int currentTrainX = LENGTH;
+    static int baseY;
+    static bool launched = false;
 
-    if (launchedTrains < NUM_TRAINS)
-    {
-        if (launchedTrains == 0 || 
-            (trainActive[launchedTrains - 1] && trainStartX[launchedTrains - 1] <= LENGTH - TRAIN_GAP))
-        {
-            int baseX = LENGTH;
-            int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
-            trainY[launchedTrains] = baseY;
-
-            for (int j = 0; j < SEGMENTS_PER_TRAIN; ++j)
-            {
-                int idx = launchedTrains * SEGMENTS_PER_TRAIN + j;
-                train[idx].x = baseX + j * (SPRITE_W + SPRITE_GAP);
-                train[idx].y = baseY;
-                train[idx].vx = -HVEC;
-                train[idx].vy = 0;
-                train[idx].reg = TRAIN_BASE_REG + idx;  // e.g., 12–23
-                train[idx].enemyARight = 14;
-                train[idx].active = true;
-            }
-
-            trainStartX[launchedTrains] = baseX;
-            trainActive[launchedTrains] = true;
-            launchedTrains++;
+    if (!launched || train[0].x <= LENGTH - TRAIN_SPACING) {
+        baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
+        for (int i = 0; i < num; ++i) {
+            train[i].x = currentTrainX + i * (SPRITE_W + SPRITE_GAP);
+            train[i].y = baseY;
+            train[i].vx = -HVEC;
+            train[i].vy = 0;
+            train[i].reg = 5 + i;
+            train[i].enemyARight = 14;
+            train[i].active = true;
         }
+        launched = true;
+        currentTrainX += TRAIN_SPACING;  // queue up next train position
     }
 
-    for (int i = 0; i < launchedTrains; ++i)
-    {
-        if (!trainActive[i]) continue;
-
-        for (int j = 0; j < SEGMENTS_PER_TRAIN; ++j)
-        {
-            int idx = i * SEGMENTS_PER_TRAIN + j;
-            train[idx].x += train[idx].vx;
-
-            write_sprite_to_kernel(
-                1,
-                train[idx].y,
-                train[idx].x,
-                train[idx].enemyARight,
-                train[idx].reg
-            );
-        }
-
-        int lastIdx = i * SEGMENTS_PER_TRAIN + SEGMENTS_PER_TRAIN - 1;
-        if (train[lastIdx].x + SPRITE_W < 0)
-        {
-            trainActive[i] = false;
-        }
+    for (int i = 0; i < num; ++i) {
+        train[i].x += train[i].vx;
+        write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
     }
-
-    bool allGone = true;
-    for (int i = 0; i < NUM_TRAINS; ++i)
-        if (trainActive[i])
-            allGone = false;
-
-    if (allGone)
-        launchedTrains = 0;
 }
+
+
+
+// void moveSpriteTrain(Enemy train[], int num)
+// {
+//     static int launchedTrains = 0;
+//     static int trainStartX[NUM_TRAINS];
+//     static bool trainActive[NUM_TRAINS] = {false};
+//     static int trainY[NUM_TRAINS];
+
+//     if (launchedTrains < NUM_TRAINS)
+//     {
+//         if (launchedTrains == 0 || 
+//             (trainActive[launchedTrains - 1] && trainStartX[launchedTrains - 1] <= LENGTH - TRAIN_GAP))
+//         {
+//             int baseX = LENGTH;
+//             int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
+//             trainY[launchedTrains] = baseY;
+
+//             for (int j = 0; j < SEGMENTS_PER_TRAIN; ++j)
+//             {
+//                 int idx = launchedTrains * SEGMENTS_PER_TRAIN + j;
+//                 train[idx].x = baseX + j * (SPRITE_W + SPRITE_GAP);
+//                 train[idx].y = baseY;
+//                 train[idx].vx = -HVEC;
+//                 train[idx].vy = 0;
+//                 train[idx].reg = TRAIN_BASE_REG + idx;  // e.g., 12–23
+//                 train[idx].enemyARight = 14;
+//                 train[idx].active = true;
+//             }
+
+//             trainStartX[launchedTrains] = baseX;
+//             trainActive[launchedTrains] = true;
+//             launchedTrains++;
+//         }
+//     }
+
+//     for (int i = 0; i < launchedTrains; ++i)
+//     {
+//         if (!trainActive[i]) continue;
+
+//         for (int j = 0; j < SEGMENTS_PER_TRAIN; ++j)
+//         {
+//             int idx = i * SEGMENTS_PER_TRAIN + j;
+//             train[idx].x += train[idx].vx;
+
+//             write_sprite_to_kernel(
+//                 1,
+//                 train[idx].y,
+//                 train[idx].x,
+//                 train[idx].enemyARight,
+//                 train[idx].reg
+//             );
+//         }
+
+//         int lastIdx = i * SEGMENTS_PER_TRAIN + SEGMENTS_PER_TRAIN - 1;
+//         if (train[lastIdx].x + SPRITE_W < 0)
+//         {
+//             trainActive[i] = false;
+//         }
+//     }
+
+//     bool allGone = true;
+//     for (int i = 0; i < NUM_TRAINS; ++i)
+//         if (trainActive[i])
+//             allGone = false;
+
+//     if (allGone)
+//         launchedTrains = 0;
+// }
 
 
 
