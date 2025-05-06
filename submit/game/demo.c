@@ -148,7 +148,7 @@ void moveSpriteTrain(Enemy train[], int num)
             train[i].vx           = -HVEC;
             train[i].vy           = 0;
             train[i].reg          = 5 + i;
-            train[i].enemyARight  = 14;
+            train[i].enemyARight  = 15;
             train[i].active       = true;
         }
     }
