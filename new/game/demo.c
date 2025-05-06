@@ -49,9 +49,9 @@
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES   5
 
-static int vga_fd, audio_fd;
-static struct controller_output_packet controller_state;
-static bool towerEnabled = true;  // enforce tower until first platform landing
+ int vga_fd, audio_fd;
+ struct controller_output_packet controller_state;
+ bool towerEnabled = true;  // enforce tower until first platform landing
 
 typedef struct {
     int x, y, vy;
