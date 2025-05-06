@@ -22,8 +22,11 @@
 #define SPRITE_GAP   8
 #define SPRITE_W     32
 #define SPRITE_H     32
-#define MAX_TRAINS 3
-#define SPRITES_PER_TRAIN 4
+// at top of file, track whether we’ve queued the “second” train
+static bool secondTrainQueued = false;
+static int  firstTrainLaunchX;  // record where the first train started
+// #define MAX_TRAINS 3
+// #define SPRITES_PER_TRAIN 4
 
 int level = 0;
 int numEnemy = MAX_ENEMIES;
@@ -64,14 +67,14 @@ typedef struct
 
 
 static Enemy enemies[MAX_ENEMIES];  //replace with platform
-static Enemy spriteTrains[MAX_TRAINS][SPRITES_PER_TRAIN];
-bool trainActive[MAX_TRAINS] = {false};
-int trainSpeed[MAX_TRAINS] = {8, 10, 12};  // example speeds, increase as trains respawn
-int trainRegs[MAX_TRAINS][SPRITES_PER_TRAIN] = {
-    {0, 1, 2, 3},
-    {4, 5, 6, 7},
-    {8, 9, 10, -1}  // last reg unused
-};
+// static Enemy spriteTrains[MAX_TRAINS][SPRITES_PER_TRAIN];
+// bool trainActive[MAX_TRAINS] = {false};
+// int trainSpeed[MAX_TRAINS] = {8, 10, 12};  // example speeds, increase as trains respawn
+// int trainRegs[MAX_TRAINS][SPRITES_PER_TRAIN] = {
+//     {0, 1, 2, 3},
+//     {4, 5, 6, 7},
+//     {8, 9, 10, -1}  // last reg unused
+// };
 
 typedef struct
 {
@@ -116,22 +119,22 @@ void initCharacter(Character *character)
 }
 
 
-void spawnTrain(int trainIdx) {
-    int totalW = SPRITES_PER_TRAIN * SPRITE_W + (SPRITES_PER_TRAIN - 1) * SPRITE_GAP;
-    int baseX = LENGTH;  // start off-screen right
-    int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H); // random Y position
+// void spawnTrain(int trainIdx) {
+//     int totalW = SPRITES_PER_TRAIN * SPRITE_W + (SPRITES_PER_TRAIN - 1) * SPRITE_GAP;
+//     int baseX = LENGTH;  // start off-screen right
+//     int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H); // random Y position
 
-    for (int i = 0; i < SPRITES_PER_TRAIN; ++i) {
-        spriteTrains[trainIdx][i].x = baseX + i * (SPRITE_W + SPRITE_GAP);
-        spriteTrains[trainIdx][i].y = baseY;
-        spriteTrains[trainIdx][i].vx = -trainSpeed[trainIdx];
-        spriteTrains[trainIdx][i].reg = trainRegs[trainIdx][i];
-        spriteTrains[trainIdx][i].enemyARight = 14;
-        spriteTrains[trainIdx][i].active = true;
-    }
+//     for (int i = 0; i < SPRITES_PER_TRAIN; ++i) {
+//         spriteTrains[trainIdx][i].x = baseX + i * (SPRITE_W + SPRITE_GAP);
+//         spriteTrains[trainIdx][i].y = baseY;
+//         spriteTrains[trainIdx][i].vx = -trainSpeed[trainIdx];
+//         spriteTrains[trainIdx][i].reg = trainRegs[trainIdx][i];
+//         spriteTrains[trainIdx][i].enemyARight = 14;
+//         spriteTrains[trainIdx][i].active = true;
+//     }
 
-    trainActive[trainIdx] = true;
-}
+//     trainActive[trainIdx] = true;
+// }
 
 void initSpriteTrain(Enemy train[], int num)
 {
@@ -162,21 +165,31 @@ void initSpriteTrain(Enemy train[], int num)
 void moveSpriteTrain(Enemy train[], int num)
 {
     // Check if last sprite has fully exited the screen
-    if (train[num - 1].x + SPRITE_W < 0)
-    {
-        // Generate new train at right edge with new Y
-        int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
-        int baseX  = LENGTH;  // offscreen right
-        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
+    // if (train[num - 1].x + SPRITE_W < 0)
+    // {
+    //     // Generate new train at right edge with new Y
+    //     int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+    //     int baseX  = LENGTH;  // offscreen right
+    //     int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
 
-        for (int i = 0; i < num; ++i) {
-            train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
-            train[i].y            = baseY;
-            train[i].vx           = -HVEC;
-            train[i].vy           = 0;
-            train[i].reg          = 5 + i;
-            train[i].enemyARight  = 14;
-            train[i].active       = true;
+    //     for (int i = 0; i < num; ++i) {
+    //         train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
+    //         train[i].y            = baseY;
+    //         train[i].vx           = -HVEC;
+    //         train[i].vy           = 0;
+    //         train[i].reg          = 5 + i;
+    //         train[i].enemyARight  = 14;
+    //         train[i].active       = true;
+    //     }
+    // }
+
+	// 1) Check for queuing the second train
+    if (!secondTrainQueued) {
+        // has the lead sprite gone 175px left of its start?
+        if (train[0].x <= firstTrainLaunchX - 175) {
+            // queue the “second” train (reuse same regs)
+            initSpriteTrainAtX(train, num, firstTrainLaunchX + 175);
+            secondTrainQueued = true;
         }
     }
 
@@ -193,41 +206,67 @@ void moveSpriteTrain(Enemy train[], int num)
     }
 }
 
-void updateTrains() {
-    for (int t = 0; t < MAX_TRAINS; ++t) {
-        if (!trainActive[t]) continue;
+// modified init to optionally take an X‐offset
+void initSpriteTrainAtX(Enemy train[], int num, int startX)
+{
+    for (int i = 0; i < num; ++i) {
+        train[i].x           = startX + i * (SPRITE_W + SPRITE_GAP);
+        train[i].y           = (WIDTH - SPRITE_H) / 2;
+        train[i].vx          = -HVEC;
+        train[i].reg         = 5 + i;
+        train[i].enemyARight = 14;
+        train[i].active      = true;
 
-        // move each sprite in train
-        for (int i = 0; i < SPRITES_PER_TRAIN; ++i) {
-            spriteTrains[t][i].x += spriteTrains[t][i].vx;
-            write_sprite_to_kernel(
-                1,
-                spriteTrains[t][i].y,
-                spriteTrains[t][i].x,
-                spriteTrains[t][i].enemyARight,
-                spriteTrains[t][i].reg
-            );
-        }
-
-        // check for triggering next train spawn
-        int rightEdge = spriteTrains[t][SPRITES_PER_TRAIN - 1].x + SPRITE_W;
-        if (rightEdge == 640 - 175) {
-            // find an inactive train to respawn
-            for (int k = 0; k < MAX_TRAINS; ++k) {
-                if (!trainActive[k]) {
-                    trainSpeed[k] += 2;  // Increase speed
-                    spawnTrain(k);
-                    break;
-                }
-            }
-        }
-
-        // deactivate if off-screen
-        if (spriteTrains[t][SPRITES_PER_TRAIN - 1].x + SPRITE_W < 0) {
-            trainActive[t] = false;
-        }
+        write_sprite_to_kernel(1, train[i].y, train[i].x,
+                               train[i].enemyARight, train[i].reg);
     }
 }
+
+// call this once at level start instead of initSpriteTrain(...)
+void launchFirstTrain(void)
+{
+    int totalW = NUM_SPRITES * SPRITE_W + (NUM_SPRITES - 1) * SPRITE_GAP;
+    int baseX  = LENGTH;           // offscreen right
+    firstTrainLaunchX = baseX;     // remember this
+    initSpriteTrainAtX(enemies, NUM_SPRITES, baseX);
+    secondTrainQueued = false;     // reset for this level
+}
+
+// void updateTrains() {
+//     for (int t = 0; t < MAX_TRAINS; ++t) {
+//         if (!trainActive[t]) continue;
+
+//         // move each sprite in train
+//         for (int i = 0; i < SPRITES_PER_TRAIN; ++i) {
+//             spriteTrains[t][i].x += spriteTrains[t][i].vx;
+//             write_sprite_to_kernel(
+//                 1,
+//                 spriteTrains[t][i].y,
+//                 spriteTrains[t][i].x,
+//                 spriteTrains[t][i].enemyARight,
+//                 spriteTrains[t][i].reg
+//             );
+//         }
+
+//         // check for triggering next train spawn
+//         int rightEdge = spriteTrains[t][SPRITES_PER_TRAIN - 1].x + SPRITE_W;
+//         if (rightEdge == 640 - 175) {
+//             // find an inactive train to respawn
+//             for (int k = 0; k < MAX_TRAINS; ++k) {
+//                 if (!trainActive[k]) {
+//                     trainSpeed[k] += 2;  // Increase speed
+//                     spawnTrain(k);
+//                     break;
+//                 }
+//             }
+//         }
+
+//         // deactivate if off-screen
+//         if (spriteTrains[t][SPRITES_PER_TRAIN - 1].x + SPRITE_W < 0) {
+//             trainActive[t] = false;
+//         }
+//     }
+// }
 
 
 
@@ -816,9 +855,9 @@ void *controller_input_thread(void *arg)
         pthread_exit(NULL);
     }
 
-	for (int i = 0; i < 1; ++i) {
-		spawnTrain(i);  // start with one train
-	}
+	// for (int i = 0; i < 1; ++i) {
+	// 	spawnTrain(i);  // start with one train
+	// }
 	
 
     while (1)
@@ -927,7 +966,8 @@ int main(int argc, char *argv[])
         Character character; //chick
         initCharacter(&character); // x=64, y=432 
 
-        initSpriteTrain(enemies, MAX_ENEMIES);
+        // initSpriteTrain(enemies, MAX_ENEMIES);
+	    launchFirstTrain();
         
         Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
@@ -1099,7 +1139,7 @@ int main(int argc, char *argv[])
                     enemies[i].y = WALL;
                     enemies[i].vy = 1;
                 }
-				updateTrains();
+				// updateTrains();
 
             }
 	    //not needed
