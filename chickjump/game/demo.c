@@ -1054,7 +1054,7 @@ int main(int argc, char *argv[])
         initCharacter(&character); // x=64, y=432 
 
         //initSpriteTrain(enemies, MAX_ENEMIES);
-	    initTrain();
+	    initTrains();
         
         Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
