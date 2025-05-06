@@ -47,9 +47,9 @@
 #define INITIAL_LIVES    5
 
 // global state
-static int vga_fd, audio_fd;
-static struct controller_output_packet controller_state;
-static bool towerEnabled = true;     // ← only draw tower while true
+int vga_fd, audio_fd;
+struct controller_output_packet controller_state;
+bool towerEnabled = true;     // ← only draw tower while true
 
 typedef struct {
     int x, y;
