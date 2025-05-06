@@ -119,7 +119,7 @@ void initSpriteTrain(Enemy train[], int num)
         train[i].vx           = -HVEC;        // horizontal speed
         train[i].vy           = 0;
         train[i].reg          = 5 + i;       // sprite slots 5–8
-        train[i].enemyARight  = 14;          // fixed frame
+        train[i].enemyARight  = 15;          // fixed frame
         train[i].active       = true;
 
         // draw initial sprite
