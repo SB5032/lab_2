@@ -103,8 +103,15 @@ int main(void) {
     // ───── start screen ────────────────────────────────────────────────────────
     cleartiles();
     clearSprites();
-    write_text((unsigned char*)"ScreamJump Chicken", 18, 10, 8);
-    write_text((unsigned char*)"Press any key to start", 22, 12, 16);
+        int index = 8;
+        write_text("scream", 6, 14, 13);
+        write_text("jump", 4, 14, 20);
+
+        write_text("press", 5, 20, index);
+        write_text("any", 3, 20, index + 6);
+        write_text("key", 3, 20, index + 10);
+        write_text("to", 2, 20, index + 14);
+        write_text("start", 5, 20, index + 17);
     while (1) {
         if (controller_state.a || controller_state.b || controller_state.x ||
             controller_state.y || controller_state.start || controller_state.select ||
