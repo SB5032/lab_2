@@ -21,6 +21,11 @@
 #define SPRITE_GAP   8
 #define SPRITE_W     32
 #define SPRITE_H     32
+#define NUM_TRAINS 4
+#define TRAIN_LENGTH NUM_SPRITES // 4 segments per train
+#define TRAIN_GAP 175
+#define SEGMENT_GAP SPRITE_GAP   // 8 pixels
+
 int level = 0;
 int numEnemy = MAX_ENEMIES;
 int numOfReward = 0;
@@ -60,6 +65,15 @@ typedef struct
 
 
 static Enemy enemies[MAX_ENEMIES];  //replace with platform
+
+typedef struct {
+    Enemy segments[TRAIN_LENGTH];
+    bool active;
+    int launchX;
+    int baseY;
+} Train;
+
+static Train trains[NUM_TRAINS];
 
 typedef struct
 {
@@ -166,53 +180,107 @@ void initSpriteTrain(Enemy train[], int num)
 //     }
 // }
 
-void moveSpriteTrain(Enemy train[], int num)
+// void moveSpriteTrain(Enemy train[], int num)
+// {
+//     static int launch_index = 0;
+//     static bool launched[MAX_ENEMIES] = {false};
+//     static int initial_x[MAX_ENEMIES];
+
+//     // Initialize positions only once
+//     if (launch_index == 0 && !launched[0]) {
+//         int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
+//         for (int i = 0; i < num; ++i) {
+//             initial_x[i] = LENGTH + i * (SPRITE_W + 175); // 175 pixel gap
+//             train[i].y = baseY;
+//             train[i].vx = -HVEC;
+//             train[i].vy = 0;
+//             train[i].reg = 5 + i;
+//             train[i].enemyARight = 14;
+//             train[i].active = false; // not active until launched
+//             launched[i] = false;
+//         }
+//     }
+
+//     // Move launched trains
+//     for (int i = 0; i < num; ++i) {
+//         if (launched[i]) {
+//             train[i].x += train[i].vx;
+//             write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
+//         }
+//     }
+
+//     // Launch next train if spacing condition is met
+//     if (launch_index < num) {
+//         if (launch_index == 0 || 
+//             (launched[launch_index - 1] && train[launch_index - 1].x <= initial_x[launch_index] - 175)) {
+//             train[launch_index].x = initial_x[launch_index];
+//             train[launch_index].active = true;
+//             launched[launch_index] = true;
+//             ++launch_index;
+//         }
+//     }
+
+//     // Reset train if the last train has exited
+//     if (launched[num - 1] && train[num - 1].x + SPRITE_W < 0) {
+//         launch_index = 0;
+//         for (int i = 0; i < num; ++i) {
+//             launched[i] = false;
+//             train[i].active = false;
+//         }
+//     }
+// }
+
+void initTrains()
 {
-    static int launch_index = 0;
-    static bool launched[MAX_ENEMIES] = {false};
-    static int initial_x[MAX_ENEMIES];
+    for (int i = 0; i < NUM_TRAINS; ++i) {
+        trains[i].active = false;
+        trains[i].launchX = LENGTH + i * TRAIN_GAP;
+        trains[i].baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
 
-    // Initialize positions only once
-    if (launch_index == 0 && !launched[0]) {
-        int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
-        for (int i = 0; i < num; ++i) {
-            initial_x[i] = LENGTH + i * (SPRITE_W + 175); // 175 pixel gap
-            train[i].y = baseY;
-            train[i].vx = -HVEC;
-            train[i].vy = 0;
-            train[i].reg = 5 + i;
-            train[i].enemyARight = 14;
-            train[i].active = false; // not active until launched
-            launched[i] = false;
+        for (int j = 0; j < TRAIN_LENGTH; ++j) {
+            Enemy* seg = &trains[i].segments[j];
+            seg->x = trains[i].launchX + j * (SPRITE_W + SEGMENT_GAP);
+            seg->y = trains[i].baseY;
+            seg->vx = -HVEC;
+            seg->vy = 0;
+            seg->reg = 5 + j;
+            seg->enemyARight = 14;
+            seg->active = false; // will be activated later
+        }
+    }
+}
+
+void moveTrains()
+{
+    static int launchedTrains = 0;
+
+    // Launch trains with 175-pixel spacing
+    if (launchedTrains < NUM_TRAINS) {
+        if (launchedTrains == 0 || 
+            trains[launchedTrains - 1].segments[0].x <= trains[launchedTrains].launchX - TRAIN_GAP)
+        {
+            trains[launchedTrains].active = true;
+            for (int j = 0; j < TRAIN_LENGTH; ++j)
+                trains[launchedTrains].segments[j].active = true;
+            launchedTrains++;
         }
     }
 
-    // Move launched trains
-    for (int i = 0; i < num; ++i) {
-        if (launched[i]) {
-            train[i].x += train[i].vx;
-            write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
+    // Move and draw trains
+    for (int i = 0; i < NUM_TRAINS; ++i) {
+        if (!trains[i].active) continue;
+
+        for (int j = 0; j < TRAIN_LENGTH; ++j) {
+            Enemy* seg = &trains[i].segments[j];
+            seg->x += seg->vx;
+            write_sprite_to_kernel(1, seg->y, seg->x, seg->enemyARight, seg->reg);
         }
     }
 
-    // Launch next train if spacing condition is met
-    if (launch_index < num) {
-        if (launch_index == 0 || 
-            (launched[launch_index - 1] && train[launch_index - 1].x <= initial_x[launch_index] - 175)) {
-            train[launch_index].x = initial_x[launch_index];
-            train[launch_index].active = true;
-            launched[launch_index] = true;
-            ++launch_index;
-        }
-    }
-
-    // Reset train if the last train has exited
-    if (launched[num - 1] && train[num - 1].x + SPRITE_W < 0) {
-        launch_index = 0;
-        for (int i = 0; i < num; ++i) {
-            launched[i] = false;
-            train[i].active = false;
-        }
+    // Reset all trains when the last one is offscreen
+    if (trains[NUM_TRAINS - 1].segments[TRAIN_LENGTH - 1].x + SPRITE_W < 0) {
+        launchedTrains = 0;
+        initTrains(); // re-randomize y and reset positions
     }
 }
 
@@ -985,7 +1053,8 @@ int main(int argc, char *argv[])
         Character character; //chick
         initCharacter(&character); // x=64, y=432 
 
-        initSpriteTrain(enemies, MAX_ENEMIES);
+        //initSpriteTrain(enemies, MAX_ENEMIES);
+	    initTrain();
         
         Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
@@ -1137,7 +1206,8 @@ int main(int argc, char *argv[])
 				if (enemies[i].reg >= 5 && enemies[i].reg < 5 + MAX_ENEMIES)
 				{
 					// Just redraw the train sprite — no y/velocity update
-					moveSpriteTrain(enemies, MAX_ENEMIES);
+					//moveSpriteTrain(enemies, MAX_ENEMIES);
+					moveTrains();
 					break; // you can break since you handled the full train in one go
 				}
 	      //enemy movement
