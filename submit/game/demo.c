@@ -166,80 +166,7 @@ void moveSpriteTrain(Enemy train[], int num)
     }
 }
 
-// Return true if (x,y,w,h) overlap character
-static bool aabb_collide(int x, int y, int w, int h,
-                         int cx, int cy, int cw, int ch) {
-  return (cx < x + w &&
-          cx + cw > x &&
-          cy < y + h &&
-          cy + ch > y);
-}
 
-void handleCollisionCharcterEnemy(Character *character,
-                                  Enemy *enemies,
-                                  int numEnemies,
-                                  Reward *reward)
-{
-  for (int i = 0; i < numEnemies; ++i) {
-    Enemy *e = &enemies[i];
-
-    // 1) Is this one of the train segments? (we used regs 5–8)
-    if (e->reg >= 5 && e->reg < 5 + NUM_SPRITES) {
-      // treat as platform collision
-      if (aabb_collide(e->x, e->y, SPRITE_W, SPRITE_H,
-                       character->x, character->y,
-                       character->width, character->height))
-      {
-        // land on top
-        character->y        = e->y - character->height;
-        character->vy       = 0;
-        character->jumping  = false;
-        // don’t die—skip to next object
-        continue;
-      }
-    }
-
-    // 2) Otherwise, your normal enemy logic:
-    if (checkCollisionCharacterEnemy(character, e)) {
-      // existing “surrounded?” and “lose a life” code here…
-            if (enemies[i].surrounded)
-            {
-                enemies[i].active = false;
-                numOfReward++;
-                initReward(&reward[numOfReward - 1], enemies[i].x, enemies[i].y, enemies[i].reg);
-                for (int j = i; j < numEnemies - 1; ++j)
-                {
-                    enemies[j] = enemies[j + 1];
-                }
-                enemies[numEnemies - 1] = (Enemy){0};
-                numEnemies--;
-                numEnemy--;
-            }
-            else
-            {
-                if (character->active)
-                {
-                    play_sfx(0);
-                    character->active = false;
-                    life--;
-                    if (life == 0)
-                    {
-                        bgm_startstop(0);
-                        write_tile_to_kernel(1, 6, 1);
-                        clearSprites();
-                        write_sprite_to_kernel(1, character->y, character->x, 1, 11);
-                        sleep(1);
-                        write_sprite_to_kernel(1, character->y, character->x, 2, 11);
-                        sleep(1);
-                        return;
-                    }
-                    initCharacter(character);
-                }
-            }	    
-      break;
-    }
-  }
-}
 
 // void handleCollisionCharcterEnemy(Character *character, Enemy *enemies, int numEnemies, Reward *reward)
 // {
@@ -814,6 +741,83 @@ void loadNextLevel(Character *character, Enemy *enemies, Wall *walls)
 }
 
 struct controller_output_packet controller_state;
+
+
+// Return true if (x,y,w,h) overlap character
+static bool aabb_collide(int x, int y, int w, int h,
+                         int cx, int cy, int cw, int ch) {
+  return (cx < x + w &&
+          cx + cw > x &&
+          cy < y + h &&
+          cy + ch > y);
+}
+
+void handleCollisionCharcterEnemy(Character *character,
+                                  Enemy *enemies,
+                                  int numEnemies,
+                                  Reward *reward)
+{
+  for (int i = 0; i < numEnemies; ++i) {
+    Enemy *e = &enemies[i];
+
+    // 1) Is this one of the train segments? (we used regs 5–8)
+    if (e->reg >= 5 && e->reg < 5 + NUM_SPRITES) {
+      // treat as platform collision
+      if (aabb_collide(e->x, e->y, SPRITE_W, SPRITE_H,
+                       character->x, character->y,
+                       character->width, character->height))
+      {
+        // land on top
+        character->y        = e->y - character->height;
+        character->vy       = 0;
+        character->jumping  = false;
+        // don’t die—skip to next object
+        continue;
+      }
+    }
+
+    // 2) Otherwise, your normal enemy logic:
+    if (checkCollisionCharacterEnemy(character, e)) {
+      // existing “surrounded?” and “lose a life” code here…
+            if (enemies[i].surrounded)
+            {
+                enemies[i].active = false;
+                numOfReward++;
+                initReward(&reward[numOfReward - 1], enemies[i].x, enemies[i].y, enemies[i].reg);
+                for (int j = i; j < numEnemies - 1; ++j)
+                {
+                    enemies[j] = enemies[j + 1];
+                }
+                enemies[numEnemies - 1] = (Enemy){0};
+                numEnemies--;
+                numEnemy--;
+            }
+            else
+            {
+                if (character->active)
+                {
+                    play_sfx(0);
+                    character->active = false;
+                    life--;
+                    if (life == 0)
+                    {
+                        bgm_startstop(0);
+                        write_tile_to_kernel(1, 6, 1);
+                        clearSprites();
+                        write_sprite_to_kernel(1, character->y, character->x, 1, 11);
+                        sleep(1);
+                        write_sprite_to_kernel(1, character->y, character->x, 2, 11);
+                        sleep(1);
+                        return;
+                    }
+                    initCharacter(character);
+                }
+            }	    
+      break;
+    }
+  }
+}
+
 
 void *controller_input_thread(void *arg)
 {
