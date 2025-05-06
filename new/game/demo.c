@@ -40,8 +40,8 @@
 #define PLATFORM_SPRITE_IDX  14  // your .mif index for platform graphic
 
 // game state
-static int vga_fd, audio_fd;
-static struct controller_output_packet controller_state;
+int vga_fd, audio_fd;
+struct controller_output_packet controller_state;
 
 typedef struct {
     int x, y;
