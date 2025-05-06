@@ -967,6 +967,7 @@ int main(int argc, char *argv[])
 
         // initSpriteTrain(enemies, MAX_ENEMIES);
 	    launchFirstTrain();
+	    sleep (5);
         
         Wall walls[] = { // not needed
             {0, 0, LENGTH, WALL},
