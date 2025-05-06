@@ -1,5 +1,6 @@
 // screamjump_with_tower_once.c
-// ScreamJump Chicken: static 3-sprite tower only on the very first screen.
+// ScreamJump Chicken: static 3-sprite tower only on first screen,
+// with gravity applied *only* when jumping.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,8 +22,8 @@
 #define CHICKEN_REG    11
 #define CHICKEN_W      32
 #define CHICKEN_H      32
-#define CHICKEN_STAND  8      // tile index in your .mif
-#define CHICKEN_JUMP   11      // tile index in your .mif
+#define CHICKEN_STAND   8   // ← your real .mif index
+#define CHICKEN_JUMP    11   // ← your real .mif index
 #define JUMP_SFX        0
 
 // jump physics
@@ -35,7 +36,7 @@
 #define PLATFORM_H     32
 #define PLATFORM_SPEED  2
 #define PLATFORM_SPACING ((LENGTH + PLATFORM_W)/MAX_PLATFORMS)
-#define PLATFORM_SPRITE_IDX 14
+#define PLATFORM_SPRITE_IDX 2
 
 // static tower
 #define TOWER_X               16
@@ -47,9 +48,9 @@
 #define INITIAL_LIVES    5
 
 // global state
-int vga_fd, audio_fd;
-struct controller_output_packet controller_state;
-bool towerEnabled = true;     // ← only draw tower while true
+ int vga_fd, audio_fd;
+ struct controller_output_packet controller_state;
+ bool towerEnabled = true;     // draw tower only until first platform landing
 
 typedef struct {
     int x, y;
@@ -68,8 +69,9 @@ void *controller_input_thread(void *arg) {
     while (1) {
         unsigned char buf[GAMEPAD_READ_LENGTH];
         int transferred;
-        if (libusb_interrupt_transfer(ctrl, ep, buf, GAMEPAD_READ_LENGTH, &transferred, 0) == 0)
-            usb_to_output(&controller_state, buf);
+        if (libusb_interrupt_transfer(ctrl, ep, buf, GAMEPAD_READ_LENGTH, &transferred, 0))
+            continue;
+        usb_to_output(&controller_state, buf);
     }
     libusb_close(ctrl);
     libusb_exit(NULL);
@@ -84,9 +86,12 @@ void initChicken(Chicken *c) {
     c->jumping = false;
 }
 
+// apply physics *only* when jumping
 void moveChicken(Chicken *c) {
-    c->y  += c->vy;
-    c->vy += GRAVITY;
+    if (c->jumping) {
+        c->y  += c->vy;
+        c->vy += GRAVITY;
+    }
 }
 
 int main(void) {
@@ -146,19 +151,18 @@ int main(void) {
                     botNow  >= plats[i].y &&
                     (chicken.x + CHICKEN_W) > plats[i].x &&
                     chicken.x  < (plats[i].x + PLATFORM_W)) {
-                    // landed
                     chicken.y       = plats[i].y - CHICKEN_H;
                     chicken.vy      = 0;
                     chicken.jumping = false;
                     score++;
                     write_score(score);
-                    // ** first landing: disable tower forever **
+                    // disable tower from now on
                     if (towerEnabled) towerEnabled = false;
                 }
             }
         }
 
-        // death?
+        // fell off bottom?
         if (chicken.y > WIDTH) {
             lives--;
             write_number(lives, 0, 0);
@@ -170,7 +174,7 @@ int main(void) {
         // redraw
         clearSprites();
 
-        // 1) draw tower only if still enabled
+        // 1) tower (only first screen)
         if (towerEnabled) {
             for (int i = 0; i < TOWER_HEIGHT_SPRITES; i++) {
                 write_sprite_to_kernel(
@@ -183,7 +187,7 @@ int main(void) {
             }
         }
 
-        // 2) moving platforms (regs 0–7)
+        // 2) moving platforms
         for (int i = 0; i < MAX_PLATFORMS; i++) {
             for (int k = 0; k < 4; k++) {
                 write_sprite_to_kernel(
@@ -196,7 +200,7 @@ int main(void) {
             }
         }
 
-        // 3) chicken (reg 11)
+        // 3) chicken
         write_sprite_to_kernel(
             1,
             chicken.y,
