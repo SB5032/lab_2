@@ -172,11 +172,6 @@ void initSpriteTrain(Enemy train[], int num)
 // }
 
 
-#define NUM_TRAINS 2
-#define SEGMENTS_PER_TRAIN 4
-#define TRAIN_GAP 175
-#define SEGMENT_GAP SPRITE_GAP // 8 px
-#define TRAIN_BASE_REG 0
 
 void moveSpriteTrain(Enemy train[], int num)
 {
