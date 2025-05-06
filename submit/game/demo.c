@@ -166,24 +166,60 @@ void initSpriteTrain(Enemy train[], int num)
 //     }
 // }
 
+// void moveSpriteTrain(Enemy train[], int num)
+// {
+//     static int currentTrainX = LENGTH; // starting offscreen right
+//     static int baseY;
+//     static bool launched = false;
+
+//     // If last sprite of current train has exited screen, prepare a new one
+//     if (train[num - 1].x + SPRITE_W < 0) {
+//         launched = false;
+//         currentTrainX = LENGTH;
+//     }
+
+//     // Launch new train if not already launched
+//     if (!launched) {
+//         baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
+
+//         for (int i = 0; i < num; ++i) {
+//             train[i].x = currentTrainX + i * (SPRITE_W + SPRITE_GAP);  // 8 pixel spacing
+//             train[i].y = baseY;
+//             train[i].vx = -HVEC;
+//             train[i].vy = 0;
+//             train[i].reg = 5 + i;
+//             train[i].enemyARight = 14;
+//             train[i].active = true;
+//         }
+
+//         launched = true;
+//     }
+
+//     // Move and draw each train segment
+//     for (int i = 0; i < num; ++i) {
+//         train[i].x += train[i].vx;
+//         write_sprite_to_kernel(
+//             1,
+//             train[i].y,
+//             train[i].x,
+//             train[i].enemyARight,
+//             train[i].reg
+//         );
+//     }
+// }
+
+#define TRAIN_SPACING 175
+
 void moveSpriteTrain(Enemy train[], int num)
 {
-    static int currentTrainX = LENGTH; // starting offscreen right
+    static int currentTrainX = LENGTH;
     static int baseY;
     static bool launched = false;
 
-    // If last sprite of current train has exited screen, prepare a new one
-    if (train[num - 1].x + SPRITE_W < 0) {
-        launched = false;
-        currentTrainX = LENGTH;
-    }
-
-    // Launch new train if not already launched
-    if (!launched) {
+    if (!launched || train[0].x <= LENGTH - TRAIN_SPACING) {
         baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
-
         for (int i = 0; i < num; ++i) {
-            train[i].x = currentTrainX + i * (SPRITE_W + SPRITE_GAP);  // 8 pixel spacing
+            train[i].x = currentTrainX + i * (SPRITE_W + SPRITE_GAP);
             train[i].y = baseY;
             train[i].vx = -HVEC;
             train[i].vy = 0;
@@ -191,20 +227,13 @@ void moveSpriteTrain(Enemy train[], int num)
             train[i].enemyARight = 14;
             train[i].active = true;
         }
-
         launched = true;
+        currentTrainX += TRAIN_SPACING;  // queue up next train position
     }
 
-    // Move and draw each train segment
     for (int i = 0; i < num; ++i) {
         train[i].x += train[i].vx;
-        write_sprite_to_kernel(
-            1,
-            train[i].y,
-            train[i].x,
-            train[i].enemyARight,
-            train[i].reg
-        );
+        write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
     }
 }
 
