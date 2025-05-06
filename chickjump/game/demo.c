@@ -39,7 +39,6 @@ static int  firstTrainLaunchX;  // record where the first train started
 #define WAVE1_BASE_REG (WAVE0_BASE_REG + NUM_SPRITES)
 
 // storage for each wave’s sprites
-static Enemy trainWaves[NUM_WAVES][NUM_SPRITES];
 // track which waves are active
 static bool  waveActive[NUM_WAVES];
 static int   waveLaunchX[NUM_WAVES];
@@ -83,6 +82,8 @@ typedef struct
 
 
 static Enemy enemies[MAX_ENEMIES];  //replace with platform
+static Enemy trainWaves[NUM_WAVES][NUM_SPRITES];
+
 // static Enemy spriteTrains[MAX_TRAINS][SPRITES_PER_TRAIN];
 // bool trainActive[MAX_TRAINS] = {false};
 // int trainSpeed[MAX_TRAINS] = {8, 10, 12};  // example speeds, increase as trains respawn
