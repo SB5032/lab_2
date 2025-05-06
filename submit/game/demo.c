@@ -119,7 +119,8 @@ void initSpriteTrain(Enemy train[], int num)
         train[i].vx           = -HVEC;        // horizontal speed
         train[i].vy           = 0;
         train[i].reg          = 5 + i;       // sprite slots 5–8
-        train[i].enemyARight  = 15;          // fixed frame
+		train[i].enemyALeft   = 15;
+        // train[i].enemyARight  = 15;          // fixed frame
         train[i].active       = true;
 
         // draw initial sprite
@@ -127,7 +128,7 @@ void initSpriteTrain(Enemy train[], int num)
           /*active*/ 1,
           /*row*/    train[i].y,
           /*col*/    train[i].x,
-          /*n*/      train[i].enemyARight,
+          /*n*/      train[i].enemyALeft,
           /*reg*/    train[i].reg
         );
     }
@@ -148,11 +149,11 @@ void moveSpriteTrain(Enemy train[], int num)
             train[i].vx           = -HVEC;
             train[i].vy           = 0;
             train[i].reg          = 5 + i;
-            train[i].enemyARight  = 15;
+            train[i].enemyALeft   = 15;
             train[i].active       = true;
         }
     }
-
+	//write_sprite_to_kernel(1, 448, i - 140, enemyS, 0);
     // Move and draw each sprite
     for (int i = 0; i < num; ++i) {
         train[i].x += train[i].vx;
@@ -160,7 +161,7 @@ void moveSpriteTrain(Enemy train[], int num)
             1,
             train[i].y,
             train[i].x,
-            train[i].enemyARight,
+            train[i].enemyALeft,
             train[i].reg
         );
     }
