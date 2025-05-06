@@ -240,9 +240,9 @@ void initEnemy(Enemy *enemy, int reg, Wall wall[]) //modify for variable length 
     enemy->reg = reg;//stores sprite reg index for rendering
     //below not needed
     enemy->enemyARight = 14;
-    enemy->enemyALeft = 16;
-    enemy->enemyBRight = 21;
-    enemy->enemyBLeft = 23;
+    enemy->enemyALeft = 14;
+    enemy->enemyBRight = 14;
+    enemy->enemyBLeft = 14;
 }
 void initReward(Reward *reward, int x, int y, int reg)
 {
