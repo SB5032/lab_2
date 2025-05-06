@@ -202,7 +202,40 @@ void handleCollisionCharcterEnemy(Character *character,
     // 2) Otherwise, your normal enemy logic:
     if (checkCollisionCharacterEnemy(character, e)) {
       // existing “surrounded?” and “lose a life” code here…
-      …
+            if (enemies[i].surrounded)
+            {
+                enemies[i].active = false;
+                numOfReward++;
+                initReward(&reward[numOfReward - 1], enemies[i].x, enemies[i].y, enemies[i].reg);
+                for (int j = i; j < numEnemies - 1; ++j)
+                {
+                    enemies[j] = enemies[j + 1];
+                }
+                enemies[numEnemies - 1] = (Enemy){0};
+                numEnemies--;
+                numEnemy--;
+            }
+            else
+            {
+                if (character->active)
+                {
+                    play_sfx(0);
+                    character->active = false;
+                    life--;
+                    if (life == 0)
+                    {
+                        bgm_startstop(0);
+                        write_tile_to_kernel(1, 6, 1);
+                        clearSprites();
+                        write_sprite_to_kernel(1, character->y, character->x, 1, 11);
+                        sleep(1);
+                        write_sprite_to_kernel(1, character->y, character->x, 2, 11);
+                        sleep(1);
+                        return;
+                    }
+                    initCharacter(character);
+                }
+            }	    
       break;
     }
   }
