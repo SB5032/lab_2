@@ -132,37 +132,87 @@ void initSpriteTrain(Enemy train[], int num)
         );
     }
 }
+// void moveSpriteTrain(Enemy train[], int num)
+// {
+//     // Check if last sprite has fully exited the screen
+//     if (train[num - 1].x + SPRITE_W < 0)
+//     {
+//         // Generate new train at right edge with new Y
+//         int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
+//         int baseX  = LENGTH;  // offscreen right
+//         int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
+
+//         for (int i = 0; i < num; ++i) {
+//             train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
+//             train[i].y            = baseY;
+//             train[i].vx           = -HVEC;
+//             train[i].vy           = 0;
+//             train[i].reg          = 5 + i;
+//             train[i].enemyARight  = 14;
+//             train[i].active       = true;
+//         }
+//     }
+
+//     // Move and draw each sprite
+//     for (int i = 0; i < num; ++i) {
+//         train[i].x += train[i].vx;
+//         write_sprite_to_kernel(
+//             1,
+//             train[i].y,
+//             train[i].x,
+//             train[i].enemyARight,
+//             train[i].reg
+//         );
+//     }
+// }
+
 void moveSpriteTrain(Enemy train[], int num)
 {
-    // Check if last sprite has fully exited the screen
-    if (train[num - 1].x + SPRITE_W < 0)
-    {
-        // Generate new train at right edge with new Y
-        int totalW = num * SPRITE_W + (num - 1) * SPRITE_GAP;
-        int baseX  = LENGTH;  // offscreen right
-        int baseY  = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);  // avoid top and bottom edges
+    static int launch_index = 0;
+    static bool launched[MAX_ENEMIES] = {false};
+    static int initial_x[MAX_ENEMIES];
 
+    // Initialize positions only once
+    if (launch_index == 0 && !launched[0]) {
+        int baseY = WALL + rand() % (WIDTH - 2 * WALL - SPRITE_H);
         for (int i = 0; i < num; ++i) {
-            train[i].x            = baseX + i * (SPRITE_W + SPRITE_GAP);
-            train[i].y            = baseY;
-            train[i].vx           = -HVEC;
-            train[i].vy           = 0;
-            train[i].reg          = 5 + i;
-            train[i].enemyARight  = 14;
-            train[i].active       = true;
+            initial_x[i] = LENGTH + i * (SPRITE_W + 175); // 175 pixel gap
+            train[i].y = baseY;
+            train[i].vx = -HVEC;
+            train[i].vy = 0;
+            train[i].reg = 5 + i;
+            train[i].enemyARight = 14;
+            train[i].active = false; // not active until launched
+            launched[i] = false;
         }
     }
 
-    // Move and draw each sprite
+    // Move launched trains
     for (int i = 0; i < num; ++i) {
-        train[i].x += train[i].vx;
-        write_sprite_to_kernel(
-            1,
-            train[i].y,
-            train[i].x,
-            train[i].enemyARight,
-            train[i].reg
-        );
+        if (launched[i]) {
+            train[i].x += train[i].vx;
+            write_sprite_to_kernel(1, train[i].y, train[i].x, train[i].enemyARight, train[i].reg);
+        }
+    }
+
+    // Launch next train if spacing condition is met
+    if (launch_index < num) {
+        if (launch_index == 0 || 
+            (launched[launch_index - 1] && train[launch_index - 1].x <= initial_x[launch_index] - 175)) {
+            train[launch_index].x = initial_x[launch_index];
+            train[launch_index].active = true;
+            launched[launch_index] = true;
+            ++launch_index;
+        }
+    }
+
+    // Reset train if the last train has exited
+    if (launched[num - 1] && train[num - 1].x + SPRITE_W < 0) {
+        launch_index = 0;
+        for (int i = 0; i < num; ++i) {
+            launched[i] = false;
+            train[i].active = false;
+        }
     }
 }
 
