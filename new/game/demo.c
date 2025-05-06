@@ -220,6 +220,7 @@ int main(void) {
                         idx
                     );
                 }
+                idx++;
             }
         }
         // draw platforms
