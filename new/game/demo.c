@@ -55,7 +55,7 @@
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES    5
 
-int vga_fd, audio_fd;
+int vga_fd; //, audio_fd;
 struct controller_output_packet controller_state;
 bool towerEnabled = true;
 
@@ -102,7 +102,7 @@ void moveChicken(Chicken *c) {
 
 int main(void) {
     if ((vga_fd   = open("/dev/vga_top",    O_RDWR)) < 0) return -1;
-    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) return -1;
+    // if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) return -1;
 
     pthread_t tid;
     pthread_create(&tid, NULL, controller_input_thread, NULL);
@@ -135,7 +135,7 @@ int main(void) {
 
     while (lives > 0) {
         if (controller_state.b && !chicken.jumping) {
-            chicken.vy = JUMP_VY; chicken.jumping = true; play_sfx(0);
+            chicken.vy = JUMP_VY; chicken.jumping = true; //play_sfx(0);
         }
         int prevY = chicken.y;
         moveChicken(&chicken);
