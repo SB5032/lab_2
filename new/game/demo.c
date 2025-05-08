@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #include "usbcontroller.h"
 #include "vga_interface.h"
-#include "audio_interface.h"
+// #include "audio_interface.h"
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH        640   // VGA width
