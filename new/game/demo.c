@@ -22,7 +22,7 @@
 // ───── sprite dimensions ─────────────────────────────────────────────────────
 #define CHICKEN_W      32
 #define CHICKEN_H      32
-#define TILE           CHICKEN_H
+#define TILE           16
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
 #define CHICKEN_STAND   8    // chicken standing tile
