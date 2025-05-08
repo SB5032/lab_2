@@ -1,5 +1,6 @@
 // screamjump_dynamic.c
 // 4 incoming platforms, must land on tower first or die, then chain platforms.
+// Added: start screen, bottom border only.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,57 +11,71 @@
 #include <fcntl.h>
 #include "usbcontroller.h"
 #include "vga_interface.h"
-#include "audio_interface.h"
+// #include "audio_interface.h"
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH        640   // VGA width
 #define WIDTH         480   // VGA height
-#define WALL           16   // top/bottom margin
+#define WALL           16   // bottom border thickness (pixels)
 #define JUMP_VY      -12
 #define GRAVITY        +1
 
 // ───── sprite dimensions ─────────────────────────────────────────────────────
 #define CHICKEN_W      32
 #define CHICKEN_H      32
+#define TILE           CHICKEN_H
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
 #define CHICKEN_STAND   8    // chicken standing tile
 #define CHICKEN_JUMP   11    // chicken jumping tile
 #define PLATFORM_SPRITE_IDX 14// platform graphic
+#define WALL_TILE_IDX    24   // your bottom-wall tile index in the MIF
 
 // ───── moving platforms ──────────────────────────────────────────────────────
 #define MAX_PLATFORMS   4
-#define PLATFORM_W    (4*32)  // 4 sprites × 32px
-#define PLATFORM_H     32
-#define PLATFORM_SPEED 2
+#define PLATFORM_W    (4*TILE)  // 4 sprites × TILE px
+#define PLATFORM_H      TILE
+#define PLATFORM_SPEED   2
 #define PLATFORM_SPACING (LENGTH / MAX_PLATFORMS)
-#define PLATFORM_REG_BASE 3   // regs 3…(3+4*MAX_PLATFORMS-1)
+#define PLATFORM_REG_BASE 3     // regs 3…(3+4*MAX_PLATFORMS-1)
 
 // ───── static tower ──────────────────────────────────────────────────────────
 #define TOWER_X         16
-#define TOWER_WIDTH     CHICKEN_W
-#define TOWER_HEIGHT    3     // stacked 3 sprites
-#define TOWER_REG_BASE  0     // uses regs 0,1,2
+#define TOWER_HEIGHT    3       // stacked 3 sprites
+#define TOWER_REG_BASE  0       // uses regs 0,1,2
 #define TOWER_BASE_Y   (WIDTH - WALL - PLATFORM_H)
+#define TOWER_WIDTH     CHICKEN_W
+
+// ───── bottom border tile map ───────────────────────────────────────────────
+#define BOTTOM_TILE_ROW  ((WIDTH - WALL) / TILE)
+#define NUM_TILE_COLS    (LENGTH / TILE)
 
 // ───── chicken sprite reg ───────────────────────────────────────────────────
-#define CHICKEN_REG (TOWER_REG_BASE + TOWER_HEIGHT + PLATFORM_REG_BASE + MAX_PLATFORMS*4)
+#define CHICKEN_REG     (TOWER_REG_BASE + TOWER_HEIGHT + PLATFORM_REG_BASE + MAX_PLATFORMS*4)
 
 // ───── lives/score & controller ──────────────────────────────────────────────
-#define INITIAL_LIVES   5
+#define INITIAL_LIVES    5
 
- int vga_fd, audio_fd;
- struct controller_output_packet controller_state;
- bool towerEnabled = true;  // enforce tower until first platform landing
+int vga_fd; //, audio_fd;
+struct controller_output_packet controller_state;
+bool towerEnabled = true;  // enforce tower until first platform landing
 
-typedef struct {
-    int x, y, vy;
-    bool jumping;
-} Chicken;
-typedef struct {
-    int x, y;
-} Platform;
+typedef struct { int row, col, tile; } Wall;
+typedef struct { int x, y, vy; bool jumping; } Chicken;
+typedef struct { int x, y; } Platform;
 
+// ───── Draw only bottom border ───────────────────────────────────────────────
+void drawBottomBorder(void) {
+    Wall walls[NUM_TILE_COLS];
+    for (int i = 0; i < NUM_TILE_COLS; i++) {
+        walls[i].row  = BOTTOM_TILE_ROW;
+        walls[i].col  = i;
+        walls[i].tile = WALL_TILE_IDX;
+    }
+    for (int i = 0; i < NUM_TILE_COLS; i++) {
+        write_tile_to_kernel(walls[i].row, walls[i].col, walls[i].tile);
+    }
+}
 
 // ───── USB controller thread ─────────────────────────────────────────────────
 void *controller_input_thread(void *arg) {
@@ -78,7 +93,6 @@ void *controller_input_thread(void *arg) {
     pthread_exit(NULL);
 }
 
-
 // ───── chicken init & physics ────────────────────────────────────────────────
 void initChicken(Chicken *c) {
     c->x = TOWER_X;
@@ -94,19 +108,31 @@ void moveChicken(Chicken *c) {
     c->vy += GRAVITY;
 }
 
-
 int main(void) {
     // open VGA & audio
-    if ((vga_fd   = open("/dev/vga_top",    O_RDWR)) < 0)   return -1;
-    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0)   return -1;
+    if ((vga_fd   = open("/dev/vga_top",    O_RDWR)) < 0) return -1;
+    // if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) return -1;
 
     // start controller thread
     pthread_t tid;
     pthread_create(&tid, NULL, controller_input_thread, NULL);
 
-    // clear everything
+    // ── START SCREEN ──────────────────────────────────────────────────────────
     cleartiles();
     clearSprites();
+    write_text((unsigned char*)"ScreamJump Chicken", 18, 10, 8);
+    write_text((unsigned char*)"Press any key to start", 22, 12, 16);
+    while (!(controller_state.a || controller_state.b || 
+             controller_state.x || controller_state.y ||
+             controller_state.start || controller_state.select ||
+             controller_state.updown || controller_state.leftright)) {
+        usleep(10000);
+    }
+
+    // ── INITIALIZE GAME ───────────────────────────────────────────────────────
+    cleartiles();
+    clearSprites();
+    drawBottomBorder();
 
     int score = 0, lives = INITIAL_LIVES;
     write_score(score);
@@ -128,7 +154,7 @@ int main(void) {
         if (controller_state.b && !chicken.jumping) {
             chicken.vy      = JUMP_VY;
             chicken.jumping = true;
-            play_sfx(0);
+            // play_sfx(0);
         }
 
         int prevY = chicken.y;
@@ -138,12 +164,10 @@ int main(void) {
         for (int i = 0; i < MAX_PLATFORMS; i++) {
             plats[i].x -= PLATFORM_SPEED;
             if (plats[i].x < -PLATFORM_W) {
-                // find rightmost
                 int maxX = plats[0].x;
                 for (int j = 1; j < MAX_PLATFORMS; j++)
                     if (plats[j].x > maxX) maxX = plats[j].x;
                 plats[i].x = maxX + PLATFORM_SPACING;
-                // jitter height around previous
                 int prevIdx = (i + MAX_PLATFORMS - 1) % MAX_PLATFORMS;
                 int delta   = (rand() % PLATFORM_H) - (PLATFORM_H/2);
                 int newY    = plats[prevIdx].y + delta;
@@ -153,19 +177,17 @@ int main(void) {
             }
         }
 
-        // ── landing on tower? ───────────────────────────────────────────────
+        // ── landing on tower? ─────────────────────────────────────
         if (towerEnabled && chicken.vy > 0) {
             int botPrev = prevY + CHICKEN_H;
             int botNow  = chicken.y  + CHICKEN_H;
             if (botPrev <= TOWER_BASE_Y && botNow >= TOWER_BASE_Y &&
                 chicken.x + CHICKEN_W > TOWER_X &&
                 chicken.x < TOWER_X + TOWER_WIDTH) {
-                // safe on tower
                 chicken.y       = TOWER_BASE_Y - CHICKEN_H;
                 chicken.vy      = 0;
                 chicken.jumping = false;
             } else if (botPrev <= TOWER_BASE_Y && chicken.y > TOWER_BASE_Y) {
-                // missed it → lose life
                 lives--;
                 write_number(lives, 0, 0);
                 initChicken(&chicken);
@@ -174,7 +196,7 @@ int main(void) {
             }
         }
 
-        // ── landing on any platform? ────────────────────────────────────────
+        // ── landing on any platform? ─────────────────────────────
         if (chicken.vy > 0) {
             for (int i = 0; i < MAX_PLATFORMS; i++) {
                 int botPrev = prevY + CHICKEN_H;
@@ -182,7 +204,6 @@ int main(void) {
                 if (botPrev <= plats[i].y && botNow >= plats[i].y &&
                     chicken.x + CHICKEN_W > plats[i].x &&
                     chicken.x < (plats[i].x + PLATFORM_W)) {
-                    // snap, score, disable tower
                     chicken.y       = plats[i].y - CHICKEN_H;
                     chicken.vy      = 0;
                     chicken.jumping = false;
@@ -194,7 +215,7 @@ int main(void) {
             }
         }
 
-        // ── fell off bottom? ───────────────────────────────────────────────
+        // ── fell off bottom? ─────────────────────────────────────────
         if (chicken.y > WIDTH) {
             lives--;
             write_number(lives, 0, 0);
@@ -203,7 +224,7 @@ int main(void) {
             continue;
         }
 
-        // ── redraw all sprites ──────────────────────────────────────────────
+        // ── redraw all sprites ────────────────────────────────────
         clearSprites();
 
         // 1) tower (regs 0–2)
