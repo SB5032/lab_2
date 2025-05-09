@@ -27,6 +27,7 @@
 #define CHICKEN_STAND   8    // chicken standing tile
 #define CHICKEN_JUMP   11    // chicken jumping tile
 #define PLATFORM_SPRITE_IDX 14// platform graphic
+#define TOWER_TILE_IDX  22    // static tower tile
 
 // ───── moving platforms ──────────────────────────────────────────────────────
 #define MAX_PLATFORMS   4
@@ -39,12 +40,11 @@
 // ───── static tower ──────────────────────────────────────────────────────────
 #define TOWER_X         16
 #define TOWER_WIDTH     CHICKEN_W
-#define TOWER_HEIGHT    3     // stacked 3 sprites
-#define TOWER_REG_BASE  0     // uses regs 0,1,2
+#define TOWER_HEIGHT    3     // stacked 3 sprites high originally
 #define TOWER_BASE_Y   (WIDTH - WALL - PLATFORM_H)
 
 // ───── chicken sprite reg ───────────────────────────────────────────────────
-#define CHICKEN_REG (TOWER_REG_BASE + TOWER_HEIGHT + PLATFORM_REG_BASE + MAX_PLATFORMS*4)
+#define CHICKEN_REG (/*unused now*/)  /* was: TOWER_REG_BASE + TOWER_HEIGHT + PLATFORM_REG_BASE + MAX_PLATFORMS*4 */
 
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES   5
@@ -104,18 +104,12 @@ int main(void) {
     // ───── START SCREEN ──────────────────────────────────────────────────────
     cleartiles();
     clearSprites();
-    // draw title
     write_text((unsigned char*)"ScreamJump Chicken", 18, 10, 8);
-    // draw prompt
     write_text((unsigned char*)"Press any key to start", 22, 12, 16);
-    // wait for any button press
-    while (1) {
-        // check common buttons
-        if (controller_state.a || controller_state.b || controller_state.x ||
-            controller_state.y || controller_state.start || controller_state.select ||
-            controller_state.updown || controller_state.leftright) {
-            break;
-        }
+    while (!(
+        controller_state.a || controller_state.b || controller_state.x ||
+        controller_state.y || controller_state.start || controller_state.select ||
+        controller_state.updown || controller_state.leftright)) {
         usleep(10000);
     }
 
@@ -127,7 +121,6 @@ int main(void) {
     write_score(score);
     write_number(lives, 0, 0);
 
-    // seed platforms just off the right edge
     srand(time(NULL));
     Platform plats[MAX_PLATFORMS];
     for (int i = 0; i < MAX_PLATFORMS; i++) {
@@ -140,6 +133,7 @@ int main(void) {
 
     // ───── MAIN GAME LOOP ─────────────────────────────────────────────────────
     while (lives > 0) {
+        // input & physics
         if (controller_state.b && !chicken.jumping) {
             chicken.vy      = JUMP_VY;
             chicken.jumping = true;
@@ -173,6 +167,7 @@ int main(void) {
             if (botPrev <= TOWER_BASE_Y && botNow >= TOWER_BASE_Y &&
                 chicken.x + CHICKEN_W > TOWER_X &&
                 chicken.x < TOWER_X + TOWER_WIDTH) {
+
                 chicken.y       = TOWER_BASE_Y - CHICKEN_H;
                 chicken.vy      = 0;
                 chicken.jumping = false;
@@ -193,6 +188,7 @@ int main(void) {
                 if (botPrev <= plats[i].y && botNow >= plats[i].y &&
                     chicken.x + CHICKEN_W > plats[i].x &&
                     chicken.x < plats[i].x + PLATFORM_W) {
+
                     chicken.y       = plats[i].y - CHICKEN_H;
                     chicken.vy      = 0;
                     chicken.jumping = false;
@@ -213,40 +209,39 @@ int main(void) {
             continue;
         }
 
-        // redraw sprites
+        // redraw
         clearSprites();
 
-        // tower
-        if (towerEnabled) {
-            for (int i = 0; i < TOWER_HEIGHT; i++) {
-                write_sprite_to_kernel(
-                    1,
-                    TOWER_BASE_Y - i*PLATFORM_H,
-                    TOWER_X,
-                    PLATFORM_SPRITE_IDX,
-                    TOWER_REG_BASE + i
-                );
+        // tower (tile-based)
+        {
+            int rowStart = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / 16;
+            int rowEnd   = TOWER_BASE_Y / 16;
+            int colStart = TOWER_X / 16;
+            int colEnd   = (TOWER_X + TOWER_WIDTH) / 16;
+            for (int r = rowStart; r < rowEnd; ++r) {
+                for (int c = colStart; c < colEnd; ++c) {
+                    write_tile_to_kernel(r, c,
+                        towerEnabled ? TOWER_TILE_IDX : 0);
+                }
             }
         }
+
         // platforms
         for (int i = 0; i < MAX_PLATFORMS; i++) {
             for (int k = 0; k < 4; k++) {
                 write_sprite_to_kernel(
-                    1,
-                    plats[i].y,
-                    plats[i].x + k*32,
+                    1, plats[i].y, plats[i].x + k*32,
                     PLATFORM_SPRITE_IDX,
                     PLATFORM_REG_BASE + i*4 + k
                 );
             }
         }
+
         // chicken
         write_sprite_to_kernel(
-            1,
-            chicken.y,
-            chicken.x,
+            1, chicken.y, chicken.x,
             chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            CHICKEN_REG
+            /* new reg */  2
         );
 
         usleep(16666); // ~60Hz
