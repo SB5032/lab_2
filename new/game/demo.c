@@ -98,7 +98,6 @@ int main(void) {
     cleartiles(); clearSprites();
     int score=0, lives=INITIAL_LIVES;
     int level=1, platformSpeed=BASE_PLATFORM_SPEED, jumpDelay=BASE_JUMP_DELAY;
-
     write_score(score); write_number(lives,0,0);
     write_number(level,0,38);
 
@@ -117,9 +116,8 @@ int main(void) {
         for(int j=0;j<cnt;j++) if(towerEnabled&&cand[j]==4){cand[j]=cand[cnt-1];cnt--;j--;}
         if(r==4) for(int j=0;j<cnt;j++) if(cand[j]==1){cand[j]=cand[cnt-1];cnt--;j--;}
         int target=cand[rand()%cnt];
-        // region2 &3: y within ±200 of chicken
-        if(r==2||r==3){
-            int lo=chicken.y-150, hi=chicken.y+150;
+        if(r==2||r==3||r==4) {
+            int lo=chicken.y-200, hi=chicken.y+200;
             if(lo<minY) lo=minY; if(hi>maxY) hi=maxY;
             plats[i].y=rand()%(hi-lo+1)+lo;
         } else {
@@ -143,8 +141,7 @@ int main(void) {
                 int cand2[2]={prevb,nextb},cnt2=2;
                 for(int j=0;j<cnt2;j++) if(towerEnabled&&cand2[j]==4){cand2[j]=cand2[cnt2-1];cnt2--;j--;}
                 if(r==4) for(int j=0;j<cnt2;j++) if(cand2[j]==1){cand2[j]=cand2[cnt2-1];cnt2--;j--;}
-                // region2 &3: ±200 range
-                if(r==2||r==3){
+                if(r==2||r==3||r==4) {
                     int lo=chicken.y-200, hi=chicken.y+200;
                     if(lo<minY) lo=minY; if(hi>maxY) hi=maxY;
                     plats[i].y=rand()%(hi-lo+1)+lo;
