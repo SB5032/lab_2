@@ -79,8 +79,10 @@ void *controller_input_thread(void *arg) {
 
 // ───── chicken init & physics ────────────────────────────────────────────────
 void initChicken(Chicken *c) {
-    c->x = TOWER_X;
-    c->y = TOWER_BASE_Y - CHICKEN_H * TOWER_HEIGHT; // atop the tower
+ //   c->x = TOWER_X;
+      c->x = 32;
+   // c->y = TOWER_BASE_Y - CHICKEN_H * TOWER_HEIGHT; // atop the tower
+    c->y = 368; // atop the tower
     c->vy = 0;
     c->jumping = false;
 }
@@ -226,8 +228,8 @@ int main(void) {
             int rowEnd   = TOWER_BASE_Y / 16;
             int colStart = TOWER_X / 16;
             int colEnd   = (TOWER_X + TOWER_WIDTH) / 16;
-            for (int r = rowStart; r < rowEnd; ++r) {
-                for (int c = colStart; c < colEnd; ++c) {
+            for (int r = 21; r < 30; ++r) {
+                for (int c = 0; c < 5; ++c) {
                     write_tile_to_kernel(r, c,
                         towerEnabled ? TOWER_TILE_IDX : 0);
                 }
