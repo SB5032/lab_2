@@ -179,13 +179,13 @@ int main(void) {
         clearSprites();
         // draw tower
         {
-            int rowStart=(TOWER_BASE_Y-TOWER_HEIGHT*PLATFORM_H)/16;
-            int rowEnd=TOWER_BASE_Y/16;
-            int colStart=TOWER_X/16;
-            int colEnd=(TOWER_X+TOWER_WIDTH)/16;
-            for(int r=rowStart;r<=rowEnd;r++)
-                for(int c=colStart;c<=colEnd;c++)
-                    write_tile_to_kernel(r,c, towerEnabled?TOWER_TILE_IDX:0);
+            int rowStart = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / 16;
+            int rowEnd   = TOWER_BASE_Y / 16;
+            int colStart = TOWER_X / 16;
+            int colEnd   = (TOWER_X + TOWER_WIDTH) / 16;
+            for (int r = 21; r < 30; ++r)
+                for (int c = 0; c < 5; ++c)
+                    write_tile_to_kernel(r, c, towerEnabled ? TOWER_TILE_IDX : 0);
         }
         // falling special block
         if(blockFalling){ fallY+=4;
@@ -196,7 +196,7 @@ int main(void) {
         for(int i=0;i<MAX_PLATFORMS;i++){
             for(int k=0;k<4;k++){
                 int tile=PLATFORM_TILE;
-                if(level==2 && plats[i].special && k==plats[i].specialIdx)
+                if(level==3 && plats[i].special && k==plats[i].specialIdx)
                     tile=SPECIAL_TILE;
                 write_sprite_to_kernel(
                     1,plats[i].y,plats[i].x+k*32,
