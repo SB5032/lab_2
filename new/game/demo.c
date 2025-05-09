@@ -86,6 +86,9 @@ void moveChicken(Chicken *c) {
     if (!c->jumping && towerEnabled) return;
     c->y  += c->vy;
     c->vy += GRAVITY;
+	if (c->vy == 0){
+		usleep(2000);
+	}
 }
 
 int main(void) {
@@ -245,7 +248,7 @@ int main(void) {
             towerEnabled = true;
             write_number(lives, 0, 0);
             initChicken(&chicken);
-            usleep(3000000);
+            usleep(1000000);
             continue;
         }
 
