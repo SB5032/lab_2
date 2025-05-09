@@ -17,7 +17,7 @@
 #define WIDTH         480   // VGA height
 #define WALL           16   // top/bottom margin
 #define JUMP_VY      -16
-#define GRAVITY        +0.5
+#define GRAVITY        +1
 
 // ───── sprite dimensions ─────────────────────────────────────────────────────
 #define CHICKEN_W      32
