@@ -17,7 +17,7 @@ module sprite_active(input logic clk,
 
 
   // sprite array access
-  logic [11:0][24:0] sprite_array;
+  logic [15:0][24:0] sprite_array;
   // indexing: 24 is active, 23-15 is v/row, 14-5 is h/col 4-0 is image number
   
 
