@@ -81,7 +81,7 @@ int main(void) {
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) return -1;
     pthread_t tid; pthread_create(&tid, NULL, controller_input_thread, NULL);
 
-    cleartiles(); clearSprites();
+    cleartiles(); clearSprites(); fill_sky_and_grass();
     write_text("scream",6,13,13); write_text("jump",4,13,20);
     write_text("press",5,19,8); write_text("any",3,19,14);
     write_text("key",3,19,20); write_text("to",2,19,26);
@@ -90,7 +90,7 @@ int main(void) {
              controller_state.y||controller_state.start||controller_state.select||
              controller_state.updown||controller_state.leftright)) usleep(10000);
 
-    cleartiles(); clearSprites();
+    cleartiles(); clearSprites(); fill_sky_and_grass();
     int score=0, lives=INITIAL_LIVES, level=1;
     int platformSpeed=BASE_PLATFORM_SPEED, jumpDelay=BASE_JUMP_DELAY;
     int jumpVy=JUMP_VY;
@@ -176,7 +176,7 @@ int main(void) {
             continue;
         }
 
-        clearSprites();
+        clearSprites(); fill_sky_and_grass();
         // draw tower
         {
             int rowStart = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / 16;
@@ -210,7 +210,7 @@ int main(void) {
         usleep(16666);
     }
 
-    cleartiles(); clearSprites();
+    cleartiles(); clearSprites(); fill_sky_and_grass();
     write_text((unsigned char*)"gameover",8,12,16);
     sleep(2);
     return 0;
