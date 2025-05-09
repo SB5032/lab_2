@@ -171,24 +171,24 @@ int main(void) {
         }
 
         // landing on tower?
-        if (towerEnabled && chicken.vy > 0) {
-            int botPrev = prevY + CHICKEN_H;
-            int botNow  = chicken.y  + CHICKEN_H;
-            if (botPrev <= TOWER_BASE_Y && botNow >= TOWER_BASE_Y &&
-                chicken.x + CHICKEN_W > TOWER_X &&
-                chicken.x < TOWER_X + TOWER_WIDTH) {
+        // if (towerEnabled && chicken.vy > 0) {
+        //     int botPrev = prevY + CHICKEN_H;
+        //     int botNow  = chicken.y  + CHICKEN_H;
+        //     if (botPrev <= TOWER_BASE_Y && botNow >= TOWER_BASE_Y &&
+        //         chicken.x + CHICKEN_W > TOWER_X &&
+        //         chicken.x < TOWER_X + TOWER_WIDTH) {
 
-                chicken.y       = TOWER_BASE_Y - CHICKEN_H;
-                chicken.vy      = 0;
-                chicken.jumping = false;
-            } else if (botPrev <= TOWER_BASE_Y && chicken.y > TOWER_BASE_Y) {
-                lives--;
-                write_number(lives, 0, 0);
-                initChicken(&chicken);
-                usleep(300000);
-                continue;
-            }
-        }
+        //         chicken.y       = TOWER_BASE_Y - CHICKEN_H;
+        //         chicken.vy      = 0;
+        //         chicken.jumping = false;
+        //     } else if (botPrev <= TOWER_BASE_Y && chicken.y > TOWER_BASE_Y) {
+        //         lives--;
+        //         write_number(lives, 0, 0);
+        //         initChicken(&chicken);
+        //         usleep(300000);
+        //         continue;
+        //     }
+        // }
 
         // landing on platforms?
         if (chicken.vy > 0) {
