@@ -214,6 +214,21 @@ int main(void) {
 
         // redraw
         clearSprites();
+		
+		// tower (tile-based)
+		{
+			int rowStart = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / 16;
+			int rowEnd   = TOWER_BASE_Y / 16;
+			int colStart = TOWER_X / 16;
+			int colEnd   = (TOWER_X + TOWER_WIDTH) / 16;
+			for (int r = 21; r < 30; ++r) {
+				for (int c = 0; c < 5; ++c) {
+					write_tile_to_kernel(r, c,
+						towerEnabled ? TOWER_TILE_IDX : 0);
+				}
+			}
+		}
+
         // draw tower, platforms, chicken...
         for (int i = 0; i < MAX_PLATFORMS; i++) {
             for (int k = 0; k < 4; k++) {
