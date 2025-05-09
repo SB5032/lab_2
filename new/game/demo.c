@@ -192,6 +192,7 @@ int main(void) {
 
         // landing on platforms?
         if (chicken.vy > 0) {
+			towerEnabled = false;
             for (int i = 0; i < MAX_PLATFORMS; i++) {
                 int botPrev = prevY + CHICKEN_H;
                 int botNow  = chicken.y  + CHICKEN_H;
