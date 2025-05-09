@@ -44,7 +44,15 @@ void write_sprite_to_kernel(unsigned char active,   //active == 1, display, acti
   }
 }
 
-
+void fill_sky_and_grass(void) {
+    unsigned char r, c, tile;
+    for (r = 0; r < ROWS; r++) {
+        tile = (r < (ROWS * 2 / 3)) ? SKY_TILE : GRASS_TILE;
+        for (c = 0; c < COLS; c++) {
+            write_tile_to_kernel(r, c, tile);
+        }
+    }
+}
 // tile operations: r*c: 40*30       r:0-29      c:0-39
 
 // for when needing to reset the background to empty

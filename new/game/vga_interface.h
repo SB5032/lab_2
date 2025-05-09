@@ -38,6 +38,8 @@ void write_text(unsigned char *text, unsigned int length, unsigned int row, unsi
 
 void cleartiles(); // for setting all tiles to empty
 
+void fill_sky_and_grass();
+
 void clearSprites();
 
 

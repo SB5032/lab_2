@@ -3,8 +3,8 @@
 module sprite_active(input logic clk,
                       input logic reset,
                       input logic write_sprite,
-                      input logic [3:0] sprite_number_write,
-                      input logic [3:0] sprite_number,
+                      input logic [4:0] sprite_number_write,
+                      input logic [4:0] sprite_number, //kv2446
                       input logic [24:0] sprite_register,
                       input logic write_vcount,
                       input logic [9:0] actual_vcount, // the line being drawn
@@ -17,7 +17,7 @@ module sprite_active(input logic clk,
 
 
   // sprite array access
-  logic [15:0][24:0] sprite_array;
+  logic [31:0][24:0] sprite_array;
   // indexing: 24 is active, 23-15 is v/row, 14-5 is h/col 4-0 is image number
   
 

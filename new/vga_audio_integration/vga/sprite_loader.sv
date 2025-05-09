@@ -2,7 +2,7 @@ module sprite_loader(input logic clk,
                    input logic reset,
                    input logic start,
                    input logic write,
-                   input logic [3:0] sprite_register_number,
+                   input logic [4:0] sprite_register_number, //kv2446
                    input logic [24:0] writedata,
                    input logic [9:0] vcount,
                    output logic [9:0] address_pixel_draw, 
@@ -11,7 +11,7 @@ module sprite_loader(input logic clk,
                    output logic wren_pixel_draw
 );
     logic sprite_active_start;
-    logic [3:0] sprite_number;
+    logic [4:0] sprite_number; //kv2446
     logic [9:0] actual_vcount; 
     logic [4:0] row_in_sprite;
     logic [9:0] sprite_column;

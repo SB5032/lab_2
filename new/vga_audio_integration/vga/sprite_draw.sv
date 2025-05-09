@@ -12,7 +12,7 @@ module sprite_draw(input logic clk,
                     output logic finish
 );
 
-  logic [14:0] sprite_rom_address;
+  logic [15:0] sprite_rom_address;
   sprite_rom(sprite_rom_address, clk, data); 
 
   logic [5:0] col;
