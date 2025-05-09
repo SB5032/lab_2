@@ -30,21 +30,18 @@
 #define TOWER_TILE_IDX  22    // static tower tile
 
 // ───── moving platforms ──────────────────────────────────────────────────────
-#define MAX_PLATFORMS   3 //4
+#define MAX_PLATFORMS   3
 #define PLATFORM_W    (4*32)  // 4 sprites × 32px
 #define PLATFORM_H     32
 #define PLATFORM_SPEED 2
 #define PLATFORM_SPACING (LENGTH / MAX_PLATFORMS)
-#define PLATFORM_REG_BASE 1   // regs 3…(3+4*MAX_PLATFORMS-1)
+#define PLATFORM_REG_BASE 1   // sprite register base
 
-// ───── static tower ──────────────────────────────────────────────────────────
+// ───── static tower ─────────────────────────────────────────────────────────
 #define TOWER_X         16
 #define TOWER_WIDTH     CHICKEN_W
 #define TOWER_HEIGHT    3     // stacked 3 sprites high originally
 #define TOWER_BASE_Y   (WIDTH - WALL - PLATFORM_H)
-
-// ───── chicken sprite reg ───────────────────────────────────────────────────
-#define CHICKEN_REG (/*unused now*/)  /* was: TOWER_REG_BASE + TOWER_HEIGHT + PLATFORM_REG_BASE + MAX_PLATFORMS*4 */
 
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES   5
@@ -79,15 +76,12 @@ void *controller_input_thread(void *arg) {
 
 // ───── chicken init & physics ────────────────────────────────────────────────
 void initChicken(Chicken *c) {
- //   c->x = TOWER_X;
-      c->x = 32;
-   // c->y = TOWER_BASE_Y - CHICKEN_H * TOWER_HEIGHT; // atop the tower
+    c->x = 32;
     c->y = 304; // atop the tower
     c->vy = 0;
     c->jumping = false;
 }
 
-// freeze on tower until jump, otherwise physics apply
 void moveChicken(Chicken *c) {
     if (!c->jumping && towerEnabled) return;
     c->y  += c->vy;
@@ -107,15 +101,13 @@ int main(void) {
     cleartiles();
     clearSprites();
     int index = 8;
-        write_text("scream", 6, 13, 13);
-        write_text("jump", 4, 13, 20);
-        write_text("press", 5, 19, index);
-        write_text("any", 3, 19, index + 6);
-        write_text("key", 3, 19, index + 10);
-        write_text("to", 2, 19, index + 14);
-        write_text("start", 5, 19, index + 17);
-    // write_text((unsigned char*)"ScreamJump Chicken", 18, 10, 8);
-    // write_text((unsigned char*)"Press any key to start", 22, 12, 16);
+    write_text("scream", 6, 13, 13);
+    write_text("jump",   4, 13, 20);
+    write_text("press",  5, 19, index);
+    write_text("any",    3, 19, index + 6);
+    write_text("key",    3, 19, index + 10);
+    write_text("to",     2, 19, index + 14);
+    write_text("start",  5, 19, index + 17);
     while (!(
         controller_state.a || controller_state.b || controller_state.x ||
         controller_state.y || controller_state.start || controller_state.select ||
@@ -131,15 +123,30 @@ int main(void) {
     write_score(score);
     write_number(lives, 0, 0);
 
+    // initialize chicken before platform generation
+    Chicken chicken;
+    initChicken(&chicken);
+
+    // setup RNG and region parameters
     srand(time(NULL));
+    int minY = WALL;
+    int maxY = WIDTH - WALL - PLATFORM_H;
+    int regionHeight = (maxY - minY + 1) / 4;
+
+    // initial platform positions: only in regions adjacent to chicken
     Platform plats[MAX_PLATFORMS];
     for (int i = 0; i < MAX_PLATFORMS; i++) {
         plats[i].x = LENGTH + i * PLATFORM_SPACING;
-        plats[i].y = rand() % (WIDTH - 2*WALL - PLATFORM_H) + WALL;
+        int chickenRegion = (chicken.y - minY) / regionHeight + 1;
+        if (chickenRegion < 1) chickenRegion = 1;
+        if (chickenRegion > 4) chickenRegion = 4;
+        int prevRegion = (chickenRegion == 1) ? 4 : (chickenRegion - 1);
+        int nextRegion = (chickenRegion == 4) ? 1 : (chickenRegion + 1);
+        int targetRegion = (rand() % 2 == 0) ? prevRegion : nextRegion;
+        int regionMinY = minY + (targetRegion - 1) * regionHeight;
+        int regionMaxY = (targetRegion == 4) ? maxY : (regionMinY + regionHeight - 1);
+        plats[i].y = rand() % (regionMaxY - regionMinY + 1) + regionMinY;
     }
-
-    Chicken chicken;
-    initChicken(&chicken);
 
     // ───── MAIN GAME LOOP ─────────────────────────────────────────────────────
     while (lives > 0) {
@@ -156,23 +163,28 @@ int main(void) {
         for (int i = 0; i < MAX_PLATFORMS; i++) {
             plats[i].x -= PLATFORM_SPEED;
             if (plats[i].x < -PLATFORM_W) {
+                // reposition off-screen platform to the right
                 int maxX = plats[0].x;
                 for (int j = 1; j < MAX_PLATFORMS; j++)
                     if (plats[j].x > maxX) maxX = plats[j].x;
                 plats[i].x = maxX + PLATFORM_SPACING;
-                int prevIdx = (i + MAX_PLATFORMS-1) % MAX_PLATFORMS;
-                int delta   = (rand() % PLATFORM_H) - (PLATFORM_H/2);
-                int newY    = plats[prevIdx].y + delta;
-                if (newY < WALL) newY = WALL;
-                if (newY > WIDTH - WALL - PLATFORM_H)
-                    newY = WIDTH - WALL - PLATFORM_H;
-                plats[i].y = newY;
+
+                // generate new Y in regions adjacent to chicken's current region
+                int chickenRegion = (chicken.y - minY) / regionHeight + 1;
+                if (chickenRegion < 1) chickenRegion = 1;
+                if (chickenRegion > 4) chickenRegion = 4;
+                int prevRegion = (chickenRegion == 1) ? 4 : (chickenRegion - 1);
+                int nextRegion = (chickenRegion == 4) ? 1 : (chickenRegion + 1);
+                int targetRegion = (rand() % 2 == 0) ? prevRegion : nextRegion;
+                int regionMinY = minY + (targetRegion - 1) * regionHeight;
+                int regionMaxY = (targetRegion == 4) ? maxY : (regionMinY + regionHeight - 1);
+                plats[i].y = rand() % (regionMaxY - regionMinY + 1) + regionMinY;
             }
         }
 
         // landing on platforms?
         if (chicken.vy > 0) {
-			towerEnabled = false;
+            towerEnabled = false;
             for (int i = 0; i < MAX_PLATFORMS; i++) {
                 int botPrev = prevY + CHICKEN_H;
                 int botNow  = chicken.y  + CHICKEN_H;
@@ -202,22 +214,7 @@ int main(void) {
 
         // redraw
         clearSprites();
-
-        // tower (tile-based)
-        {
-            int rowStart = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / 16;
-            int rowEnd   = TOWER_BASE_Y / 16;
-            int colStart = TOWER_X / 16;
-            int colEnd   = (TOWER_X + TOWER_WIDTH) / 16;
-            for (int r = 21; r < 30; ++r) {
-                for (int c = 0; c < 5; ++c) {
-                    write_tile_to_kernel(r, c,
-                        towerEnabled ? TOWER_TILE_IDX : 0);
-                }
-            }
-        }
-
-        // platforms
+        // draw tower, platforms, chicken...
         for (int i = 0; i < MAX_PLATFORMS; i++) {
             for (int k = 0; k < 4; k++) {
                 write_sprite_to_kernel(
@@ -227,12 +224,10 @@ int main(void) {
                 );
             }
         }
-
-        // chicken
         write_sprite_to_kernel(
             1, chicken.y, chicken.x,
             chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            /* new reg */  0
+            /* chicken reg */ 0
         );
 
         usleep(16666); // ~60Hz
@@ -240,7 +235,7 @@ int main(void) {
 
     // game over
     cleartiles(); clearSprites();
-    write_text((unsigned char*)"gameover",8,12,16);
+    write_text((unsigned char*)"gameover", 8, 12, 16);
     sleep(2);
     return 0;
 }
