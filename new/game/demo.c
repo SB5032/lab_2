@@ -32,6 +32,7 @@
 // ───── moving platforms ──────────────────────────────────────────────────────
 #define MAX_PLATFORMS     3
 #define PLATFORM_W      (4*32)  // 4 sprites × 32px
+#define PLATFORM_H      (32)    // 32px
 #define PLATFORM_SPACING  (LENGTH / MAX_PLATFORMS)
 #define PLATFORM_REG_BASE 1      // sprite register base
 
