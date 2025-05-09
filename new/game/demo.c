@@ -16,7 +16,7 @@
 #define LENGTH        640   // VGA width
 #define WIDTH         480   // VGA height
 #define WALL           16   // top/bottom margin
-#define JUMP_VY      -24
+#define JUMP_VY      -16
 #define GRAVITY        +0.5
 
 // ───── sprite dimensions ─────────────────────────────────────────────────────
