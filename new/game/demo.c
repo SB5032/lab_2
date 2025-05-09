@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include "usbcontroller.h"
 #include "vga_interface.h"
-#include "audio_interface.h"
+// #include "audio_interface.h"
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH        640   // VGA width
@@ -46,7 +46,7 @@
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES   5
 
-int vga_fd, audio_fd;
+int vga_fd; //, audio_fd;
 struct controller_output_packet controller_state;
 bool towerEnabled = true;  // enforce tower until first platform landing
 
@@ -100,7 +100,7 @@ void moveChicken(Chicken *c) {
 int main(void) {
     // open VGA & audio
     if ((vga_fd   = open("/dev/vga_top",    O_RDWR)) < 0)   return -1;
-    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0)   return -1;
+    // if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0)   return -1;
 
     // start controller thread
     pthread_t tid;
@@ -173,7 +173,7 @@ int main(void) {
             chicken.vy      = JUMP_VY;
             chicken.jumping = true;
             landed = false;
-            play_sfx(0);
+            // play_sfx(0);
         }
         int prevY = chicken.y;
         moveChicken(&chicken);
