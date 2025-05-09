@@ -54,7 +54,7 @@ module sprite_loader(input logic clk,
                 actual_vcount <= 0; // draw the first line
             end
         end else if (!finish) begin
-          if (sprite_number < 12) begin
+          if (sprite_number < 16) begin //12) begin
                 // check sprite active
                 if (!checked) begin
                     if (!checking) begin

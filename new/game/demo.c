@@ -30,12 +30,12 @@
 #define TOWER_TILE_IDX  22    // static tower tile
 
 // ───── moving platforms ──────────────────────────────────────────────────────
-#define MAX_PLATFORMS   4
+#define MAX_PLATFORMS   3 //4
 #define PLATFORM_W    (4*32)  // 4 sprites × 32px
 #define PLATFORM_H     32
 #define PLATFORM_SPEED 2
 #define PLATFORM_SPACING (LENGTH / MAX_PLATFORMS)
-#define PLATFORM_REG_BASE 3   // regs 3…(3+4*MAX_PLATFORMS-1)
+#define PLATFORM_REG_BASE 1   // regs 3…(3+4*MAX_PLATFORMS-1)
 
 // ───── static tower ──────────────────────────────────────────────────────────
 #define TOWER_X         16
@@ -252,7 +252,7 @@ int main(void) {
         write_sprite_to_kernel(
             1, chicken.y, chicken.x,
             chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            /* new reg */  2
+            /* new reg */  0
         );
 
         usleep(16666); // ~60Hz
