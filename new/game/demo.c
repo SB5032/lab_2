@@ -119,7 +119,7 @@ int main(void) {
         int target=cand[rand()%cnt];
         // region2 &3: y within ±200 of chicken
         if(r==2||r==3){
-            int lo=chicken.y-200, hi=chicken.y+200;
+            int lo=chicken.y-150, hi=chicken.y+150;
             if(lo<minY) lo=minY; if(hi>maxY) hi=maxY;
             plats[i].y=rand()%(hi-lo+1)+lo;
         } else {
