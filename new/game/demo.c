@@ -47,7 +47,7 @@
 
 // ───── level & difficulty ────────────────────────────────────────────────────
 #define BASE_PLATFORM_SPEED 4
-#define BASE_JUMP_DELAY   300000  // microseconds
+#define BASE_JUMP_DELAY   2000  // microseconds
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
@@ -242,7 +242,7 @@ int main(void) {
                             level++;
                             write_number(level, 0, 38);
                             platformSpeed = BASE_PLATFORM_SPEED + (level - 1);
-                            jumpDelay = BASE_JUMP_DELAY - (level - 1) * 50000;
+                            jumpDelay = BASE_JUMP_DELAY - (level - 1) * 400;
                             if (jumpDelay < 50000) jumpDelay = 50000;
                         }
                         // slow down after landing
