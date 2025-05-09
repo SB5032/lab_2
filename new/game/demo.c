@@ -206,9 +206,10 @@ int main(void) {
         // fell off bottom?
         if (chicken.y > WIDTH) {
             lives--;
+	    towerEnabled = true;
             write_number(lives, 0, 0);
             initChicken(&chicken);
-            usleep(300000);
+            usleep(3000000);
             continue;
         }
 
