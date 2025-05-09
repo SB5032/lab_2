@@ -22,8 +22,8 @@
 #define CHICKEN_REG   11      // sprite register
 #define CHICKEN_W     32
 #define CHICKEN_H     32
-#define CHICKEN_STAND  0      // tile index in your .mif
-#define CHICKEN_JUMP   1      // tile index in your .mif
+#define CHICKEN_STAND  8      // tile index in your .mif
+#define CHICKEN_JUMP   11      // tile index in your .mif
 #define JUMP_SFX       0      // audio index for chicken scream
 
 // jump physics
@@ -40,8 +40,8 @@
 #define PLATFORM_SPRITE_IDX  2  // your .mif index for platform graphic
 
 // game state
-static int vga_fd, audio_fd;
-static struct controller_output_packet controller_state;
+int vga_fd, audio_fd;
+struct controller_output_packet controller_state;
 
 typedef struct {
     int x, y;
