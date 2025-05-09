@@ -82,7 +82,7 @@ void initChicken(Chicken *c) {
  //   c->x = TOWER_X;
       c->x = 32;
    // c->y = TOWER_BASE_Y - CHICKEN_H * TOWER_HEIGHT; // atop the tower
-    c->y = 368; // atop the tower
+    c->y = 304; // atop the tower
     c->vy = 0;
     c->jumping = false;
 }
