@@ -43,9 +43,13 @@
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
 
+// corrected Chicken struct!
 typedef struct {
     int x, y;
+    int vy;        // vertical velocity
+    bool jumping;  // whether we're airborne
 } Chicken;
+
 typedef struct {
     int x, y;
 } Platform;
@@ -57,8 +61,9 @@ void initChicken(Chicken *c) {
     c->vy = 0;
     c->jumping = false;
 }
+
 void moveChicken(Chicken *c) {
-    c->y += c->vy;
+    c->y  += c->vy;
     c->vy += GRAVITY;
 }
 
@@ -122,11 +127,11 @@ int main(void) {
         int prevY = chicken.y;
         moveChicken(&chicken);
 
-        // update & recycle platforms for even spacing
+        // update & recycle platforms
         for (int i = 0; i < MAX_PLATFORMS; i++) {
             plats[i].x -= PLATFORM_SPEED;
             if (plats[i].x < -PLATFORM_W) {
-                // find current rightmost
+                // respawn to the right of the current rightmost
                 int maxX = plats[0].x;
                 for (int j = 1; j < MAX_PLATFORMS; j++)
                     if (plats[j].x > maxX) maxX = plats[j].x;
@@ -157,9 +162,7 @@ int main(void) {
         if (chicken.y > WIDTH) {
             lives--;
             write_number(lives, 0, 0);
-            // reset chicken to top
             initChicken(&chicken);
-            // short pause
             usleep(500000);
             continue;
         }
