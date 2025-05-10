@@ -60,7 +60,12 @@ module vga_top(input logic        clk,
     logic sprite_start;
     logic sprite_finish;
     logic sprite_write;
-    assign sprite_write = (chipselect && write && (address >= 1)); // address >= 1: write sprite
+    //assign sprite_write = (chipselect && write && (address >= 1)); // address >= 1: write sprite
+	localparam int NUM_SPRITES = 16;
+	assign sprite_write = chipselect  && write && (address >= 1)  && (address < 1 + NUM_SPRITES);
+
+
+
     sprite_loader(clk, reset, sprite_start, sprite_write, address, writedata[24:0], vcount, address_pixel_draw, data_pixel_draw, sprite_finish, wren_pixel_draw);
     //logic [4:0] row_in_sprite;
     //assign row_in_sprite = (vcount+1)%525%32;
