@@ -52,9 +52,9 @@
 
 // ───── moving bar (background tiles) ─────────────────────────────────────────
 #define BAR_TILE_IDX      23    // tile index for the moving bar
-#define BAR_LENGTH         4    // number of tiles wide
+#define BAR_LENGTH         6    // number of tiles wide
 #define BAR_SPEED          4    // pixels per frame
-#define BAR_Y_PX        200    // desired Y in pixels
+#define BAR_Y_PX        150    // desired Y in pixels
 #define BAR_ROW       (BAR_Y_PX / TILE_SIZE)
 
 int vga_fd, audio_fd;
@@ -275,15 +275,10 @@ int main(void) {
         }
 
         // draw tower
-        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
-             r <= TOWER_BASE_Y / TILE_SIZE; r++) {
-            for (int c = TOWER_X / TILE_SIZE;
-                 c <= (TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
-                write_tile_to_kernel(r, c,
-                    towerEnabled ? TOWER_TILE_IDX : 0);
-            }
-        }
-
+            for (int r = 21; r < 30; ++r)
+                for (int c = 0; c < 5; ++c)
+                    write_tile_to_kernel(r, c, towerEnabled ? TOWER_TILE_IDX : 0);
+        
         // falling block
         if (blockFalling) {
             fallY += 4;
