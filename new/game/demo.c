@@ -30,7 +30,7 @@
 #define CHICKEN_H        32
 
 // ───── tower tiles ───────────────────────────────────────────────────────────
-#define TOWER_TILE_IDX   22
+#define TOWER_TILE_IDX   40
 #define TOWER_X           16
 #define TOWER_WIDTH      CHICKEN_W
 #define PLATFORM_H        32
