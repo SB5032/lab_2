@@ -54,7 +54,7 @@
 #define BAR_TILE_IDX      23    // tile index for the moving bar
 #define BAR_LENGTH         6    // number of tiles wide
 #define BAR_SPEED          4    // pixels per frame
-#define BAR_Y_PX        150    // desired Y in pixels
+#define BAR_Y_PX        250    // desired Y in pixels
 #define BAR_ROW       (BAR_Y_PX / TILE_SIZE)
 
 int vga_fd, audio_fd;
