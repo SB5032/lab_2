@@ -38,7 +38,7 @@
 // ───── platform constants ───────────────────────────────────────────────────
 #define PLATFORM_H         32    // platform height
 #define MAX_SPRITES       11     // total sprite registers for platforms
-
+#define PLATFORM_REG_BASE  1     // sprite register base
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES     5
 
@@ -105,9 +105,10 @@ int main(void) {
     int numPlatforms = INIT_PLATFORMS;
     int platformGap = LENGTH / numPlatforms;
     // header
-    write_text("Lives", 0, 0, 1); write_number(lives, 0, 6, 7);
+    write_text("Lives", 0, 0, 1); write_number(lives, 6, 7);
     write_text("Score", 0, 10, 15); write_number(score, 0, 21);
-    write_text("Level", 0, 20, 31); write_number(level, 0, 26, 38);
+    write_text("Level", 0, 20, 31); write_number(level, 26, 38);
+    
 
     Chicken chicken; initChicken(&chicken);
     bool landed = false, blockFalling = false;
