@@ -1,3 +1,4 @@
+
 // screamjump_dynamic_start.c
 // Adds a start screen: displays title and "Press any key to start"
 
@@ -167,7 +168,7 @@ int main(void) {
                 for (int j = 1; j < numPlatforms; j++)
                     if (plats[j].x > mx) mx = plats[j].x;
                 plats[i].x = mx + platformGap;
-                int maxSeg = MAX_SPRSITES / numPlatforms;
+                int maxSeg = MAX_SPRITES / numPlatforms;
                 plats[i].segCount = rand() % maxSeg + 1;
                 int prevIdx = (i + numPlatforms - 1) % numPlatforms;
                 int low = plats[prevIdx].y - 150;
