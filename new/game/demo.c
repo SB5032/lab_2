@@ -1,3 +1,4 @@
+
 // screamjump_dynamic_start.c
 // Adds a start screen: displays title and "Press any key to start"
 
@@ -8,16 +9,9 @@
 #include <pthread.h>
 #include <time.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>           // for ioctl
 #include "usbcontroller.h"
 #include "vga_interface.h"
 #include "audio_interface.h"
-
-// ───── Quick‐hack VSync ioctl ───────────────────────────────────────────────
-#define VGA_IOCTL_WAIT_VSYNC _IO('v','v')
-static inline int wait_for_vsync(int fd) {
-    return ioctl(fd, VGA_IOCTL_WAIT_VSYNC, NULL);
-}
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH            640   // VGA width (pixels)
@@ -135,11 +129,10 @@ int main(void) {
     srand(time(NULL));
     int minY = WALL + 40, maxY = WIDTH - WALL - PLATFORM_H;
     Platform plats[MAX_SPRITES];
-    int fixedSegs[INIT_PLATFORMS] = { 4, 4, 4, 3 };
-
     for (int i = 0; i < numPlatforms; i++) {
         plats[i].x = LENGTH + i * platformGap;
-        plats[i].segCount = fixedSegs[i];
+        int maxSeg = MAX_SPRITES / numPlatforms;
+        plats[i].segCount = rand() % maxSeg + 1;
         int low = chicken.y - 150, high = chicken.y + 150;
         if (low < minY) low = minY;
         if (high > maxY) high = maxY;
@@ -149,15 +142,13 @@ int main(void) {
             plats[i].specialIdx = rand() % plats[i].segCount;
     }
 
+    // initialize moving bars
     MovingBar bars[BAR_COUNT] = {
         { LENGTH,    BAR_Y_PX1 },
         { LENGTH/2,  BAR_Y_PX2 }
     };
 
     while (lives > 0) {
-        // wait for vertical blank to avoid tearing
-        wait_for_vsync(vga_fd);
-
         if (controller_state.b && !chicken.jumping) {
             chicken.vy = jumpVy;
             chicken.jumping = true;
@@ -168,6 +159,7 @@ int main(void) {
         moveChicken(&chicken);
         if (chicken.y < minY) chicken.y = minY;
 
+        // move & respawn platforms
         for (int i = 0; i < numPlatforms; i++) {
             plats[i].x -= platformSpeed;
             int width = plats[i].segCount * CHICKEN_W;
@@ -176,7 +168,8 @@ int main(void) {
                 for (int j = 1; j < numPlatforms; j++)
                     if (plats[j].x > mx) mx = plats[j].x;
                 plats[i].x = mx + platformGap;
-                plats[i].segCount = fixedSegs[i];
+                int maxSeg = MAX_SPRITES / numPlatforms;
+                plats[i].segCount = rand() % maxSeg + 1;
                 int prevIdx = (i + numPlatforms - 1) % numPlatforms;
                 int low = plats[prevIdx].y - 150;
                 int high = plats[prevIdx].y + 150;
@@ -189,10 +182,12 @@ int main(void) {
             }
         }
 
+        // collision & score
         if (chicken.vy > 0) {
             towerEnabled = false;
             bool collided = false;
 
+            // check moving bars collision
             for (int b = 0; b < BAR_COUNT; b++) {
                 int barY_px = bars[b].y_px;
                 int botPrev = prevY + CHICKEN_H;
@@ -215,6 +210,7 @@ int main(void) {
                 }
             }
 
+            // existing platform collision
             if (!collided) {
                 for (int i = 0; i < numPlatforms; i++) {
                     int botPrev = prevY + CHICKEN_H;
@@ -242,9 +238,7 @@ int main(void) {
                             }
                             if (level == 3 && plats[i].special) {
                                 blockFalling = true;
-                                fallReg      = PLATFORM_REG_BASE
-                                               + i * plats[i].segCount
-                                               + plats[i].specialIdx;
+                                fallReg      = PLATFORM_REG_BASE + i * plats[i].segCount + plats[i].specialIdx;
                                 fallX        = plats[i].x + plats[i].specialIdx * CHICKEN_W;
                                 fallY        = plats[i].y;
                                 plats[i].special = false;
@@ -267,10 +261,49 @@ int main(void) {
             continue;
         }
 
+        // redraw frame
         clearSprites();
         fill_sky_and_grass();
 
-        // draw moving bars, tower, falling block, platforms & chicken...
+        // draw moving bars
+        for (int b = 0; b < BAR_COUNT; b++) {
+            bars[b].x -= BAR_SPEED;
+            if (bars[b].x + BAR_WIDTH * TILE_SIZE <= 0)
+                bars[b].x = LENGTH;
+
+            int startCol = bars[b].x / TILE_SIZE;
+            int maxCols  = LENGTH / TILE_SIZE;
+            int barRow   = bars[b].y_px / TILE_SIZE;
+            int endRow   = barRow + BAR_HEIGHT - 1;
+
+            for (int r = barRow; r <= endRow; r++) {
+                for (int i = 0; i < BAR_WIDTH; i++) {
+                    int col = startCol + i;
+                    if (col >= 0 && col < maxCols) {
+                        write_tile_to_kernel(r, col, BAR_TILE_IDX);
+                    }
+                }
+            }
+        }
+
+        // draw tower
+        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
+             r <= TOWER_BASE_Y / TILE_SIZE; r++) {
+            for (int c = TOWER_X / TILE_SIZE;
+                 c <= (TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
+                write_tile_to_kernel(r, c,
+                    towerEnabled ? TOWER_TILE_IDX : 0);
+            }
+        }
+
+        // falling block
+        if (blockFalling) {
+            fallY += 4;
+            write_sprite_to_kernel(1, fallY, fallX, SPECIAL_TILE, fallReg);
+            if (fallY > WIDTH) blockFalling = false;
+        }
+
+        // draw platforms
         for (int i = 0; i < numPlatforms; i++) {
             for (int k = 0; k < plats[i].segCount; k++) {
                 int tile = PLATFORM_TILE;
@@ -286,6 +319,7 @@ int main(void) {
             }
         }
 
+        // draw chicken
         write_sprite_to_kernel(
             1,
             chicken.y,
