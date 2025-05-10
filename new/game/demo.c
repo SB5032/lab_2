@@ -37,7 +37,7 @@
 
 // ───── platform constants ───────────────────────────────────────────────────
 #define PLATFORM_H         32    // platform height
-#define MAX_SPRITES       11    // total sprite registers for platforms
+#define MAX_SPRITES       11     // total sprite registers for platforms
 
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES     5
@@ -62,7 +62,7 @@ void *controller_input_thread(void *arg) {
     if (!ctrl) pthread_exit(NULL);
     while (1) {
         unsigned char buf[GAMEPAD_READ_LENGTH]; int transferred;
-        if (libusb_interrupt_transfer(ctrl, ep, buf, GAMEPAD_READ_LENGTH, &transferred, 0)==0)
+        if (libusb_interrupt_transfer(ctrl, ep, buf, GAMEPAD_READ_LENGTH, &transferred, 0) == 0)
             usb_to_output(&controller_state, buf);
     }
 }
@@ -80,106 +80,123 @@ void moveChicken(Chicken *c) {
 }
 
 int main(void) {
-    if ((vga_fd = open("/dev/vga_top", O_RDWR))<0) return -1;
-    if ((audio_fd = open("/dev/fpga_audio",O_RDWR))<0) return -1;
-    pthread_t tid; pthread_create(&tid,NULL,controller_input_thread,NULL);
+    if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) return -1;
+    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) return -1;
+    pthread_t tid; pthread_create(&tid, NULL, controller_input_thread, NULL);
 
     // start screen
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("scream",6,13,13); write_text("jump",4,13,20);
-    write_text("press",5,19,8); write_text("any",3,19,14);
-    write_text("key",3,19,20); write_text("to",2,19,26);
-    write_text("start",5,19,29);
-    while (!(controller_state.a||controller_state.b||controller_state.start)) usleep(10000);
+    write_text("scream", 6, 13, 13);
+    write_text("jump",   4, 13, 20);
+    write_text("press",  5, 19, 8);
+    write_text("any",    3, 19, 14);
+    write_text("key",    3, 19, 20);
+    write_text("to",     2, 19, 26);
+    write_text("start",  5, 19, 29);
+    while (!(controller_state.a || controller_state.b || controller_state.start))
+        usleep(10000);
 
     // init game
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    int score=0, lives=INITIAL_LIVES, level=1;
-    int jumpVy=INIT_JUMP_VY;
-    int platformSpeed=BASE_SPEED;
-    int jumpDelay=BASE_DELAY;
-    int numPlatforms=INIT_PLATFORMS;
-    int platformGap=LENGTH/numPlatforms;
-    write_text("Lives",0,0); write_number(lives,0,6);
-    write_text("Score",0,10); write_number(score,0,16);
-    write_text("Level",0,20); write_number(level,0,26);
+    int score = 0, lives = INITIAL_LIVES, level = 1;
+    int jumpVy = INIT_JUMP_VY;
+    int platformSpeed = BASE_SPEED;
+    int jumpDelay = BASE_DELAY;
+    int numPlatforms = INIT_PLATFORMS;
+    int platformGap = LENGTH / numPlatforms;
+    // header
+    write_text("Lives", 0, 0); write_number(lives, 0, 6);
+    write_text("Score", 0, 10); write_number(score, 0, 16);
+    write_text("Level", 0, 20); write_number(level, 0, 26);
 
     Chicken chicken; initChicken(&chicken);
-    bool landed=false, blockFalling=false;
-    int fallX=0, fallY=0, fallReg=0;
+    bool landed = false, blockFalling = false;
+    int fallX = 0, fallY = 0, fallReg = 0;
 
     srand(time(NULL));
-    int minY=WALL+40, maxY=WIDTH-WALL-PLATFORM_H;
+    int minY = WALL + 40, maxY = WIDTH - WALL - PLATFORM_H;
     Platform plats[MAX_SPRITES];
     // init platforms
-    for(int i=0;i<numPlatforms;i++){
-        plats[i].x=LENGTH + i*platformGap;
-        // random segment count
-        int maxSeg=MAX_SPRITES/numPlatforms;
-        plats[i].segCount = rand()%maxSeg + 1;
-        // random y near tower
-        int low=chicken.y-150, high=chicken.y+150;
-        if(low<minY) low=minY; if(high>maxY) high=maxY;
-        plats[i].y=rand()%(high-low+1)+low;
-        plats[i].special=(level==3 && rand()%plats[i].segCount==0);
-        if(plats[i].special) plats[i].specialIdx=rand()%plats[i].segCount;
+    for (int i = 0; i < numPlatforms; i++) {
+        plats[i].x = LENGTH + i * platformGap;
+        int maxSeg = MAX_SPRITES / numPlatforms;
+        plats[i].segCount = rand() % maxSeg + 1;
+        int low = chicken.y - 150, high = chicken.y + 150;
+        if (low < minY) low = minY;
+        if (high > maxY) high = maxY;
+        plats[i].y = rand() % (high - low + 1) + low;
+        plats[i].special = (level == 3 && rand() % plats[i].segCount == 0);
+        if (plats[i].special)
+            plats[i].specialIdx = rand() % plats[i].segCount;
     }
 
-    while(lives>0){
-        if(controller_state.b && !chicken.jumping){
-            chicken.vy=jumpVy; chicken.jumping=true; landed=false; play_sfx(0);
+    while (lives > 0) {
+        if (controller_state.b && !chicken.jumping) {
+            chicken.vy = jumpVy;
+            chicken.jumping = true;
+            landed = false;
+            play_sfx(0);
         }
-        int prevY=chicken.y; moveChicken(&chicken);
-        if(chicken.y<minY) chicken.y=minY;
+        int prevY = chicken.y;
+        moveChicken(&chicken);
+        if (chicken.y < minY) chicken.y = minY;
 
-        // move & respawn
-        for(int i=0;i<numPlatforms;i++){
-            plats[i].x-=platformSpeed;
-            if(plats[i].x< -PLATFORM_W){
-                // reposition
-                int mx=plats[0].x;
-                for(int j=1;j<numPlatforms;j++) if(plats[j].x>mx) mx=plats[j].x;
-                plats[i].x=mx+platformGap;
-                // random segments
-                int maxSeg=MAX_SPRITES/numPlatforms;
-                plats[i].segCount=rand()%maxSeg+1;
-                // y near prev
-                int low=plats[(i+numPlatforms-1)%numPlatforms].y-150;
-                int high=plats[(i+numPlatforms-1)%numPlatforms].y+150;
-                if(low<minY) low=minY; if(high>maxY) high=maxY;
-                plats[i].y=rand()%(high-low+1)+low;
-                plats[i].special=(level==3 && rand()%plats[i].segCount==0);
-                if(plats[i].special) plats[i].specialIdx=rand()%plats[i].segCount;
+        // move & respawn platforms
+        for (int i = 0; i < numPlatforms; i++) {
+            plats[i].x -= platformSpeed;
+            int width = plats[i].segCount * CHICKEN_W;
+            if (plats[i].x < -width) {
+                int mx = plats[0].x;
+                for (int j = 1; j < numPlatforms; j++)
+                    if (plats[j].x > mx) mx = plats[j].x;
+                plats[i].x = mx + platformGap;
+                int maxSeg = MAX_SPRITES / numPlatforms;
+                plats[i].segCount = rand() % maxSeg + 1;
+                int prevIdx = (i + numPlatforms - 1) % numPlatforms;
+                int low = plats[prevIdx].y - 150;
+                int high = plats[prevIdx].y + 150;
+                if (low < minY) low = minY;
+                if (high > maxY) high = maxY;
+                plats[i].y = rand() % (high - low + 1) + low;
+                plats[i].special = (level == 3 && rand() % plats[i].segCount == 0);
+                if (plats[i].special)
+                    plats[i].specialIdx = rand() % plats[i].segCount;
             }
         }
 
         // collision & score
-        if(chicken.vy>0){
-            towerEnabled=false;
-            for(int i=0;i<numPlatforms;i++){
-                int botPrev=prevY+CHICKEN_H;
-                int botNow=chicken.y+CHICKEN_H;
-                if(botPrev<=plats[i].y && botNow>=plats[i].y &&
-                   chicken.x+CHICKEN_W>plats[i].x &&
-                   chicken.x<plats[i].x+plats[i].segCount*CHICKEN_W){
-                    chicken.y=plats[i].y-CHICKEN_H; chicken.vy=0; chicken.jumping=false;
-                    if(!landed){
-                        score++; write_number(score,0,16);
-                        landed=true;
-                        if(score%20==0){
-                            level++; write_number(level,0,26);
-                            platformSpeed=BASE_SPEED+level-1;
-                            platformGap=LENGTH/(INIT_PLATFORMS+level-1);
-                            jumpDelay=BASE_DELAY-(level-1)*400;
-                            if(jumpDelay<500) jumpDelay=500;
-                            if(level>=3) jumpVy=INIT_JUMP_VY-(level-2)*5;
+        if (chicken.vy > 0) {
+            towerEnabled = false;
+            for (int i = 0; i < numPlatforms; i++) {
+                int botPrev = prevY + CHICKEN_H;
+                int botNow = chicken.y + CHICKEN_H;
+                int width = plats[i].segCount * CHICKEN_W;
+                if (botPrev <= plats[i].y && botNow >= plats[i].y &&
+                    chicken.x + CHICKEN_W > plats[i].x &&
+                    chicken.x < plats[i].x + width) {
+                    chicken.y = plats[i].y - CHICKEN_H;
+                    chicken.vy = 0;
+                    chicken.jumping = false;
+                    if (!landed) {
+                        score++;
+                        write_number(score, 0, 16);
+                        landed = true;
+                        if (score % 20 == 0) {
+                            level++;
+                            write_number(level, 0, 26);
+                            platformSpeed = BASE_SPEED + (level - 1);
+                            platformGap = LENGTH / (INIT_PLATFORMS + level - 1);
+                            jumpDelay = BASE_DELAY - (level - 1) * 400;
+                            if (jumpDelay < 500) jumpDelay = 500;
+                            if (level >= 3)
+                                jumpVy = INIT_JUMP_VY - (level - 2) * 5;
                         }
-                        if(level==3 && plats[i].special){
-                            blockFalling=true;
-                            fallReg=PLATFORM_REG_BASE + i*plats[i].segCount;
-                            fallX=plats[i].x+plats[i].specialIdx*CHICKEN_W;
-                            fallY=plats[i].y;
-                            plats[i].special=false;
+                        if (level == 3 && plats[i].special) {
+                            blockFalling = true;
+                            fallReg = PLATFORM_REG_BASE + i * plats[i].segCount + plats[i].specialIdx;
+                            fallX = plats[i].x + plats[i].specialIdx * CHICKEN_W;
+                            fallY = plats[i].y;
+                            plats[i].special = false;
                         }
                         usleep(jumpDelay);
                     }
@@ -188,40 +205,61 @@ int main(void) {
             }
         }
 
-        if(chicken.y>WIDTH){
-            lives--; write_number(lives,0,6);
-            towerEnabled=true; initChicken(&chicken);
-            landed=false; usleep(3000000);
+        if (chicken.y > WIDTH) {
+            lives--;
+            write_number(lives, 0, 6);
+            towerEnabled = true;
+            initChicken(&chicken);
+            landed = false;
+            usleep(3000000);
             continue;
         }
 
         // redraw
         clearSprites(); fill_sky_and_grass();
-        // tower
-        for(int r=(TOWER_BASE_Y-TOWER_HEIGHT*PLATFORM_H)/16; r<=TOWER_BASE_Y/16; r++)
-            for(int c=TOWER_X/16; c<=(TOWER_X+TOWER_WIDTH)/16; c++)
-                write_tile_to_kernel(r,c, towerEnabled?TOWER_TILE_IDX:0);
-        // falling
-        if(blockFalling){ fallY+=4;
-            write_sprite_to_kernel(1,fallY,fallX,SPECIAL_TILE,fallReg);
-            if(fallY>WIDTH) blockFalling=false;
-        }
-        // platforms
-        for(int i=0;i<numPlatforms;i++){
-            for(int k=0;k<plats[i].segCount;k++){
-                int tile=PLATFORM_TILE;
-                if(level==3 && plats[i].special && k==plats[i].specialIdx) tile=SPECIAL_TILE;
-                write_sprite_to_kernel(1,plats[i].y,plats[i].x+k*CHICKEN_W,
-                    tile, PLATFORM_REG_BASE + i*plats[i].segCount + k);
+        // draw tower
+        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / 16;
+             r <= TOWER_BASE_Y / 16; r++) {
+            for (int c = TOWER_X / 16;
+                 c <= (TOWER_X + TOWER_WIDTH) / 16; c++) {
+                write_tile_to_kernel(r, c,
+                    towerEnabled ? TOWER_TILE_IDX : 0);
             }
         }
-        // chicken
-        write_sprite_to_kernel(1,chicken.y,chicken.x,
-            chicken.jumping?CHICKEN_JUMP:CHICKEN_STAND, 0);
+        // falling
+        if (blockFalling) {
+            fallY += 4;
+            write_sprite_to_kernel(
+                1, fallY, fallX, SPECIAL_TILE, fallReg);
+            if (fallY > WIDTH) blockFalling = false;
+        }
+        // draw platforms
+        for (int i = 0; i < numPlatforms; i++) {
+            for (int k = 0; k < plats[i].segCount; k++) {
+                int tile = PLATFORM_TILE;
+                if (level == 3 && plats[i].special && k == plats[i].specialIdx)
+                    tile = SPECIAL_TILE;
+                write_sprite_to_kernel(
+                    1,
+                    plats[i].y,
+                    plats[i].x + k * CHICKEN_W,
+                    tile,
+                    PLATFORM_REG_BASE + i * plats[i].segCount + k
+                );
+            }
+        }
+        // draw chicken
+        write_sprite_to_kernel(1,
+            chicken.y,
+            chicken.x,
+            chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
+            0
+        );
         usleep(16666);
     }
 
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("gameover",8,12,16); sleep(2);
+    write_text("gameover", 8, 12, 16);
+    sleep(2);
     return 0;
 }
