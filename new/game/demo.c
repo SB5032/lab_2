@@ -39,7 +39,7 @@
 #define TOWER_BASE_Y    (WIDTH - WALL - PLATFORM_H)
 
 // ───── platform constants ───────────────────────────────────────────────────
-#define MAX_SPRITES       11    // total sprite registers for platforms
+#define MAX_SPRITES       15    // total sprite registers for platforms
 #define PLATFORM_REG_BASE  1    // sprite register base
 
 // ───── lives/score & controller ──────────────────────────────────────────────
