@@ -53,6 +53,8 @@
 // ───── moving bar (background tiles) ─────────────────────────────────────────
 #define BAR_TILE_IDX      23    // tile index for the moving bar
 #define BAR_LENGTH         6    // number of tiles wide
+#define BAR_WIDTH         5    // 5 columns
+#define BAR_HEIGHT        2    // 2 rows 
 #define BAR_SPEED          4    // pixels per frame
 #define BAR_Y_PX        250    // desired Y in pixels
 #define BAR_ROW       (BAR_Y_PX / TILE_SIZE)
@@ -266,10 +268,13 @@ int main(void) {
             // draw only visible tiles
             int startCol = barX / TILE_SIZE;
             int maxCols  = LENGTH / TILE_SIZE;
-            for (int i = 0; i < BAR_LENGTH; i++) {
-                int col = startCol + i;
-                if (col >= 0 && col < maxCols) {
-                    write_tile_to_kernel(BAR_ROW, col, BAR_TILE_IDX);
+            int endRow = BAR_ROW + BAR_HEIGHT - 1;
+            for (int r = BAR_ROW; r <= endRow; r++) {
+                for (int i = 0; i < BAR_WIDTH; i++) {
+                    int col = startCol + i;
+                    if (col >= 0 && col < maxCols) {
+                        write_tile_to_kernel(r, col, BAR_TILE_IDX);
+                    }
                 }
             }
         }
