@@ -231,15 +231,21 @@ int main(void) {
         fill_sky_and_grass();
 
         // ── draw moving bar (background tiles) ────────────────────────────────
-        {
-            int startCol = barX / TILE_SIZE;
-            for (int i = 0; i < BAR_LENGTH; i++) {
-                write_tile_to_kernel(BAR_ROW, startCol + i, BAR_TILE_IDX);
-            }
-            barX -= BAR_SPEED;
-            if (barX + BAR_LENGTH * TILE_SIZE < 0)
-                barX = LENGTH;
+    {
+        // 1) update position first
+        barX -= BAR_SPEED;
+        if (barX + BAR_LENGTH * TILE_SIZE <= 0)
+            barX = LENGTH;
+
+        // 2) compute tile‐column and draw only visible tiles
+        int startCol = barX / TILE_SIZE;
+        int maxCols  = LENGTH / TILE_SIZE;
+        for (int i = 0; i < BAR_LENGTH; i++) {
+            int col = startCol + i;
+            if (col >= 0 && col < maxCols)
+                write_tile_to_kernel(BAR_ROW, col, BAR_TILE_IDX);
         }
+    }
 
         // draw tower
         for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
