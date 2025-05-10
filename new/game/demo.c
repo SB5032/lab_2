@@ -13,9 +13,10 @@
 #include "audio_interface.h"
 
 // ───── screen & physics ──────────────────────────────────────────────────────
-#define LENGTH            640   // VGA width
-#define WIDTH             480   // VGA height
-#define WALL              16    // top/bottom margin
+#define LENGTH            640   // VGA width (pixels)
+#define WIDTH             480   // VGA height (pixels)
+#define TILE_SIZE          16   // background tile size (pixels)
+#define WALL              16    // top/bottom margin (pixels)
 #define GRAVITY           +1
 
 // ───── sprite dimensions ─────────────────────────────────────────────────────
@@ -39,14 +40,21 @@
 #define PLATFORM_H         32    // platform height
 #define MAX_SPRITES       11     // total sprite registers for platforms
 #define PLATFORM_REG_BASE  1     // sprite register base
+
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES     5
 
 // ───── initial parameters ─────────────────────────────────────────────────────
 #define INIT_PLATFORMS    4      // starting number of platforms
 #define INIT_JUMP_VY     -20     // base jump velocity
-#define BASE_SPEED        4      // base platform speed
+#define BASE_SPEED        4      // base platform speed (pixels/frame)
 #define BASE_DELAY      2000     // base jump delay (µs)
+
+// ───── moving bar (background tiles) ─────────────────────────────────────────
+#define BAR_TILE_IDX      23     // tile index for the moving bar
+#define BAR_LENGTH         4     // number of tiles wide
+#define BAR_SPEED          4     // pixels per frame
+#define BAR_ROW          15      // tile‐row (0 at top) to draw the bar
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
@@ -105,10 +113,9 @@ int main(void) {
     int numPlatforms = INIT_PLATFORMS;
     int platformGap = LENGTH / numPlatforms;
     // header
-    write_text("Lives", 0, 0, 1); write_number(lives, 6, 7);
-    write_text("Score", 0, 10, 15); write_number(score, 0, 21);
-    write_text("Level", 0, 20, 31); write_number(level, 26, 38);
-    
+    write_text("Lives", 0, 0, 1);     write_number(lives, 6, 7);
+    write_text("Score", 0, 10, 15);   write_number(score, 0, 21);
+    write_text("Level", 0, 20, 31);   write_number(level, 26, 38);
 
     Chicken chicken; initChicken(&chicken);
     bool landed = false, blockFalling = false;
@@ -130,6 +137,9 @@ int main(void) {
         if (plats[i].special)
             plats[i].specialIdx = rand() % plats[i].segCount;
     }
+
+    // ── initialize moving bar ──────────────────────────────────────────────────
+    int barX = LENGTH;   // start at right edge (pixels)
 
     while (lives > 0) {
         if (controller_state.b && !chicken.jumping) {
@@ -170,8 +180,8 @@ int main(void) {
             towerEnabled = false;
             for (int i = 0; i < numPlatforms; i++) {
                 int botPrev = prevY + CHICKEN_H;
-                int botNow = chicken.y + CHICKEN_H;
-                int width = plats[i].segCount * CHICKEN_W;
+                int botNow  = chicken.y + CHICKEN_H;
+                int width   = plats[i].segCount * CHICKEN_W;
                 if (botPrev <= plats[i].y && botNow >= plats[i].y &&
                     chicken.x + CHICKEN_W > plats[i].x &&
                     chicken.x < plats[i].x + width) {
@@ -186,8 +196,8 @@ int main(void) {
                             level++;
                             write_number(level, 0, 26);
                             platformSpeed = BASE_SPEED + (level - 1);
-                            platformGap = LENGTH / (INIT_PLATFORMS + level - 1);
-                            jumpDelay = BASE_DELAY - (level - 1) * 400;
+                            platformGap    = LENGTH / (INIT_PLATFORMS + level - 1);
+                            jumpDelay      = BASE_DELAY - (level - 1) * 400;
                             if (jumpDelay < 500) jumpDelay = 500;
                             if (level >= 3)
                                 jumpVy = INIT_JUMP_VY - (level - 2) * 5;
@@ -195,8 +205,8 @@ int main(void) {
                         if (level == 3 && plats[i].special) {
                             blockFalling = true;
                             fallReg = PLATFORM_REG_BASE + i * plats[i].segCount + plats[i].specialIdx;
-                            fallX = plats[i].x + plats[i].specialIdx * CHICKEN_W;
-                            fallY = plats[i].y;
+                            fallX   = plats[i].x + plats[i].specialIdx * CHICKEN_W;
+                            fallY   = plats[i].y;
                             plats[i].special = false;
                         }
                         usleep(jumpDelay);
@@ -216,18 +226,31 @@ int main(void) {
             continue;
         }
 
-        // redraw
-        clearSprites(); fill_sky_and_grass();
+        // ── redraw frame ───────────────────────────────────────────────────────
+        clearSprites();
+        fill_sky_and_grass();
+
+        // ── draw moving bar (background tiles) ────────────────────────────────
+        {
+            int startCol = barX / TILE_SIZE;
+            for (int i = 0; i < BAR_LENGTH; i++) {
+                write_tile_to_kernel(BAR_ROW, startCol + i, BAR_TILE_IDX);
+            }
+            barX -= BAR_SPEED;
+            if (barX + BAR_LENGTH * TILE_SIZE < 0)
+                barX = LENGTH;
+        }
+
         // draw tower
-        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / 16;
-             r <= TOWER_BASE_Y / 16; r++) {
-            for (int c = TOWER_X / 16;
-                 c <= (TOWER_X + TOWER_WIDTH) / 16; c++) {
+        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
+             r <= TOWER_BASE_Y / TILE_SIZE; r++) {
+            for (int c = TOWER_X / TILE_SIZE;
+                 c <= (TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
                 write_tile_to_kernel(r, c,
                     towerEnabled ? TOWER_TILE_IDX : 0);
             }
         }
-        // falling
+        // falling block
         if (blockFalling) {
             fallY += 4;
             write_sprite_to_kernel(
@@ -250,12 +273,14 @@ int main(void) {
             }
         }
         // draw chicken
-        write_sprite_to_kernel(1,
+        write_sprite_to_kernel(
+            1,
             chicken.y,
             chicken.x,
             chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
             0
         );
+
         usleep(16666);
     }
 
