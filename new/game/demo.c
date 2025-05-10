@@ -37,7 +37,7 @@
 #define TOWER_BASE_Y    (WIDTH - WALL - PLATFORM_H)
 
 // ───── moving bars (background tiles) ───────────────────────────────────────
-#define BAR_TILE_IDX     23    // tile index for moving bars
+#define BAR_TILE_IDX     38    // tile index for moving bars
 #define BAR_TILE_COUNT    6    // tiles used: 1 up-left,2 mid-up,3 up-right,4 bot-left,5 mid-down,6 bot-right
 #define BAR_WIDTH         3    // columns per bar
 #define BAR_HEIGHT        2    // rows per bar
