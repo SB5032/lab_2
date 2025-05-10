@@ -29,7 +29,7 @@
 #define CHICKEN_JUMP     11     // chicken jumping tile
 #define PLATFORM_TILE    14     // normal platform tile
 #define SPECIAL_TILE     15     // special falling tile
-#define TOWER_TILE_IDX   22     // static tower tile
+#define TOWER_TILE_IDX   40     // static tower tile
 
 // ───── static tower ─────────────────────────────────────────────────────────
 #define TOWER_X           16
@@ -52,7 +52,7 @@
 #define BASE_DELAY      2000    // base jump delay (µs)
 
 // ───── moving bars (background tiles) ───────────────────────────────────────
-#define BAR_TILE_IDX      23    // tile index for moving bars
+#define BAR_TILE_IDX      38    // tile index for moving bars
 #define BAR_WIDTH          5    // columns per bar
 #define BAR_HEIGHT         2    // rows per bar
 #define BAR_SPEED          4    // pixels per frame
