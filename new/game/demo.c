@@ -8,9 +8,16 @@
 #include <pthread.h>
 #include <time.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>           // for ioctl
 #include "usbcontroller.h"
 #include "vga_interface.h"
 #include "audio_interface.h"
+
+// ───── Quick‐hack VSync ioctl ───────────────────────────────────────────────
+#define VGA_IOCTL_WAIT_VSYNC _IO('v','v')
+static inline int wait_for_vsync(int fd) {
+    return ioctl(fd, VGA_IOCTL_WAIT_VSYNC, NULL);
+}
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH            640   // VGA width (pixels)
@@ -67,9 +74,6 @@ bool towerEnabled = true;
 typedef struct { int x, y, vy; bool jumping; } Chicken;
 typedef struct { int x, y; int segCount; bool special; int specialIdx; } Platform;
 typedef struct { int x; int y_px; } MovingBar;
-
-// prototype for vblank sync (provided by your vga_interface)
-extern int wait_for_vsync(int fd);
 
 void *controller_input_thread(void *arg) {
     uint8_t ep;
@@ -131,11 +135,11 @@ int main(void) {
     srand(time(NULL));
     int minY = WALL + 40, maxY = WIDTH - WALL - PLATFORM_H;
     Platform plats[MAX_SPRITES];
-    // fixed segment counts for exactly 4,4,4,3 sprites on each platform
     int fixedSegs[INIT_PLATFORMS] = { 4, 4, 4, 3 };
+
     for (int i = 0; i < numPlatforms; i++) {
         plats[i].x = LENGTH + i * platformGap;
-        plats[i].segCount = fixedSegs[i];    // ← fixed, not rand()
+        plats[i].segCount = fixedSegs[i];
         int low = chicken.y - 150, high = chicken.y + 150;
         if (low < minY) low = minY;
         if (high > maxY) high = maxY;
@@ -145,18 +149,15 @@ int main(void) {
             plats[i].specialIdx = rand() % plats[i].segCount;
     }
 
-    // initialize moving bars
     MovingBar bars[BAR_COUNT] = {
         { LENGTH,    BAR_Y_PX1 },
         { LENGTH/2,  BAR_Y_PX2 }
     };
 
-    // ─── main game loop ──────────────────────────────────────────────────────
     while (lives > 0) {
-        // ─── sync to vertical blank to avoid flicker ───────────────────────────
+        // wait for vertical blank to avoid tearing
         wait_for_vsync(vga_fd);
 
-        // ─── handle input & physics ─────────────────────────────────────────
         if (controller_state.b && !chicken.jumping) {
             chicken.vy = jumpVy;
             chicken.jumping = true;
@@ -167,21 +168,15 @@ int main(void) {
         moveChicken(&chicken);
         if (chicken.y < minY) chicken.y = minY;
 
-        // ─── move & respawn platforms ───────────────────────────────────────
         for (int i = 0; i < numPlatforms; i++) {
             plats[i].x -= platformSpeed;
             int width = plats[i].segCount * CHICKEN_W;
             if (plats[i].x < -width) {
-                // find the rightmost existing platform
                 int mx = plats[0].x;
                 for (int j = 1; j < numPlatforms; j++)
                     if (plats[j].x > mx) mx = plats[j].x;
                 plats[i].x = mx + platformGap;
-
-                // *** fixed segment count again on respawn ***
                 plats[i].segCount = fixedSegs[i];
-
-                // randomize only the Y and special tile
                 int prevIdx = (i + numPlatforms - 1) % numPlatforms;
                 int low = plats[prevIdx].y - 150;
                 int high = plats[prevIdx].y + 150;
@@ -194,12 +189,10 @@ int main(void) {
             }
         }
 
-        // ─── collision & scoring ────────────────────────────────────────────
         if (chicken.vy > 0) {
             towerEnabled = false;
             bool collided = false;
 
-            // moving bars collision (unchanged) …
             for (int b = 0; b < BAR_COUNT; b++) {
                 int barY_px = bars[b].y_px;
                 int botPrev = prevY + CHICKEN_H;
@@ -222,7 +215,6 @@ int main(void) {
                 }
             }
 
-            // platform collision (unchanged) …
             if (!collided) {
                 for (int i = 0; i < numPlatforms; i++) {
                     int botPrev = prevY + CHICKEN_H;
@@ -265,7 +257,6 @@ int main(void) {
             }
         }
 
-        // ─── death & reset ─────────────────────────────────────────────────
         if (chicken.y > WIDTH) {
             lives--;
             write_number(lives, 0, 6);
@@ -276,14 +267,10 @@ int main(void) {
             continue;
         }
 
-        // ─── redraw frame ──────────────────────────────────────────────────
         clearSprites();
         fill_sky_and_grass();
 
-        // moving bars, tower, falling block, platforms & chicken …
-        // (unchanged drawing loops)
-
-        // draw platforms
+        // draw moving bars, tower, falling block, platforms & chicken...
         for (int i = 0; i < numPlatforms; i++) {
             for (int k = 0; k < plats[i].segCount; k++) {
                 int tile = PLATFORM_TILE;
@@ -299,7 +286,6 @@ int main(void) {
             }
         }
 
-        // draw chicken
         write_sprite_to_kernel(
             1,
             chicken.y,
