@@ -8,77 +8,128 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdbool.h> // MODIFICATION: Added for bool type
+#include <stdbool.h> // For bool type
 
-// Shadow tilemap to keep track of the current state of tiles on screen
-// This helps in reducing redundant ioctl calls.
-unsigned char shadow_tilemap[TILE_ROWS][TILE_COLS];
-// Flag to ensure shadow map is initialized
-bool shadow_map_initialized = false;
+// --- Software Double Buffering ---
+// Two software buffers to represent the "front" (last presented) and "back" (current drawing) states.
+static unsigned char display_buffer_A[TILE_ROWS][TILE_COLS];
+static unsigned char display_buffer_B[TILE_ROWS][TILE_COLS];
 
-// NEW: Initialization function for the VGA interface and shadow tilemap
+// Pointers to designate which buffer is currently the back buffer (for drawing)
+// and which is the front buffer (representing what's on screen).
+static unsigned char (*current_back_buffer)[TILE_COLS] = display_buffer_A;
+static unsigned char (*current_front_buffer)[TILE_COLS] = display_buffer_B;
+
+// Shadow map for actual hardware writes. This tracks what's physically on the screen
+// to avoid redundant ioctl calls when presenting the frame.
+static unsigned char shadow_hardware_map[TILE_ROWS][TILE_COLS];
+static bool vga_initialized = false;
+
+// Internal function to write a single tile to the hardware.
+// This is only called by vga_present_frame() if a tile in the
+// back buffer differs from what's currently on the hardware (tracked by shadow_hardware_map).
+static void vga_hardware_write_tile(unsigned char r, unsigned char c, unsigned char n) {
+    // Boundary check for safety.
+    if (r >= TILE_ROWS || c >= TILE_COLS) {
+        // fprintf(stderr, "vga_hardware_write_tile: Coords out of bounds (r:%d, c:%d)\n", r, c);
+        return;
+    }
+    // Only issue ioctl if the hardware state is different.
+    if (shadow_hardware_map[r][c] == n) {
+        return; 
+    }
+
+    vga_top_arg_t vla; // Structure for ioctl argument
+    vla.r = r;
+    vla.c = c;
+    vla.n = n;
+    if (ioctl(vga_fd, VGA_TOP_WRITE_TILE, &vla)) {
+        perror("ioctl(VGA_TOP_WRITE_TILE) failed in vga_hardware_write_tile");
+        return; // If ioctl fails, shadow map isn't updated, retry might happen.
+    }
+    shadow_hardware_map[r][c] = n; // Update hardware shadow map on successful write.
+}
+
+// Initializes the VGA interface, software buffers, and hardware shadow map.
 void init_vga_interface(void) {
-    // Initialize the shadow tilemap with a value that forces the first draw
-    // or with BLANKTILE if you want to start with a cleared concept.
-    // Using a distinct initial value helps ensure the first full draw occurs.
+    if (vga_initialized) return; // Prevent re-initialization
+
+    // Initialize both software buffers to a known state (e.g., BLANKTILE).
+    // Initialize hardware shadow map to a state that forces the first full draw (e.g., 0xFF).
     for (int r = 0; r < TILE_ROWS; r++) {
         for (int c = 0; c < TILE_COLS; c++) {
-            shadow_tilemap[r][c] = 0xFF; // A value different from any valid tile index
-                                         // to force the first actual write.
-                                         // Or use BLANKTILE if you prefer.
+            display_buffer_A[r][c] = BLANKTILE; 
+            display_buffer_B[r][c] = BLANKTILE; 
+            shadow_hardware_map[r][c] = 0xFF; // Different from any valid tile to ensure first hardware write.
         }
     }
-    shadow_map_initialized = true;
-    // Optionally, you could call cleartiles() here to ensure the actual screen
-    // matches the shadow map's initial blank state if shadow_tilemap is init with BLANKTILE.
-    // cleartiles(); // If shadow_tilemap is initialized to BLANKTILE
+    // Set initial roles for the buffers.
+    current_back_buffer = display_buffer_A;
+    current_front_buffer = display_buffer_B;
+
+    // Perform an initial clear of the actual hardware screen to match the software buffers.
+    for (int r = 0; r < TILE_ROWS; r++) {
+        for (int c = 0; c < TILE_COLS; c++) {
+            vga_hardware_write_tile(r, c, BLANKTILE);
+        }
+    }
+    vga_initialized = true;
 }
 
-
-// r*c: 40*30       r:0-29      c:0-39
-// n means image number, number of the image stored in memory
-void write_tile_to_kernel(unsigned char r, unsigned char c, unsigned char n) 
-{
-  // Boundary checks
+// MODIFIED: Writes tile data to the current software back_buffer.
+// No direct hardware write happens here.
+void write_tile_to_kernel(unsigned char r, unsigned char c, unsigned char n) {
+  if (!vga_initialized) {
+      // This is a safeguard. init_vga_interface() should always be called first from main.
+      // fprintf(stderr, "Warning: VGA interface not initialized. Attempting to initialize now.\n");
+      // init_vga_interface(); // This could be problematic if vga_fd isn't set yet.
+      return; // Better to fail or log if not initialized properly.
+  }
+  // Boundary check.
   if (r >= TILE_ROWS || c >= TILE_COLS) {
-    // fprintf(stderr, "write_tile_to_kernel: Coords out of bounds (r:%d, c:%d)\n", r, c);
+    // fprintf(stderr, "write_tile_to_kernel (back_buffer): Coords out of bounds (r:%d, c:%d)\n", r, c);
     return;
   }
-
-  // If shadow map isn't initialized, force write (should not happen if init_vga_interface is called)
-  if (!shadow_map_initialized) {
-      // Fallback: Directly write, but this indicates an issue with initialization flow.
-      // Consider initializing it here as a safety, though it's better to ensure init_vga_interface is called first.
-      // init_vga_interface(); // Or at least initialize the specific shadow tile
-      // shadow_tilemap[r][c] = 0xFF; // Force this write
-  }
-
-
-  // MODIFIED: Only write if the new tile is different from the shadow map
-  if (shadow_tilemap[r][c] == n) {
-    return; // Tile is already what we want, skip ioctl
-  }
-
-  vga_top_arg_t vla;
-  vla.r = r;
-  vla.c = c;
-  vla.n = n;
-  if (ioctl(vga_fd, VGA_TOP_WRITE_TILE, &vla)) {
-    perror("ioctl(VGA_TOP_WRITE_TILE) failed");
-    // If ioctl fails, we don't update the shadow map, so a retry might happen next frame.
-    return;
-  }
-  // Update shadow map on successful write
-  shadow_tilemap[r][c] = n;
+  current_back_buffer[r][c] = n;
 }
 
-// sprite r and c is pixel, r range is 0 - 639, c range is 0-479
-void write_sprite_to_kernel(unsigned char active,   //active == 1, display, active == 0 not display
-                            unsigned short r,
-                            unsigned short c,
-                            unsigned char n,
-                            unsigned short register_n) 
-{
+// NEW: Presents the drawn frame (current_back_buffer) to the screen.
+// It compares the back buffer with the hardware shadow map and only writes differences.
+void vga_present_frame(void) {
+    if (!vga_initialized) return;
+
+    for (int r = 0; r < TILE_ROWS; r++) {
+        for (int c = 0; c < TILE_COLS; c++) {
+            // If the tile in the back buffer is different from what's on hardware, update hardware.
+            if (current_back_buffer[r][c] != shadow_hardware_map[r][c]) {
+                 vga_hardware_write_tile(r, c, current_back_buffer[r][c]);
+            }
+        }
+    }
+
+    // Swap the roles of the software buffers.
+    // The current_back_buffer (which was just drawn to and presented) becomes the new current_front_buffer.
+    // The old current_front_buffer becomes the new current_back_buffer, ready for the next frame's drawing.
+    unsigned char (*temp_buffer)[TILE_COLS] = current_front_buffer;
+    current_front_buffer = current_back_buffer;
+    current_back_buffer = temp_buffer;
+
+    // Optional: Clear the new back buffer immediately after swapping.
+    // This ensures each frame starts drawing on a clean slate.
+    // If not cleared, the new back buffer contains the previous frame's content,
+    // which might be desired if only parts of the screen change.
+    // For a full-screen update game like this, clearing is often preferred.
+    // for (int r = 0; r < TILE_ROWS; r++) {
+    //     for (int c = 0; c < TILE_COLS; c++) {
+    //         current_back_buffer[r][c] = BLANKTILE; 
+    //     }
+    // }
+}
+
+// Sprites are still written directly to hardware.
+// This is because sprites are often hardware overlays and might not be part of the tilemap memory.
+// If sprite flickering is an issue, a similar buffering strategy for sprite states might be needed.
+void write_sprite_to_kernel(unsigned char active, unsigned short r, unsigned short c, unsigned char n, unsigned short register_n) {
   vga_top_arg_s vla;
   vla.active = active;
   vla.r = r;
@@ -87,126 +138,110 @@ void write_sprite_to_kernel(unsigned char active,   //active == 1, display, acti
   vla.register_n = register_n;
   if (ioctl(vga_fd, VGA_TOP_WRITE_SPRITE, &vla)) {
     perror("ioctl(VGA_TOP_WRITE_SPRITE) failed");
-    return;
+    // No return here, as it's a common pattern to attempt all sprite writes.
   }
 }
 
-
-// tile operations: r*c: 40*30       r:0-29      c:0-39
-
-// for when needing to reset the background to empty
-void cleartiles()
-{
-  if (!shadow_map_initialized) {
-    // This is a good place to ensure it's initialized if somehow missed,
-    // as cleartiles implies a fresh state.
-    init_vga_interface();
+// MODIFIED: cleartiles now clears the current_back_buffer by writing BLANKTILE to it.
+void cleartiles() {
+  if (!vga_initialized) {
+      // init_vga_interface(); // Safeguard, but should be called from main.
+      return;
   }
-  int i, j;
-  for(i=0; i < TILE_ROWS; i++)
-  {
-     for(j=0; j < TILE_COLS; j++)
-     {
-        // This will now use the optimized write_tile_to_kernel
-        write_tile_to_kernel(i, j, BLANKTILE);
+  for(int i=0; i < TILE_ROWS; i++) {
+     for(int j=0; j < TILE_COLS; j++) {
+        current_back_buffer[i][j] = BLANKTILE; // Write to software back buffer
      }
   }
 }
 
+// Clears all hardware sprites.
 void clearSprites(){
-  for(int i = 0; i <12; i++){ // Assuming 12 sprite registers based on previous context
-    write_sprite_to_kernel(0, 0, 0, 0, i);
+  for(int i = 0; i < 12; i++){ // Assuming 12 sprite registers based on typical usage.
+    write_sprite_to_kernel(0, 0, 0, 0, i); // Deactivate sprite and move off-screen.
   }
 }
 
-// write a single digit number at a specific tile
-void write_number(unsigned int num, unsigned int row, unsigned int col)
-{
-  if (num > 9) num = 9; // Ensure it's a single digit for NUMBERTILE mapping
+// Writes a single digit number to the current_back_buffer.
+void write_number(unsigned int num, unsigned int row, unsigned int col) {
+  if (num > 9) num = 9; // Ensure it's a single digit.
   write_tile_to_kernel((unsigned char) row, (unsigned char) col, NUMBERTILE(num));
 }
 
-// write a letter at a specific tile, only works with lower case
-void write_letter(unsigned char letter, unsigned int row, unsigned int col)
-{
+// Writes a single letter to the current_back_buffer.
+void write_letter(unsigned char letter, unsigned int row, unsigned int col) {
   if (letter >= 'a' && letter <= 'z') {
-    letter = letter - 'a'; // convert 'a' to 0, 'b' to 1, etc.
+    letter = letter - 'a'; // Convert 'a' to 0, 'b' to 1, etc. for LETTERTILE macro.
     write_tile_to_kernel(row, col, LETTERTILE(letter));
   } else {
-    // Handle non-lowercase letters if necessary, e.g., write a blank or a default char
-    write_tile_to_kernel(row, col, BLANKTILE); 
+    write_tile_to_kernel(row, col, BLANKTILE); // Default for non-lowercase letters.
   }
 }
 
-// if digits longer than actual number, the front will be padded with zero
-void write_numbers(unsigned int nums, unsigned int digits, unsigned int row, unsigned int col)
-{
-  if ((col + digits) > TILE_COLS) {
-    // printf("number too long or out of bounds!\n");
+// Writes multiple numbers (a string of digits) to the current_back_buffer.
+void write_numbers(unsigned int nums, unsigned int digits, unsigned int row, unsigned int col) {
+  if ((col + digits) > TILE_COLS) { // Prevent writing out of bounds.
+    // fprintf(stderr, "write_numbers: Number string out of bounds.\n");
     return;
   }
-  // Ensure digits is not excessively large to prevent issues with temp_num
-  if (digits == 0 || digits > 10) digits = 1; // Max 10 digits for unsigned int, default to 1 if 0
+  if (digits == 0 ) digits = 1; // Default to 1 digit if 0 is passed.
+  if (digits > 10) digits = 10; // Cap digits for practical limits of unsigned int.
 
-  char temp_num_str[11]; // Max 10 digits + null terminator
-  sprintf(temp_num_str, "%0*u", digits, nums); // Format with leading zeros
+  char temp_num_str[11]; // Max 10 digits + null terminator.
+  sprintf(temp_num_str, "%0*u", digits, nums); // Format with leading zeros.
 
   for (unsigned int i = 0; i < digits; i++) {
-      if ((col + i) < TILE_COLS) { // Ensure writing within bounds
+      // Check bounds for each character, though initial check should cover it.
+      if ((col + i) < TILE_COLS) { 
           write_number(temp_num_str[i] - '0', row, col + i);
-      } else {
-          break; // Stop if we go out of column bounds
+      } else { 
+          break; 
       }
   }
 }
 
-
-// update displayed score at a pre-determined location, max digit length of 4
-// only work with positive integers
-void write_score(int new_score)
-{
-  if (new_score < 0) new_score = 0; // Handle negative scores if necessary
+// Writes the score to the current_back_buffer.
+void write_score(int new_score) {
+  if (new_score < 0) new_score = 0; // Display non-negative scores.
   write_numbers((unsigned int) new_score, SCORE_MAX_LENGTH, SCORE_COORD_R, SCORE_COORD_C);
 }
 
-
-// write a string at a specific tile, only works with lower case letters, make sure to keep the string short
-void write_text(unsigned char *text, unsigned int length, unsigned int row, unsigned int col)
-{
+// Writes a text string to the current_back_buffer.
+void write_text(unsigned char *text, unsigned int length, unsigned int row, unsigned int col) {
   if (!text) return;
+  unsigned int write_len = length;
+  // Truncate if the string would go out of bounds.
   if ((col + length) > TILE_COLS) {
-    // printf("string too long or out of bounds!\n");
-    // Optionally truncate or skip drawing
-    length = TILE_COLS - col; // Truncate if it goes out of bounds
+    write_len = TILE_COLS - col; 
   }
   
-  for (unsigned int i = 0; i < length; i++) {
-    if ((col + i) < TILE_COLS) { // Double check bounds per character
+  for (unsigned int i = 0; i < write_len; i++) {
+    // Final check for each character, though truncation should handle it.
+    if ((col + i) < TILE_COLS) {
         write_letter(*(text + i), row, col + i);
-    } else {
-        break;
+    } else { 
+        break; 
     }
   }
 }
 
-// NEW: Implementation of fill_sky_and_grass
-// This function will now benefit from the shadow tilemap optimization
-// if called repeatedly with the same sky/grass pattern.
+// MODIFIED: Fills the sky and grass in the current_back_buffer.
 void fill_sky_and_grass(void) {
-    if (!shadow_map_initialized) {
-        init_vga_interface(); // Ensure shadow map is ready
+    if (!vga_initialized) {
+        // init_vga_interface(); // Safeguard
+        return;
     }
     int r, c;
-    // Draw sky
-    for (r = 0; r < GRASS_ROW_START; ++r) {
+    // Draw sky tiles to the back buffer.
+    for (r = 0; r < GRASS_ROW_START; ++r) { 
         for (c = 0; c < TILE_COLS; ++c) {
-            write_tile_to_kernel(r, c, SKY_TILE_IDX);
+            write_tile_to_kernel(r, c, SKY_TILE_IDX); 
         }
     }
-    // Draw grass
-    for (r = GRASS_ROW_START; r < TILE_ROWS; ++r) {
+    // Draw grass tiles to the back buffer.
+    for (r = GRASS_ROW_START; r < TILE_ROWS; ++r) { 
         for (c = 0; c < TILE_COLS; ++c) {
-            write_tile_to_kernel(r, c, GRASS_TILE_IDX);
+            write_tile_to_kernel(r, c, GRASS_TILE_IDX); 
         }
     }
 }
