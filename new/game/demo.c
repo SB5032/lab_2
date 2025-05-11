@@ -12,6 +12,7 @@
 #include "vga_interface.h"
 #include "audio_interface.h"
 
+
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH            640   // VGA width (pixels)
 #define WIDTH             480   // VGA height (pixels)
@@ -38,16 +39,17 @@
 #define BASE_DELAY       2000   // base jump delay (µs)
 
 // ───── bar-config limits ─────────────────────────────────────────────────────
-#define BAR_COUNT          6     // bars per group
+#define BAR_COUNT          7     // MODIFIED: Was 6. Aiming for ~96px spacing (640/7 = ~91.4px).
 #define BAR_HEIGHT_ROWS    2     // tiles tall
 #define BAR_SPEED_BASE     4     // pixels/frame
-#define MIN_BAR_TILES      3
-#define MAX_BAR_TILES     10
+#define MIN_BAR_TILES      5     // MODIFIED: Was 3. Min length based on 1/8th screen width (80px / 16px/tile = 5 tiles).
+#define MAX_BAR_TILES     10     // Max length in tiles
 #define BAR_TILE_IDX      39
 
 // ───── bar Y-bounds ─────────────────────────────────────────────────────────
 #define BAR_MIN_Y         (WALL + 120)
 #define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL)
+
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
