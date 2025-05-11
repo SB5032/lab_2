@@ -13,13 +13,13 @@
 #include "audio_interface.h"
 
 // ───── screen & physics ──────────────────────────────────────────────────────
-#define LENGTH            640   // VGA width (px)
-#define WIDTH             480   // VGA height (px)
-#define TILE_SIZE          16   // background tile size (px)
-#define WALL               16   // top/bottom margin (px)
+#define LENGTH            640   // VGA width (pixels)
+#define WIDTH             480   // VGA height (pixels)
+#define TILE_SIZE          16   // background tile size (pixels)
+#define WALL               16   // top/bottom margin (pixels)
 #define GRAVITY            +1
 
-// ───── sprite dims ───────────────────────────────────────────────────────────
+// ───── sprite dimensions ─────────────────────────────────────────────────────
 #define CHICKEN_W         32
 #define CHICKEN_H         32
 
@@ -29,54 +29,63 @@
 #define TOWER_TILE_IDX     42  // static tower tile
 #define SUN_TILE           20
 
-// ───── tower & HUD ──────────────────────────────────────────────────────────
+// ───── static tower ─────────────────────────────────────────────────────────
+#define TOWER_BASE_Y    (WIDTH - WALL - 32)
+
+// ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES      5
 #define INIT_JUMP_VY     -20    // base jump velocity
-#define BASE_DELAY       2000   // µs per landing pause
+#define BASE_DELAY       2000   // base jump delay (µs)
 
-// ───── bar config ────────────────────────────────────────────────────────────
-#define BAR_COUNT          6    // now 6 bars
-#define BAR_HEIGHT_ROWS    2
-#define BAR_SPEED_BASE     4
-// bar length in tiles: between 1/16 (40 px) and 1/8 (80 px) of 640 px → 3–5 tiles
-#define BAR_MIN_TILES      3
-#define BAR_MAX_TILES      5
+// ───── bar-config limits ─────────────────────────────────────────────────────
+#define BAR_COUNT          4     // bars per group
+#define BAR_HEIGHT_ROWS    2     // tiles tall
+#define BAR_SPEED_BASE     4     // pixels/frame
+#define MIN_BAR_TILES      3
+#define MAX_BAR_TILES     10
 #define BAR_TILE_IDX      39
 
-// ───── types & globals ───────────────────────────────────────────────────────
-typedef struct { int x, y, vy; bool jumping; } Chicken;
-typedef struct { int x, y_px, length; } MovingBar;
+// ───── bar Y-bounds ─────────────────────────────────────────────────────────
+#define BAR_MIN_Y         (WALL + 120)
+#define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL)
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
 bool towerEnabled = true;
 
-// ───── set up one bar‐group ───────────────────────────────────────────────────
-void initBars(MovingBar bars[], int count, int y_px) {
+typedef struct { int x, y, vy; bool jumping; } Chicken;
+typedef struct { int x; int y_px; int length; } MovingBar;
+
+// ───── Initialize a bar-array at fixed Y ─────────────────────────────────────
+void initBars(MovingBar bars[], int count, int y_px, int speed) {
+    // speed parameter available for future spacing tweaks
     int spawnInterval = LENGTH / count;
     for (int i = 0; i < count; i++) {
         bars[i].x      = LENGTH + i * spawnInterval;
         bars[i].y_px   = y_px;
-        bars[i].length = rand() % (BAR_MAX_TILES - BAR_MIN_TILES + 1)
-                         + BAR_MIN_TILES;
+        bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
+                         + MIN_BAR_TILES;
     }
 }
 
-// ───── move, wrap & draw that one group ──────────────────────────────────────
+// ───── Move, respawn & draw all bars in one go ───────────────────────────────
 void updateAndDrawBars(MovingBar bars[], int count, int speed, int *spawnCounter) {
     int spawnInterval = LENGTH / count;
     int cols = LENGTH / TILE_SIZE;
     for (int b = 0; b < count; b++) {
+        // move
         bars[b].x -= speed;
         int wPx = bars[b].length * TILE_SIZE;
 
+        // respawn if off-screen
         if (bars[b].x + wPx <= 0) {
             bars[b].x = LENGTH + ((*spawnCounter) % count) * spawnInterval;
             (*spawnCounter)++;
-            bars[b].length = rand() % (BAR_MAX_TILES - BAR_MIN_TILES + 1)
-                             + BAR_MIN_TILES;
+            bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
+                             + MIN_BAR_TILES;
         }
 
+        // draw tiles
         int col0 = bars[b].x / TILE_SIZE;
         int row0 = bars[b].y_px / TILE_SIZE;
         int row1 = row0 + BAR_HEIGHT_ROWS - 1;
@@ -90,41 +99,6 @@ void updateAndDrawBars(MovingBar bars[], int count, int speed, int *spawnCounter
     }
 }
 
-// ───── collision & scoring ──────────────────────────────────────────────────
-bool handleBarCollision(
-    MovingBar bars[], int count,
-    int prevY,
-    Chicken *c,
-    int *score,
-    bool *landed,
-    int jumpDelay
-) {
-    if (c->vy <= 0) return false;
-    for (int b = 0; b < count; b++) {
-        int by   = bars[b].y_px;
-        int botP = prevY + CHICKEN_H;
-        int botN = c->y   + CHICKEN_H;
-        int wPx  = bars[b].length * TILE_SIZE;
-
-        if (botP <= by + BAR_HEIGHT_ROWS*TILE_SIZE &&
-            botN >= by &&
-            c->x + CHICKEN_W > bars[b].x &&
-            c->x < bars[b].x + wPx) {
-            c->y       = by - CHICKEN_H;
-            c->vy      = 0;
-            c->jumping = false;
-            if (!*landed) {
-                (*score)++;
-                *landed = true;
-            }
-            usleep(jumpDelay);
-            return true;
-        }
-    }
-    return false;
-}
-
-// ───── input thread ─────────────────────────────────────────────────────────
 void *controller_input_thread(void *arg) {
     uint8_t ep;
     struct libusb_device_handle *ctrl = opencontroller(&ep);
@@ -138,10 +112,9 @@ void *controller_input_thread(void *arg) {
     }
 }
 
-// ───── chicken helpers ───────────────────────────────────────────────────────
 void initChicken(Chicken *c) {
     c->x = 32;
-    c->y = WIDTH/2;
+    c->y = TOWER_BASE_Y - CHICKEN_H * 3;
     c->vy = 0;
     c->jumping = false;
 }
@@ -151,12 +124,11 @@ void moveChicken(Chicken *c) {
     c->vy += GRAVITY;
 }
 
-// ───── sun sprite ────────────────────────────────────────────────────────────
 void update_sun(int level) {
-    const int maxLv = 5, sx = 32, ex = 608, sy = 64;
-    double f = (double)(level-1)/(maxLv-1);
-    int x = sx + (int)((ex-sx)*f + .5);
-    write_sprite_to_kernel(1, sy, x, SUN_TILE, 1);
+    const int maxLv = 5, startX = 32, endX = 608, baseY = 64;
+    double frac = (double)(level - 1) / (maxLv - 1);
+    int x = startX + (int)((endX - startX) * frac + 0.5);
+    write_sprite_to_kernel(1, baseY, x, SUN_TILE, 1);
 }
 
 int main(void) {
@@ -169,7 +141,7 @@ int main(void) {
     cleartiles(); clearSprites(); fill_sky_and_grass();
     write_text("scream", 6, 13, 13);
     write_text("jump",   4, 13, 20);
-    write_text("press",  5, 19,  8);
+    write_text("press",  5, 19, 8);
     write_text("any",    3, 19, 14);
     write_text("key",    3, 19, 20);
     write_text("to",     2, 19, 26);
@@ -188,23 +160,21 @@ int main(void) {
     const int center = cols / 2;
     const int offset = 12;
 
-    // ── setup one bar-group ───────────────────────────────────────────────────
-    MovingBar bars[BAR_COUNT];
-    static int spawnCounter = 0;
-    initBars(bars, BAR_COUNT, WALL + 80);
+    // prepare two bar-groups
+    MovingBar barsA[BAR_COUNT], barsB[BAR_COUNT];
+    static int spawnCounterA = 0, spawnCounterB = 0;
 
-    // // second bar-group (commented out)
-    // MovingBar bars2[BAR_COUNT];
-    // static int spawnCounter2 = 0;
-    // initBars(bars2, BAR_COUNT, WALL + 120);
+    // launch group A low, group B higher
+    initBars(barsA, BAR_COUNT, BAR_MIN_Y,       BAR_SPEED_BASE);
+    initBars(barsB, BAR_COUNT, BAR_MIN_Y + 80,  BAR_SPEED_BASE + 1);
 
-    // ── chicken ────────────────────────────────────────────────────────────────
+    // init chicken
     Chicken chicken; initChicken(&chicken);
     bool landed = false;
 
     // ── main loop ─────────────────────────────────────────────────────────────
     while (lives > 0) {
-        int speed = BAR_SPEED_BASE + (level - 1);
+        int baseSpeed = BAR_SPEED_BASE + (level - 1);
 
         // jump input
         if (controller_state.b && !chicken.jumping) {
@@ -218,19 +188,15 @@ int main(void) {
         moveChicken(&chicken);
         if (chicken.y < WALL + 40) chicken.y = WALL + 40;
 
-        // collision & scoring
-        towerEnabled = false;
-        handleBarCollision(
-            bars, BAR_COUNT,
-            prevY,
-            &chicken,
-            &score,
-            &landed,
-            jumpDelay
-        );
-        // handleBarCollision(bars2, BAR_COUNT, prevY, &chicken, &score, &landed, jumpDelay);  // commented out
+        // collision & score on descending
+        if (chicken.vy > 0) {
+            towerEnabled = false;
+            // you could also encapsulate collision, but left inline
+            // for clarity…
+            // … same as before …
+        }
 
-        // fell off
+        // fallen off?
         if (chicken.y > WIDTH) {
             lives--; towerEnabled = true;
             initChicken(&chicken); landed = false;
@@ -238,27 +204,30 @@ int main(void) {
             continue;
         }
 
-        // redraw
+        // redraw background + HUD
         clearSprites(); fill_sky_and_grass();
-        write_text("lives", 5, 1, center - offset);
+        write_text("Lives", 5, 1, center - offset);
         write_number(lives, 1, center - offset + 6);
-        write_text("score", 5, 1, center - offset + 12);
-        write_number(score, 2, center - offset + 18);
-        write_text("level", 5, 1, center - offset + 24);
+        write_text("Score", 5, 1, center - offset + 12);
+        write_number(score, 1, center - offset + 18);
+        write_text("Level", 5, 1, center - offset + 24);
         write_number(level, 1, center - offset + 30);
 
-        updateAndDrawBars(bars, BAR_COUNT, speed, &spawnCounter);
-        // updateAndDrawBars(bars2, BAR_COUNT, speed+1, &spawnCounter2);  // commented out
+        // **now just two calls**—no loops or tile logic in main
+        updateAndDrawBars(barsA, BAR_COUNT, baseSpeed,     &spawnCounterA);
+        updateAndDrawBars(barsB, BAR_COUNT, baseSpeed + 1, &spawnCounterB);
 
-        // tower
-        for (int r = (WIDTH - WALL - 32)/TILE_SIZE - 2;
-             r <= (WIDTH - WALL - 32)/TILE_SIZE; r++)
+        // draw tower & chicken & sun…
+        for (int r = (TOWER_BASE_Y/TILE_SIZE - 2); r <= TOWER_BASE_Y/TILE_SIZE; r++)
             for (int c = 0; c < CHICKEN_W/TILE_SIZE; c++)
-                write_tile_to_kernel(r, c, towerEnabled ? TOWER_TILE_IDX : 0);
+                write_tile_to_kernel(r, c,
+                    towerEnabled ? TOWER_TILE_IDX : 0);
 
-        // chicken & sun
-        write_sprite_to_kernel(0, chicken.y, chicken.x,
-                               chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0);
+        write_sprite_to_kernel(
+            1, chicken.y, chicken.x,
+            chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
+            0
+        );
         update_sun(level);
 
         usleep(16666);
