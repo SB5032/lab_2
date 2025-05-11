@@ -41,14 +41,14 @@
 #define BASE_DELAY       2000   // base jump delay (µs)
 
 // ───── bar-config limits ─────────────────────────────────────────────────────
-#define BAR_COUNT          2     // # of moving bars on-screen
+#define BAR_COUNT          5     // # of moving bars on-screen
 #define BAR_HEIGHT_ROWS    2     // each bar is 2 tiles tall
 #define BAR_SPEED_BASE     4     // start speed (pixels/frame)
 #define MIN_BAR_TILES      3     // shortest bar: 3 tiles
 #define MAX_BAR_TILES     10     // longest bar: 10 tiles
 #define BAR_Y_PX1        200    // vertical position of bar #0
 #define BAR_Y_PX2        300    // vertical position of bar #1
-#define BAR_GAP_BASE     (LENGTH / BAR_COUNT)  // initial pixel gap between bars
+#define BAR_GAP_BASE     64  // initial pixel gap between bars
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
