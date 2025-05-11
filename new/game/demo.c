@@ -115,8 +115,7 @@ int main(void) {
 
     // compute columns & center for HUD
     const int cols   = LENGTH / TILE_SIZE;  // e.g. 40
-    const int center = cols / 2;            // e.g. 20
-    const int offset = 12;                  // half HUD width
+    const int offset = 3;                  // half HUD width
 
     // spawn spacing & counter
     const int spawnInterval = LENGTH / BAR_COUNT;
@@ -193,12 +192,12 @@ int main(void) {
         clearSprites();
         fill_sky_and_grass();
 
-        write_text("lives", 5, 1, center - offset);
-        write_number(lives, 1, center - offset + 6);
-        write_text("score", 5, 1, center - offset + 12);
-        write_number(score, 1, center - offset + 18);
-        write_text("level", 5, 1, center - offset + 24);
-        write_number(level, 1, center - offset + 30);
+        write_text("lives", 5, 1, offset);
+        write_number(lives, 1, offset + 6);
+        write_text("score", 5, 1, offset + 15);
+        write_number(score, 1, offset + 21);
+        write_text("level", 5, 1, offset + 30);
+        write_number(level, 1, offset + 36);
 
         // move & draw bars (spawn only from right)
         for (int b = 0; b < BAR_COUNT; b++) {
