@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <time.h>
 #include <fcntl.h>
 #include "usbcontroller.h"
 #include "vga_interface.h"
@@ -36,17 +37,18 @@
 
 // ───── lives/score & controller ──────────────────────────────────────────────
 #define INITIAL_LIVES      5
-#define INIT_JUMP_VY     -20   // base jump velocity
-#define BASE_DELAY       2000  // base jump delay (µs)
+#define INIT_JUMP_VY     -20    // base jump velocity
+#define BASE_DELAY       2000   // base jump delay (µs)
 
-// ───── moving bars (background tiles) ───────────────────────────────────────
-#define BAR_TILE_IDX      39    // tile index for moving bars
-#define BAR_WIDTH          5    // columns per bar
-#define BAR_HEIGHT         2    // rows per bar
-#define BAR_SPEED          4    // pixels per frame
-#define BAR_Y_PX1        200    // top Y pixel for bar 1
-#define BAR_Y_PX2        300    // top Y pixel for bar 2
-#define BAR_COUNT          2
+// ───── bar-config limits ─────────────────────────────────────────────────────
+#define BAR_COUNT          2     // # of moving bars on-screen
+#define BAR_HEIGHT_ROWS    2     // each bar is 2 tiles tall
+#define BAR_SPEED_BASE     4     // start speed (pixels/frame)
+#define MIN_BAR_TILES      3     // shortest bar: 3 tiles
+#define MAX_BAR_TILES     10     // longest bar: 10 tiles
+#define BAR_Y_PX1        200    // vertical position of bar #0
+#define BAR_Y_PX2        300    // vertical position of bar #1
+#define BAR_GAP_BASE     (LENGTH / BAR_COUNT)  // initial pixel gap between bars
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
@@ -54,7 +56,7 @@ bool towerEnabled = true;
 
 // ───── data structures ───────────────────────────────────────────────────────
 typedef struct { int x, y, vy; bool jumping; } Chicken;
-typedef struct { int x; int y_px; } MovingBar;
+typedef struct { int x; int y_px; int length; } MovingBar;
 
 void *controller_input_thread(void *arg) {
     uint8_t ep;
@@ -99,28 +101,39 @@ int main(void) {
 
     // ── init game ──────────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    int score = 0, lives = INITIAL_LIVES;
-    int jumpVy = INIT_JUMP_VY;
+    int score = 0, lives = INITIAL_LIVES, level = 1;
+    int jumpVy    = INIT_JUMP_VY;
     int jumpDelay = BASE_DELAY;
+
     write_text("Lives", 0, 0, 1);   write_number(lives, 6, 7);
     write_text("Score", 0, 10, 15); write_number(score, 0, 21);
+    write_text("Level", 0, 20, 31); write_number(level, 26, 38);
 
     Chicken chicken; initChicken(&chicken);
     bool landed = false;
     int minY = WALL + 40;
 
     // ── initialize moving bars ───────────────────────────────────────────────
-    MovingBar bars[BAR_COUNT] = {
-        { LENGTH,    BAR_Y_PX1 },
-        { LENGTH/2,  BAR_Y_PX2 }
-    };
+    MovingBar bars[BAR_COUNT];
+    srand(time(NULL));
+    for (int i = 0; i < BAR_COUNT; i++) {
+        bars[i].x      = LENGTH + i * BAR_GAP_BASE;
+        bars[i].y_px   = (i == 0 ? BAR_Y_PX1 : BAR_Y_PX2);
+        bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
+                         + MIN_BAR_TILES;
+    }
 
     // ── main loop ─────────────────────────────────────────────────────────────
     while (lives > 0) {
+        // update per‐level bar parameters
+        int barGapPx = BAR_GAP_BASE + (level - 1) * TILE_SIZE * 2;
+        int barSpeed = BAR_SPEED_BASE + (level - 1);
+
+        // jump input
         if (controller_state.b && !chicken.jumping) {
-            chicken.vy = jumpVy;
+            chicken.vy      = jumpVy;
             chicken.jumping = true;
-            landed = false;
+            landed          = false;
             play_sfx(0);
         }
 
@@ -128,17 +141,20 @@ int main(void) {
         moveChicken(&chicken);
         if (chicken.y < minY) chicken.y = minY;
 
-        // ── collision & scoring (bars only) ─────────────────────────────────
+        // ── bar collision & score ────────────────────────────────────────────
         if (chicken.vy > 0) {
             towerEnabled = false;
             for (int b = 0; b < BAR_COUNT; b++) {
                 int barY_px = bars[b].y_px;
                 int botPrev = prevY + CHICKEN_H;
                 int botNow  = chicken.y + CHICKEN_H;
-                if (botPrev <= barY_px + BAR_HEIGHT * TILE_SIZE &&
+                int widthPx = bars[b].length * TILE_SIZE;
+
+                if (botPrev <= barY_px + BAR_HEIGHT_ROWS * TILE_SIZE &&
                     botNow  >= barY_px &&
                     chicken.x + CHICKEN_W > bars[b].x &&
-                    chicken.x < bars[b].x + BAR_WIDTH * TILE_SIZE) {
+                    chicken.x < bars[b].x + widthPx) {
+
                     chicken.y       = barY_px - CHICKEN_H;
                     chicken.vy      = 0;
                     chicken.jumping = false;
@@ -153,7 +169,7 @@ int main(void) {
             }
         }
 
-        // ── life loss on fall ────────────────────────────────────────────────
+        // ── lose life if you fall below screen ────────────────────────────────
         if (chicken.y > WIDTH) {
             lives--;
             write_number(lives, 0, 6);
@@ -167,19 +183,28 @@ int main(void) {
         // ── redraw frame ───────────────────────────────────────────────────────
         clearSprites(); fill_sky_and_grass();
 
-        // draw moving bars
+        // draw & move bars
         for (int b = 0; b < BAR_COUNT; b++) {
-            bars[b].x -= BAR_SPEED;
-            if (bars[b].x + BAR_WIDTH * TILE_SIZE <= 0)
-                bars[b].x = LENGTH;
+            bars[b].x -= barSpeed;
+            int widthPx = bars[b].length * TILE_SIZE;
+
+            if (bars[b].x + widthPx <= 0) {
+                // respawn behind the farthest bar
+                int prev = (b + BAR_COUNT - 1) % BAR_COUNT;
+                bars[b].x = bars[prev].x + barGapPx;
+                // new random length
+                bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
+                                 + MIN_BAR_TILES;
+                widthPx = bars[b].length * TILE_SIZE;
+            }
 
             int startCol = bars[b].x / TILE_SIZE;
             int maxCols  = LENGTH / TILE_SIZE;
             int barRow   = bars[b].y_px / TILE_SIZE;
-            int endRow   = barRow + BAR_HEIGHT - 1;
+            int endRow   = barRow + BAR_HEIGHT_ROWS - 1;
 
             for (int r = barRow; r <= endRow; r++) {
-                for (int i = 0; i < BAR_WIDTH; i++) {
+                for (int i = 0; i < bars[b].length; i++) {
                     int col = startCol + i;
                     if (col >= 0 && col < maxCols)
                         write_tile_to_kernel(r, col, BAR_TILE_IDX);
