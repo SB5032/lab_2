@@ -155,7 +155,7 @@ void *controller_input_thread(void *arg) {
 
 void initChicken(Chicken *c) {
     c->x = 32;
-    c->y = TOWER_BASE_Y - CHICKEN_H * 3;
+    c->y = 368; // atop the tower
     c->vy = 0;
     c->jumping = false;
 }
@@ -243,7 +243,7 @@ int main(void) {
                 &score,
                 &landed,
                 jumpDelay
-            ))
+            );
         // {
         //     // then second group
         //     handleBarCollision(
@@ -280,13 +280,11 @@ int main(void) {
         //updateAndDrawBars(barsB, BAR_COUNT, baseSpeed + 1, &spawnCounterB);
 
         // draw tower & chicken & sun…
-            for (int r = row0; r <= row1; r++) {
-                for (int i = 0; i < bars[b].length; i++) {
-                    int c = col0 + i;
-                    if (c >= 0 && c < maxC)
-                        write_tile_to_kernel(r, c, BAR_TILE_IDX);
+            for (int r = 21; r < 30; ++r) {
+                for (int c = 0; c < 5; ++c) {
+                    write_tile_to_kernel(r, c,
+                        towerEnabled ? TOWER_TILE_IDX : 0);
                 }
-            }
 
         write_sprite_to_kernel(
             1, chicken.y, chicken.x,
