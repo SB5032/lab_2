@@ -246,7 +246,7 @@ int main(void) {
             chicken.y,
             chicken.x,
             chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            0
+            1
         );
 
         usleep(16666);
