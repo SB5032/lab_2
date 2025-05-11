@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdbool.h> // MODIFICATION: Added for bool type
 
 // Shadow tilemap to keep track of the current state of tiles on screen
 // This helps in reducing redundant ioctl calls.
