@@ -91,12 +91,14 @@ static void generateBars(MovingBar bars[], int barCount, int barSpeed) {
     static int spawnCounter = 0;
     int cols = LENGTH / TILE_SIZE;
     for (int i = 0; i < barCount; i++) {
+        // move and respawn
         bars[i].x -= barSpeed;
         if (bars[i].x + bars[i].length * TILE_SIZE <= 0) {
             bars[i].x = LENGTH + (spawnCounter++ % barCount) * (LENGTH / barCount);
             bars[i].y_px = randBarY();
             bars[i].length = MIN_BAR_TILES + rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1);
         }
+        // enqueue tiles
         int col0 = bars[i].x / TILE_SIZE;
         int row0 = bars[i].y_px / TILE_SIZE;
         for (int r = 0; r < BAR_HEIGHT_ROWS; r++)
@@ -134,26 +136,18 @@ void moveChicken(Chicken *c) {
 }
 
 int main(void) {
+    // open devices
     vga_fd = open("/dev/vga_top", O_RDWR);
     audio_fd = open("/dev/fpga_audio", O_RDWR);
     if (vga_fd < 0 || audio_fd < 0) return -1;
     pthread_t tid;
     pthread_create(&tid, NULL, controller_input_thread, NULL);
 
-    // ── start screen ──────────────────────────────────────────────────────────
+    // ── initial background & HUD ─────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("scream", 6, 13, 13);
-    write_text("jump", 4, 13, 20);
-    write_text("press", 5, 19,  8);
-    write_text("any",   3, 19, 14);
-    write_text("key",   3, 19, 20);
-    write_text("to",    2, 19, 26);
-    write_text("start", 5, 19, 29);
-    while (!(controller_state.a || controller_state.b || controller_state.start))
-        usleep(10000);
+    // initial HUD blank values (will update each frame)
 
-    // ── init game ─────────────────────────────────────────────────────────────
-    cleartiles(); clearSprites(); fill_sky_and_grass();
+    // ── init game entities ───────────────────────────────────────────────────
     int lives = INITIAL_LIVES, score = 0, level = 1;
     int jumpVy = INIT_JUMP_VY, jumpDelay = BASE_DELAY;
     const int cols = LENGTH / TILE_SIZE;
@@ -180,6 +174,7 @@ int main(void) {
         int prevY = chicken.y;
         moveChicken(&chicken);
         if (chicken.y < WALL + 40) chicken.y = WALL + 40;
+
         // collision & scoring
         if (chicken.vy > 0) {
             for (int b = 0; b < BAR_COUNT; b++) {
@@ -200,12 +195,10 @@ int main(void) {
         }
         if (chicken.y > WIDTH) { lives--; initChicken(&chicken); usleep(3000000); continue; }
 
-        // ── draw frame ─────────────────────────────────────────────────────────
-        cleartiles();             // fully clear tilemap each frame
-        clearSprites();           // clear sprite layer
-        fill_sky_and_grass();     // redraw background
+        // ── clear only sprite layer ────────────────────────────────────────────
+        clearSprites();
 
-        // HUD
+        // ── update HUD ─────────────────────────────────────────────────────────
         write_text("lives", 5, 1, offset);
         write_number(lives, 1, offset + 6);
         write_text("score", 5, 1, offset + 12);
@@ -213,17 +206,16 @@ int main(void) {
         write_text("level", 5, 1, offset + 28);
         write_number(level, 1, offset + 34);
 
-        // bars & movement (double-buffered)
+        // ── draw bars & tower ──────────────────────────────────────────────────
         beginTiles();
         generateBars(bars, BAR_COUNT, barSpeed);
-        flushTiles();
-
-        // tower
+        // tower as part of same buffer
         for (int r = 21; r <= 29; r++)
             for (int c = 0; c <= 4; c++)
-                write_tile_to_kernel(r, c, TOWER_TILE_IDX);
+                addTile(r, c, TOWER_TILE_IDX);
+        flushTiles();
 
-        // sprites (double-buffered)
+        // ── draw sprites (chicken) ────────────────────────────────────────────
         beginSprites();
         addSprite(chicken.y, chicken.x,
                   chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0);
