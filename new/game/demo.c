@@ -11,6 +11,19 @@
 #include "usbcontroller.h"
 #include "vga_interface.h"
 #include "audio_interface.h"
+#include <sys/ioctl.h>
+
+// You may need to define this ioctl code to match your kernel driver
+#ifndef VGA_WAIT_VSYNC
+#define VGA_WAIT_VSYNC 0x1234
+#endif
+
+void wait_for_vsync(void) {
+    // Assumes vga_fd is the global file descriptor for /dev/vga_top
+    ioctl(vga_fd, VGA_WAIT_VSYNC, 0);
+    // If your driver does not support this, fallback to a fixed delay:
+    // usleep(16666); // ~60Hz
+}
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH            640   // VGA width (pixels)
