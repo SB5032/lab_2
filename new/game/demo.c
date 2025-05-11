@@ -246,10 +246,26 @@ int main(void) {
             chicken.y,
             chicken.x,
             chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            1
+            0
         );
 
+		// Draw sun on a semi-circular path based on current level (1–5)
+void update_sun(int level) {
+    const int maxLevels = 5;
+    const int startX = 32;
+    const int endX   = 608;
+    const double radius = (endX - startX) / 2.0;
+    const int centerX = (startX + endX) / 2;
+    const int baseY = 64;
+    double t = M_PI * (level - 1) / (maxLevels - 1);
+    int x = (int)(centerX + radius * cos(t));
+    int y = (int)(baseY - radius * sin(t));
+    // use sprite register 1 for sun
+    write_sprite_to_kernel(1, y, x, 20, 1);
+}
+
         usleep(16666);
+
     }
 
     // ── game over ────────────────────────────────────────────────────────────
