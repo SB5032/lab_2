@@ -207,7 +207,7 @@ int main(void) {
                 for (int i = 0; i < bars[b].length; i++) {
                     int col = startCol + i;
                     if (col >= 0 && col < maxCols)
-                        write_tile_to_kernel(r, col, BAR_TILE_IDX);
+                        write_tile_to_kernel(r, col, 23); //BAR_TILE_IDX);
                 }
             }
         }
