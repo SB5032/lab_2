@@ -1,6 +1,6 @@
 // screamjump_dynamic_start.c
 // Uses software double buffering via vga_interface.c
-// Adjusted game parameters for difficulty.
+// Implements level-based difficulty and fixes multi-digit score display.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,31 +39,26 @@
 #define INITIAL_LIVES      5
 #define INIT_JUMP_VY     -20    // base jump velocity
 #define BASE_DELAY       2000   // base jump delay (µs)
+#define SCORE_PER_LEVEL    5     // Points needed to advance to the next level
+#define MAX_GAME_LEVEL     5     // Maximum number of levels
+#define MAX_SCORE_DISPLAY_DIGITS 3 // For displaying score like 000 to 999
 
-// Bar properties
-#define BAR_ARRAY_SIZE     10    // Max bars stored per group (A or B) - Should be >= BAR_COUNT_PER_WAVE
-// MODIFICATION: Reduced number of bars per wave
-#define BAR_COUNT_PER_WAVE 3     // Number of bars spawned in a single wave (was 5)
-// MODIFICATION: Increased spacing between bars
-#define BAR_INTER_SPACING_PX 150 // Horizontal distance between start of bars in a wave (was 100)
+// Bar properties (some of these will be overridden by level settings)
+#define BAR_ARRAY_SIZE     10    // Max bars stored per group (A or B)
 #define WAVE_SWITCH_TRIGGER_OFFSET_PX 100 // How far the last bar of a wave moves *onto the screen* before next group activates
-
 #define BAR_HEIGHT_ROWS    2     // tiles tall
-// MODIFICATION: Increased base speed of bars
-#define BAR_SPEED_BASE     6     // pixels/frame (was 4)
-#define MIN_BAR_TILES      3     // Min length in tiles (3 * 16px = 48px)
-#define MAX_BAR_TILES      6     // Max length in tiles (6 * 16px = 96px)
 #define BAR_TILE_IDX      39    // Tile index for the bars - USER MUST VERIFY THIS VALUE
 #define BAR_INACTIVE_X  -1000 // Sentinel X value for inactive/off-screen bars
 
-// Bar positioning
-#define BAR_MIN_Y_GROUP_A (WALL + 100) 
-#define BAR_Y_OFFSET_GROUP_B 150       
-#define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL) 
-#define BAR_INITIAL_X_STAGGER_GROUP_B 96 // Initial X offset for the entire Group B wave
+// Default Bar positioning (can be overridden by level settings, especially for Y)
+#define DEFAULT_BAR_MIN_Y_GROUP_A (WALL + 100) 
+#define DEFAULT_BAR_Y_OFFSET_GROUP_B 150       
+#define BAR_MAX_Y_POS         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL - CHICKEN_H - TILE_SIZE) // Max Y for bar top, ensuring chicken can stand
+#define BAR_MIN_Y_POS         (WALL + 60) // Min Y for bar top
+#define BAR_RANDOM_Y_RANGE    120      // Max +/- random offset for group B in random levels
 
 // Global variables
-int vga_fd; // Defined here, used by vga_interface.c via extern
+int vga_fd; 
 int audio_fd; 
 struct controller_output_packet controller_state; 
 bool towerEnabled = true; 
@@ -81,19 +76,16 @@ void draw_all_active_bars_to_back_buffer(MovingBar bars_a[], MovingBar bars_b[],
             if (current_bar_group[b].x == BAR_INACTIVE_X || current_bar_group[b].length == 0) continue;
             
             int bar_pixel_width = current_bar_group[b].length * TILE_SIZE;
-            // Only attempt to draw if the bar is potentially on screen
             if (current_bar_group[b].x < LENGTH && current_bar_group[b].x + bar_pixel_width > 0) { 
                 int col0 = current_bar_group[b].x / TILE_SIZE;         
                 int row0 = current_bar_group[b].y_px / TILE_SIZE;      
                 int row1 = row0 + BAR_HEIGHT_ROWS - 1;    
-
                 for (int r_tile = row0; r_tile <= row1; r_tile++) { 
-                    if (r_tile < 0 || r_tile >= TILE_ROWS) continue; // Row boundary check
+                    if (r_tile < 0 || r_tile >= TILE_ROWS) continue;
                     for (int i = 0; i < current_bar_group[b].length; i++) {
                         int c_tile = col0 + i; 
-                        // Ensure column is within bounds before drawing
                         if (c_tile >= 0 && c_tile < TILE_COLS)
-                            write_tile_to_kernel(r_tile, c_tile, BAR_TILE_IDX); // Writes to software back buffer
+                            write_tile_to_kernel(r_tile, c_tile, BAR_TILE_IDX);
                     }
                 }
             }
@@ -117,368 +109,282 @@ void move_all_active_bars(MovingBar bars_a[], MovingBar bars_b[], int array_size
     }
 }
 
-// Handles collision between chicken and a group of bars
 bool handleBarCollision(MovingBar bars[], int array_size, int prevY_chicken, Chicken *chicken, int *score, bool *has_landed_this_jump, int jumpDelayMicroseconds) {
-    if (chicken->vy <= 0) return false; // Only check when falling
+    if (chicken->vy <= 0) return false;
     for (int b = 0; b < array_size; b++) {
-        if (bars[b].x == BAR_INACTIVE_X) continue; // Skip inactive bars
-
-        int bar_top_y = bars[b].y_px; 
-        int bar_bottom_y = bars[b].y_px + BAR_HEIGHT_ROWS * TILE_SIZE;
-        int bar_left_x = bars[b].x; 
-        int bar_right_x = bars[b].x + bars[b].length * TILE_SIZE;
-
-        int chicken_bottom_prev = prevY_chicken + CHICKEN_H; 
-        int chicken_bottom_curr = chicken->y + CHICKEN_H;
+        if (bars[b].x == BAR_INACTIVE_X) continue;
+        int bar_top_y = bars[b].y_px; int bar_bottom_y = bars[b].y_px + BAR_HEIGHT_ROWS * TILE_SIZE;
+        int bar_left_x = bars[b].x; int bar_right_x = bars[b].x + bars[b].length * TILE_SIZE;
+        int chicken_bottom_prev = prevY_chicken + CHICKEN_H; int chicken_bottom_curr = chicken->y + CHICKEN_H;
         int chicken_right_x = chicken->x + CHICKEN_W;
-
-        // Collision condition
-        if (chicken_bottom_prev <= bar_top_y && chicken_bottom_curr >= bar_top_y && 
-            chicken_bottom_curr <= bar_bottom_y && chicken_right_x > bar_left_x && 
-            chicken->x < bar_right_x) {          
-            chicken->y = bar_top_y - CHICKEN_H; // Snap to bar top
-            chicken->vy = 0;                     // Stop falling
-            chicken->jumping = false;                 
-            if (!(*has_landed_this_jump)) { // Score only once per landing
-                (*score)++; 
-                *has_landed_this_jump = true; 
-            }
-            usleep(jumpDelayMicroseconds); // Brief pause
-            return true; // Collision handled
+        if (chicken_bottom_prev <= bar_top_y && chicken_bottom_curr >= bar_top_y && chicken_bottom_curr <= bar_bottom_y && chicken_right_x > bar_left_x && chicken->x < bar_right_x) {          
+            chicken->y = bar_top_y - CHICKEN_H; chicken->vy = 0; chicken->jumping = false;                 
+            if (!(*has_landed_this_jump)) { (*score)++; *has_landed_this_jump = true; }
+            usleep(jumpDelayMicroseconds); return true; 
         }
     }
-    return false; // No collision with this group
+    return false; 
 }
 
-// Thread for handling controller input
 void *controller_input_thread(void *arg) {
     uint8_t endpoint_address;
     struct libusb_device_handle *controller_handle = opencontroller(&endpoint_address);
-    if (!controller_handle) { 
-        perror("USB controller open failed in thread"); 
-        pthread_exit(NULL); 
-    }
-    unsigned char buffer[GAMEPAD_READ_LENGTH]; 
-    int actual_length_transferred;
-    while (1) { // Loop indefinitely to read controller state
+    if (!controller_handle) { perror("USB controller open failed in thread"); pthread_exit(NULL); }
+    unsigned char buffer[GAMEPAD_READ_LENGTH]; int actual_length_transferred;
+    while (1) {
         int status = libusb_interrupt_transfer(controller_handle, endpoint_address, buffer, GAMEPAD_READ_LENGTH, &actual_length_transferred, 0);
-        if (status == 0 && actual_length_transferred == GAMEPAD_READ_LENGTH) {
-            usb_to_output(&controller_state, buffer); 
-        } else {
-            // fprintf(stderr, "Controller read error: %s\n", libusb_error_name(status)); // Can be noisy
-            usleep(10000); // Wait a bit before retrying on error
-        }
+        if (status == 0 && actual_length_transferred == GAMEPAD_READ_LENGTH) usb_to_output(&controller_state, buffer); 
+        else usleep(10000); 
     }
-    // libusb_close(controller_handle); // Should be called if thread could exit, but it's an infinite loop.
-    // pthread_exit(NULL);
 }
 
-// Initializes chicken state
-void initChicken(Chicken *c) { 
-    c->x = 32; 
-    c->y = CHICKEN_ON_TOWER_Y; 
-    c->vy = 0; 
-    c->jumping = false; 
-}
+void initChicken(Chicken *c) { c->x = 32; c->y = CHICKEN_ON_TOWER_Y; c->vy = 0; c->jumping = false; }
+void moveChicken(Chicken *c) { if (!c->jumping && towerEnabled) return; c->y += c->vy; c->vy += GRAVITY; }
 
-// Updates chicken position based on physics
-void moveChicken(Chicken *c) { 
-    if (!c->jumping && towerEnabled) return; // Don't move if on tower and not jumping
-    c->y += c->vy; 
-    c->vy += GRAVITY; 
-}
-
-// Updates and draws the sun sprite
-void update_sun_sprite(int current_level) { 
-    const int max_level = 5; 
-    const int start_x_sun = 32; 
-    const int end_x_sun = 608; 
-    const int base_y_sun = 64;      
-    double fraction = (current_level > 1) ? (double)(current_level - 1) / (max_level - 1) : 0.0;
-    if (current_level >= max_level) fraction = 1.0; 
+void update_sun_sprite(int current_level_display) { // Takes display level (1-5)
+    const int max_sun_level = MAX_GAME_LEVEL; 
+    const int start_x_sun = 32; const int end_x_sun = 608; const int base_y_sun = 64;      
+    double fraction = (current_level_display > 1) ? (double)(current_level_display - 1) / (max_sun_level - 1) : 0.0;
+    if (current_level_display >= max_sun_level) fraction = 1.0; 
     int sun_x_pos = start_x_sun + (int)((end_x_sun - start_x_sun) * fraction + 0.5);
-    // Sprite register 1 is arbitrarily chosen for the sun.
-    write_sprite_to_kernel(1, base_y_sun, sun_x_pos, SUN_TILE, 1); 
+    write_sprite_to_kernel(1, base_y_sun, sun_x_pos, SUN_TILE, 1);
 }
 
-// Resets all bars in an array to an inactive state
 void resetBarArray(MovingBar bars[], int array_size) {
-    for (int i = 0; i < array_size; i++) { 
-        bars[i].x = BAR_INACTIVE_X; 
-        bars[i].length = 0; 
-    }
+    for (int i = 0; i < array_size; i++) { bars[i].x = BAR_INACTIVE_X; bars[i].length = 0; }
 }
 
-// Main game function
 int main(void) {
-    // Open device files for VGA and Audio
-    if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { 
-        perror("VGA open failed"); 
-        return -1; 
-    }
-    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { 
-        perror("Audio open failed"); 
-        close(vga_fd); // Close already opened vga_fd
-        return -1; 
-    }
+    if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open failed"); return -1; }
+    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     
-    // Initialize the VGA interface (software double buffers, hardware shadow map)
     init_vga_interface(); 
 
-    // Create thread for controller input
     pthread_t controller_thread_id;
     if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
-        perror("Controller thread create failed"); 
-        close(vga_fd); 
-        close(audio_fd); 
-        return -1;
+        perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
 
-    // --- Start Screen Setup ---
-    cleartiles(); // Clears current software back buffer
-    clearSprites(); // Clears hardware sprites
-    fill_sky_and_grass(); // Fills current software back buffer with sky and grass
-    vga_present_frame(); // Present the initial empty screen with background
-
-    // Draw start screen text to the (new) back buffer
-    // Cast string literals to (unsigned char *) for write_text
-    write_text((unsigned char *)"scream", 6, 13, 13); 
-    write_text((unsigned char *)"jump", 4, 13, 20);
-    write_text((unsigned char *)"press", 5, 19, 8); 
-    write_text((unsigned char *)"any", 3, 19, 14); 
-    write_text((unsigned char *)"key", 3, 19, 20);
-    write_text((unsigned char *)"to", 2, 19, 26); 
+    cleartiles(); clearSprites(); fill_sky_and_grass(); vga_present_frame(); 
+    write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
+    write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"any", 3, 19, 14); 
+    write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
-    vga_present_frame(); // Present the start screen text
+    vga_present_frame(); 
     
-    // Wait for player to press a key to start the game
-    while (!(controller_state.a || controller_state.b || controller_state.start)) { 
-        usleep(10000); // Check controller state every 10ms
-    }
+    while (!(controller_state.a || controller_state.b || controller_state.start)) { usleep(10000); }
 
-    // --- Game Initialization ---
-    cleartiles(); // Clear back buffer for game screen
-    clearSprites(); // Clear hardware sprites
-    fill_sky_and_grass(); // Draw initial game background to back buffer
-    // Initial game state will be drawn and presented in the first iteration of the game loop.
+    cleartiles(); clearSprites(); fill_sky_and_grass(); 
 
-    srand(time(NULL)); // Seed random number generator
-    int score = 0, lives = INITIAL_LIVES, level = 1;
-    int jump_velocity = INIT_JUMP_VY; 
-    int jump_pause_delay = BASE_DELAY;
-    const int hud_center_col = TILE_COLS / 2; // TILE_COLS from vga_interface.h
-    const int hud_offset = 12; 
+    srand(time(NULL)); 
+    int score = 0;
+    int game_level = 1; // Actual game level used for logic
+    int lives = INITIAL_LIVES;
+    int jump_velocity = INIT_JUMP_VY; int jump_pause_delay = BASE_DELAY;
+    const int hud_center_col = TILE_COLS / 2; const int hud_offset = 12; 
 
-    MovingBar barsA[BAR_ARRAY_SIZE]; 
-    MovingBar barsB[BAR_ARRAY_SIZE];
-    resetBarArray(barsA, BAR_ARRAY_SIZE); // Initialize bars to inactive
-    resetBarArray(barsB, BAR_ARRAY_SIZE);
+    MovingBar barsA[BAR_ARRAY_SIZE]; MovingBar barsB[BAR_ARRAY_SIZE];
+    resetBarArray(barsA, BAR_ARRAY_SIZE); resetBarArray(barsB, BAR_ARRAY_SIZE);
 
-    int y_pos_group_A = BAR_MIN_Y_GROUP_A; 
-    int y_pos_group_B = BAR_MIN_Y_GROUP_A + BAR_Y_OFFSET_GROUP_B;
-    // Ensure Group B bars are within screen limits
-    if (y_pos_group_B > BAR_MAX_Y) y_pos_group_B = BAR_MAX_Y;
-    if (y_pos_group_B + BAR_HEIGHT_ROWS * TILE_SIZE > WIDTH - WALL) {
-        y_pos_group_B = WIDTH - WALL - (BAR_HEIGHT_ROWS * TILE_SIZE);
-    }
+    // Level-dependent parameters
+    int current_min_bar_tiles;
+    int current_max_bar_tiles;
+    int current_bar_count_per_wave;
+    int current_bar_speed_base;
+    int current_bar_inter_spacing_px;
+    int current_y_pos_A;
+    int current_y_pos_B;
+    int current_wave_switch_trigger_offset_px;
+    int current_bar_initial_x_stagger_group_B;
 
-    Chicken chicken; 
-    initChicken(&chicken); 
+
+    Chicken chicken; initChicken(&chicken); 
     bool has_landed_this_jump = false; 
-    bool group_A_is_active_spawner = true; // Group A starts spawning
-    bool needs_to_spawn_wave_A = true; 
-    bool needs_to_spawn_wave_B = false;
-    int next_bar_slot_A = 0; // Tracks next available slot for spawning in barsA
-    int next_bar_slot_B = 0; // Tracks next available slot for spawning in barsB
-    int watching_bar_idx_A = -1; // Index of the last bar in Group A's current wave
-    int watching_bar_idx_B = -1; // Index of the last bar in Group B's current wave
+    bool group_A_is_active_spawner = true; bool needs_to_spawn_wave_A = true; bool needs_to_spawn_wave_B = false;
+    int next_bar_slot_A = 0; int next_bar_slot_B = 0; 
+    int watching_bar_idx_A = -1; int watching_bar_idx_B = -1; 
 
     // --- Main Game Loop ---
     while (lives > 0) {
-        int current_bar_speed = BAR_SPEED_BASE + (level - 1); // Bar speed increases with level
+        // Update game_level based on score
+        game_level = 1 + (score / SCORE_PER_LEVEL);
+        if (game_level > MAX_GAME_LEVEL) {
+            game_level = MAX_GAME_LEVEL;
+        }
+
+        // Set parameters based on current game_level
+        switch (game_level) {
+            case 1:
+                current_min_bar_tiles = 5; current_max_bar_tiles = 8;
+                current_bar_count_per_wave = 4;
+                current_bar_speed_base = 3;
+                current_bar_inter_spacing_px = 180; // Wider spacing for easier level
+                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A;
+                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
+                break;
+            case 2:
+                current_min_bar_tiles = 4; current_max_bar_tiles = 7;
+                current_bar_count_per_wave = 3;
+                current_bar_speed_base = 4;
+                current_bar_inter_spacing_px = 160;
+                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A - 20; // Slightly different Y
+                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
+                break;
+            case 3:
+                current_min_bar_tiles = 3; current_max_bar_tiles = 6;
+                current_bar_count_per_wave = 3;
+                current_bar_speed_base = 5;
+                current_bar_inter_spacing_px = 150;
+                // Random Y positions
+                current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
+                current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
+                if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
+                if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
+                break;
+            case 4:
+                current_min_bar_tiles = 2; current_max_bar_tiles = 5;
+                current_bar_count_per_wave = 3;
+                current_bar_speed_base = 6;
+                current_bar_inter_spacing_px = 140;
+                 // Random Y positions, potentially tighter or more varied than L3
+                current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
+                current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
+                if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
+                if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
+                break;
+            case 5:
+            default: // Default to hardest if level somehow exceeds MAX_GAME_LEVEL
+                current_min_bar_tiles = 2; current_max_bar_tiles = 4;
+                current_bar_count_per_wave = 2;
+                current_bar_speed_base = 7;
+                current_bar_inter_spacing_px = 130;
+                // Random Y positions
+                current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
+                current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
+                if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
+                if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
+                break;
+        }
+        // These can also be level-dependent if desired
+        current_wave_switch_trigger_offset_px = WAVE_SWITCH_TRIGGER_OFFSET_PX;
+        current_bar_initial_x_stagger_group_B = BAR_INITIAL_X_STAGGER_GROUP_B;
+
+
+        int actual_bar_speed = current_bar_speed_base + (game_level -1); // Overall speed still slightly increases with raw level
 
         // ───── 1. INPUT PROCESSING ─────
-        if (controller_state.b && !chicken.jumping) { // 'B' button for jump
-            chicken.vy = jump_velocity; 
-            chicken.jumping = true;
-            has_landed_this_jump = false; // Reset landing flag
-            towerEnabled = false;      // Chicken has left the tower
-            play_sfx(0); // Play jump sound
+        if (controller_state.b && !chicken.jumping) {
+            chicken.vy = jump_velocity; chicken.jumping = true;
+            has_landed_this_jump = false; towerEnabled = false; play_sfx(0); 
         }
 
         // ───── 2. UPDATE GAME STATE ─────
-        int prevY_chicken = chicken.y; // Store Y before moving for collision detection
-        moveChicken(&chicken);      // Apply physics to chicken
-        move_all_active_bars(barsA, barsB, BAR_ARRAY_SIZE, current_bar_speed); // Move all bars
+        int prevY_chicken = chicken.y; moveChicken(&chicken);      
+        move_all_active_bars(barsA, barsB, BAR_ARRAY_SIZE, actual_bar_speed);
         
-        // Wave Spawning Logic
         if (group_A_is_active_spawner && needs_to_spawn_wave_A) {
-            int spawned_count = 0, last_idx_in_wave = -1;
-            for (int i = 0; i < BAR_COUNT_PER_WAVE; i++) { // Attempt to spawn a full wave
-                int slot_to_use = -1;
-                // Find an inactive slot in barsA array
+            int spawned_count = 0, last_idx = -1;
+            for (int i = 0; i < current_bar_count_per_wave; i++) {
+                int slot = -1;
                 for (int j = 0; j < BAR_ARRAY_SIZE; j++) {
-                    int current_search_idx = (next_bar_slot_A + j) % BAR_ARRAY_SIZE;
-                    if (barsA[current_search_idx].x == BAR_INACTIVE_X) { 
-                        slot_to_use = current_search_idx; 
-                        break; 
-                    }
+                    int cur_idx = (next_bar_slot_A + j) % BAR_ARRAY_SIZE;
+                    if (barsA[cur_idx].x == BAR_INACTIVE_X) { slot = cur_idx; break; }
                 }
-                if (slot_to_use != -1) { // If a free slot is found
-                    barsA[slot_to_use].x = LENGTH + (i * BAR_INTER_SPACING_PX); // Position new bar
-                    barsA[slot_to_use].y_px = y_pos_group_A;
-                    barsA[slot_to_use].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
-                    last_idx_in_wave = slot_to_use; 
-                    spawned_count++;
-                } else { break; } // No free slot, wave might be shorter or not spawn fully
+                if (slot != -1) {
+                    barsA[slot].x = LENGTH + (i * current_bar_inter_spacing_px); 
+                    barsA[slot].y_px = current_y_pos_A;
+                    barsA[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
+                    last_idx = slot; spawned_count++;
+                } else break;
             }
-            if (spawned_count > 0) { // If any bars were spawned for this wave
-                watching_bar_idx_A = last_idx_in_wave; // Track the last bar of this wave
-                next_bar_slot_A = (last_idx_in_wave + 1) % BAR_ARRAY_SIZE; // Update hint for next search
-            }
-            needs_to_spawn_wave_A = false; // Wave A spawning attempt done for now
+            if (spawned_count > 0) { watching_bar_idx_A = last_idx; next_bar_slot_A = (last_idx + 1) % BAR_ARRAY_SIZE; }
+            needs_to_spawn_wave_A = false;
         } 
-        else if (!group_A_is_active_spawner && needs_to_spawn_wave_B) { // Similar logic for Group B
-            int spawned_count = 0, last_idx_in_wave = -1;
-            for (int i = 0; i < BAR_COUNT_PER_WAVE; i++) {
-                int slot_to_use = -1;
+        else if (!group_A_is_active_spawner && needs_to_spawn_wave_B) {
+            int spawned_count = 0, last_idx = -1;
+            for (int i = 0; i < current_bar_count_per_wave; i++) {
+                int slot = -1;
                 for (int j = 0; j < BAR_ARRAY_SIZE; j++) {
-                    int current_search_idx = (next_bar_slot_B + j) % BAR_ARRAY_SIZE;
-                    if (barsB[current_search_idx].x == BAR_INACTIVE_X) { 
-                        slot_to_use = current_search_idx; 
-                        break; 
-                    }
+                    int cur_idx = (next_bar_slot_B + j) % BAR_ARRAY_SIZE;
+                    if (barsB[cur_idx].x == BAR_INACTIVE_X) { slot = cur_idx; break; }
                 }
-                if (slot_to_use != -1) {
-                    barsB[slot_to_use].x = LENGTH + BAR_INITIAL_X_STAGGER_GROUP_B + (i * BAR_INTER_SPACING_PX);
-                    barsB[slot_to_use].y_px = y_pos_group_B;
-                    barsB[slot_to_use].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
-                    last_idx_in_wave = slot_to_use; 
-                    spawned_count++;
-                } else { break; }
+                if (slot != -1) {
+                    barsB[slot].x = LENGTH + current_bar_initial_x_stagger_group_B + (i * current_bar_inter_spacing_px);
+                    barsB[slot].y_px = current_y_pos_B;
+                    barsB[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
+                    last_idx = slot; spawned_count++;
+                } else break;
             }
-            if (spawned_count > 0) {
-                watching_bar_idx_B = last_idx_in_wave;
-                next_bar_slot_B = (last_idx_in_wave + 1) % BAR_ARRAY_SIZE;
-            }
+            if (spawned_count > 0) { watching_bar_idx_B = last_idx; next_bar_slot_B = (last_idx + 1) % BAR_ARRAY_SIZE; }
             needs_to_spawn_wave_B = false;
         }
 
-        // Turn Switching Logic (based on last bar of current wave's position)
         if (group_A_is_active_spawner && watching_bar_idx_A != -1 && barsA[watching_bar_idx_A].x != BAR_INACTIVE_X) {
-            if (barsA[watching_bar_idx_A].x < LENGTH - WAVE_SWITCH_TRIGGER_OFFSET_PX) { // If last bar is sufficiently on screen
-                group_A_is_active_spawner = false; // Switch to Group B
-                needs_to_spawn_wave_B = true;    // Group B needs to spawn
-                watching_bar_idx_A = -1;         // Stop watching Group A's bar for this wave
+            if (barsA[watching_bar_idx_A].x < LENGTH - current_wave_switch_trigger_offset_px) {
+                group_A_is_active_spawner = false; needs_to_spawn_wave_B = true; watching_bar_idx_A = -1;         
             }
         } 
         else if (!group_A_is_active_spawner && watching_bar_idx_B != -1 && barsB[watching_bar_idx_B].x != BAR_INACTIVE_X) {
-            if (barsB[watching_bar_idx_B].x < LENGTH - WAVE_SWITCH_TRIGGER_OFFSET_PX) {
-                group_A_is_active_spawner = true;  // Switch back to Group A
-                needs_to_spawn_wave_A = true;    // Group A needs to spawn
-                watching_bar_idx_B = -1;         // Stop watching Group B's bar
+            if (barsB[watching_bar_idx_B].x < LENGTH - current_wave_switch_trigger_offset_px) {
+                group_A_is_active_spawner = true; needs_to_spawn_wave_A = true; watching_bar_idx_B = -1;         
             }
         }
 
-        // Collision Detection with bars
-        if (chicken.vy > 0) { // Only check collision if chicken is falling
-            bool landed_on_A = handleBarCollision(barsA, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump, jump_pause_delay);
-            if (!landed_on_A) { // If not landed on Group A, check Group B
-                handleBarCollision(barsB, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump, jump_pause_delay);
-            }
+        if (chicken.vy > 0) {
+            bool landed = handleBarCollision(barsA, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump, jump_pause_delay);
+            if (!landed) handleBarCollision(barsB, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump, jump_pause_delay);
         }
         
-        // Boundary and Death Checks
-        if (chicken.y < WALL + 40 && chicken.jumping) { // Ceiling check
-             chicken.y = WALL + 40; 
-             if (chicken.vy < 0) chicken.vy = 0; // Stop upward motion if hit ceiling
-        }
-        if (chicken.y + CHICKEN_H > WIDTH - WALL) { // Floor check (death condition)
-            lives--; 
-            towerEnabled = true; // Re-enable tower for respawn
-            initChicken(&chicken); // Reset chicken
-            has_landed_this_jump = false;
-            // Reset wave spawning state fully on death
-            group_A_is_active_spawner = true; 
-            needs_to_spawn_wave_A = true; 
-            needs_to_spawn_wave_B = false;
-            watching_bar_idx_A = -1; 
-            watching_bar_idx_B = -1; 
-            next_bar_slot_A = 0; 
-            next_bar_slot_B = 0;
-            resetBarArray(barsA, BAR_ARRAY_SIZE); // Clear all bars from internal state
-            resetBarArray(barsB, BAR_ARRAY_SIZE);
-            
-            // Prepare screen for death pause or next life
-            cleartiles(); // Clear back buffer
-            fill_sky_and_grass(); // Redraw static background to back buffer
-            clearSprites(); // Clear hardware sprites
-            // Optional: Could draw "You Died" or lives remaining to back buffer here
-            vga_present_frame(); // Present the cleared state
-
-            if (lives > 0) { 
-                play_sfx(1); // Play death/fall sound
-                usleep(2000000); // Pause for 2 seconds
-            } 
-            continue; // Skip rest of the loop iteration, start next life/game over
+        if (chicken.y < WALL + 40 && chicken.jumping) { chicken.y = WALL + 40; if (chicken.vy < 0) chicken.vy = 0; }
+        if (chicken.y + CHICKEN_H > WIDTH - WALL) { 
+            lives--; towerEnabled = true; initChicken(&chicken); has_landed_this_jump = false;
+            group_A_is_active_spawner = true; needs_to_spawn_wave_A = true; needs_to_spawn_wave_B = false;
+            watching_bar_idx_A = -1; watching_bar_idx_B = -1; next_bar_slot_A = 0; next_bar_slot_B = 0;
+            resetBarArray(barsA, BAR_ARRAY_SIZE); resetBarArray(barsB, BAR_ARRAY_SIZE);
+            cleartiles(); fill_sky_and_grass(); clearSprites(); 
+            vga_present_frame(); 
+            if (lives > 0) { play_sfx(1); usleep(2000000); } 
+            continue; 
         }
 
         // ───── 3. DRAW TO BACK BUFFER ─────
-        // All tile-based drawing operations now write to the software back buffer.
-        fill_sky_and_grass(); // Redraws background to back buffer (optimized by vga_interface)
-        draw_all_active_bars_to_back_buffer(barsA, barsB, BAR_ARRAY_SIZE); // Draw bars to back buffer
+        fill_sky_and_grass(); 
+        draw_all_active_bars_to_back_buffer(barsA, barsB, BAR_ARRAY_SIZE);
         
-        // Draw HUD elements to back buffer
         write_text((unsigned char *)"lives", 5, 1, hud_center_col - hud_offset); 
-        write_number(lives, 1, hud_center_col - hud_offset + 6);
+        write_number(lives, 1, hud_center_col - hud_offset + 6); // Single digit for lives
         write_text((unsigned char *)"score", 5, 1, hud_center_col - hud_offset + 12); 
-        write_number(score, 1, hud_center_col - hud_offset + 18);
+        // MODIFICATION: Use write_numbers for multi-digit score
+        write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 1, hud_center_col - hud_offset + 18); 
         write_text((unsigned char *)"level", 5, 1, hud_center_col - hud_offset + 24); 
-        write_number(level, 1, hud_center_col - hud_offset + 30);
+        write_number(game_level, 1, hud_center_col - hud_offset + 30); // Display current game level
         
-        // Draw Tower to back buffer if enabled
         if (towerEnabled) {
             for (int r_tower = TOWER_TOP_VISIBLE_ROW; r_tower < TOWER_TOP_VISIBLE_ROW + 9; ++r_tower) { 
-                 if (r_tower >= TILE_ROWS ) break; // Boundary check
-                for (int c_tower = 0; c_tower < 5; ++c_tower) { // Tower width
-                    write_tile_to_kernel(r_tower, c_tower, TOWER_TILE_IDX);
-                }
+                 if (r_tower >= TILE_ROWS ) break; 
+                for (int c_tower = 0; c_tower < 5; ++c_tower) { write_tile_to_kernel(r_tower, c_tower, TOWER_TILE_IDX); }
             }
         }
         
         // ───── 4. PRESENT THE FRAME ─────
-        // This copies the completed back buffer to the hardware screen efficiently.
         vga_present_frame();
 
         // ───── 5. DRAW SPRITES (OVERLAYS) ─────
-        // Sprites are drawn directly to hardware after the tilemap frame is presented.
-        // This ensures they appear on top of the tile-based graphics.
-        clearSprites(); // Clear previous hardware sprite positions before drawing new ones
-        write_sprite_to_kernel(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); // Chicken on sprite reg 0
-        update_sun_sprite(level); // Sun on sprite reg 1 (update_sun_sprite calls write_sprite_to_kernel)
+        clearSprites(); 
+        write_sprite_to_kernel(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0);
+        update_sun_sprite(game_level); // Sun position based on game level
 
-        // Frame delay to aim for approximately 60 FPS
         usleep(16666); 
     }
 
-    // --- Game Over Sequence ---
-    cleartiles(); // Clear back buffer
-    fill_sky_and_grass(); // Draw background to back buffer
-    clearSprites(); // Clear hardware sprites
-
-    // Draw "Game Over" and final score to back buffer
+    cleartiles(); fill_sky_and_grass(); clearSprites();
     write_text((unsigned char *)"gameover", 8, 12, (TILE_COLS / 2) - 4); 
     write_text((unsigned char *)"score", 5, 14, (TILE_COLS/2) - 6);
-    write_number(score, 14, (TILE_COLS/2) ); // Display final score
-    
-    vga_present_frame(); // Present Game Over screen
-    play_sfx(2); // Play game over sound
-    sleep(3); // Display game over message for 3 seconds
+    write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 14, (TILE_COLS/2) ); 
+    vga_present_frame(); 
+    play_sfx(2); 
+    sleep(3); 
 
-    // Cleanup
-    close(vga_fd); 
-    close(audio_fd);
-    // For a very clean exit, you might signal the controller_thread to terminate and then pthread_join it.
-    // This is often omitted in simpler embedded programs where main doesn't return or the system reboots.
+    close(vga_fd); close(audio_fd);
     return 0;
 }
