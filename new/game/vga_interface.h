@@ -1,3 +1,9 @@
+#ifndef VGA_INTERFACE_H
+#define VGA_INTERFACE_H
+
+// Define screen dimensions in tiles
+#define TILE_ROWS 30
+#define TILE_COLS 40
 
 #define BLANKTILE 0 // img number of blank tile
 // TODO: Change the offset according to the actual mapping
@@ -16,14 +22,11 @@
 #define SCORE_COORD_C 20
 #define SCORE_MAX_LENGTH 4
 
-#define SKY_TILE  37 
-#define GRASS_TILE 38
-#define ROWS       30    // your screen is 30 tiles tall
-#define COLS       40    // your screen is 40 tiles wide
-
 
 extern int vga_fd; // vga file descriptor, define in main file
 
+// NEW: Initialization function for the VGA interface (and shadow tilemap)
+void init_vga_interface(void);
 
 void write_tile_to_kernel(unsigned char r, unsigned char c, unsigned char n);
 
@@ -43,11 +46,13 @@ void write_text(unsigned char *text, unsigned int length, unsigned int row, unsi
 
 void cleartiles(); // for setting all tiles to empty
 
-void fill_sky_and_grass();
-
 void clearSprites();
 
+// Placeholder for your sky/grass tiles - adjust these as needed
+#define SKY_TILE_IDX 37  // Example tile index for sky
+#define GRASS_TILE_IDX 38 // Example tile index for grass
+#define GRASS_ROW_START 25 // Example row where grass starts
 
+void fill_sky_and_grass(void); // Declaration for the function now in vga_interface.c
 
-
-
+#endif // VGA_INTERFACE_H
