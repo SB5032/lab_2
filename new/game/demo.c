@@ -85,7 +85,6 @@ void moveChicken(Chicken *c) {
     c->vy += GRAVITY;
 }
 
-// random Y between BAR_MIN_Y and BAR_MAX_Y inclusive
 static inline int randBarY(void) {
     return (rand() % (BAR_MAX_Y - BAR_MIN_Y + 1)) + BAR_MIN_Y;
 }
@@ -114,6 +113,7 @@ int main(void) {
     int jumpVy    = INIT_JUMP_VY;
     int jumpDelay = BASE_DELAY;
 
+    // draw initial HUD
     write_text("Lives", 0, 0, 1);   write_number(lives, 6,  7);
     write_text("Score", 0, 10,15);  write_number(score, 0, 21);
     write_text("Level", 0, 20,31);  write_number(level,26, 38);
@@ -189,21 +189,29 @@ int main(void) {
         }
 
         // ── redraw frame ───────────────────────────────────────────────────────
-        clearSprites(); fill_sky_and_grass();
+        clearSprites();
+        fill_sky_and_grass();
+
+        // redraw HUD each frame
+        write_text("Lives", 0, 0, 1);
+        write_number(lives, 6, 7);
+        write_text("Score", 0, 10,15);
+        write_number(score, 0, 21);
+        write_text("Level", 0, 20,31);
+        write_number(level,26, 38);
 
         // draw & move bars
         for (int b = 0; b < BAR_COUNT; b++) {
             bars[b].x -= barSpeed;
-            int widthPx = bars[b].length * TILE_SIZE;
+            int wPx = bars[b].length * TILE_SIZE;
 
-            if (bars[b].x + widthPx <= 0) {
-                // respawn off the right edge, evenly spaced
+            if (bars[b].x + wPx <= 0) {
                 int prev = (b + BAR_COUNT - 1) % BAR_COUNT;
                 bars[b].x      = bars[prev].x + spawnInterval;
                 bars[b].y_px   = randBarY();
                 bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
                                  + MIN_BAR_TILES;
-                widthPx = bars[b].length * TILE_SIZE;
+                wPx = bars[b].length * TILE_SIZE;
             }
 
             int startCol = bars[b].x / TILE_SIZE;
