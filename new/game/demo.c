@@ -1,4 +1,4 @@
-// screamjump_dynamic_start.c
+// screamjump_double_buffered.c
 // Adds a start screen: displays title and "Press any key to start"
 
 #include <stdio.h>
@@ -95,6 +95,13 @@ int main(void) {
     pthread_t tid;
     pthread_create(&tid, NULL, controller_input_thread, NULL);
 
+    // Initialize double buffering
+    unsigned int buffer_size = LENGTH * WIDTH;
+    unsigned char *buffer1 = (unsigned char *) malloc(buffer_size);
+    unsigned char *buffer2 = (unsigned char *) malloc(buffer_size);
+    unsigned char *current_buffer = buffer1;
+    unsigned char *next_buffer = buffer2;
+
     // ── start screen ──────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
     write_text("scream",   6, 13, 13);
@@ -189,71 +196,17 @@ int main(void) {
             continue;
         }
 
-        // redraw background + top-centre HUD
+        // Draw to next buffer
         clearSprites();
         fill_sky_and_grass();
 
-        write_text("Lives", 5, 1, center - offset);
-        write_number(lives, 1, center - offset + 6);
-        write_text("Score", 5, 1, center - offset + 12);
-        write_number(score, 1, center - offset + 18);
-        write_text("Level", 5, 1, center - offset + 24);
-        write_number(level, 1, center - offset + 30);
+        write_text_to_buffer(next_buffer, buffer_size, "Lives", 5, 1, center - offset);
+        write_number_to_buffer(next_buffer, buffer_size, lives, 1, center - offset + 6);
+        write_text_to_buffer(next_buffer, buffer_size, "Score", 5, 1, center - offset + 12);
+        write_number_to_buffer(next_buffer, buffer_size, score, 1, center - offset + 18);
+        write_text_to_buffer(next_buffer, buffer_size, "Level", 5, 1, center - offset + 24);
+        write_number_to_buffer(next_buffer, buffer_size, level, 1, center - offset + 30);
 
         // move & draw bars (spawn only from right)
         for (int b = 0; b < BAR_COUNT; b++) {
-            bars[b].x -= barSpeed;
-            int wPx = bars[b].length * TILE_SIZE;
-
-            if (bars[b].x + wPx <= 0) {
-                // respawn at right edge, evenly spaced
-                bars[b].x      = LENGTH + (spawnCounter % BAR_COUNT) * spawnInterval;
-                spawnCounter++;
-                bars[b].y_px   = randBarY();
-                bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
-                                 + MIN_BAR_TILES;
-                wPx = bars[b].length * TILE_SIZE;
-            }
-
-            int col0 = bars[b].x / TILE_SIZE;
-            int row0 = bars[b].y_px / TILE_SIZE;
-            int row1 = row0 + BAR_HEIGHT_ROWS - 1;
-            int maxC = cols;
-
-            for (int r = row0; r <= row1; r++) {
-                for (int i = 0; i < bars[b].length; i++) {
-                    int c = col0 + i;
-                    if (c >= 0 && c < maxC)
-                        write_tile_to_kernel(r, c, BAR_TILE_IDX);
-                }
-            }
-        }
-
-// draw tower
-        for (int r = 21; //(TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
-             r <= 29; r++){ //TOWER_BASE_Y / TILE_SIZE; r++) {
-            for (int c = 0; //TOWER_X / TILE_SIZE;
-                 c <= 4; c++){ //(TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
-                write_tile_to_kernel(r, c,
-                    towerEnabled ? TOWER_TILE_IDX : 0);
-            }
-        }
-
-        // draw chicken (sprite 0)
-        write_sprite_to_kernel(
-            1,
-            chicken.y,
-            chicken.x,
-            chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            0
-        );
-
-        usleep(16666);
-    }
-
-    // ── game over ────────────────────────────────────────────────────────────
-    cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("gameover", 8, 12, 16);
-    sleep(2);
-    return 0;
-}
+            bars[b].x
