@@ -12,7 +12,7 @@
 #include "usbcontroller.h"
 #include "vga_interface.h"
 #include "audio_interface.h"
-#include <math.h>
+// #include <math.h>
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH            640   // VGA width (pixels)
@@ -91,20 +91,19 @@ static inline int randBarY(void) {
     return (rand() % (BAR_MAX_Y - BAR_MIN_Y + 1)) + BAR_MIN_Y;
 }
 
-		// Draw sun on a semi-circular path based on current level (1–5)
-		void update_sun(int level) {
-			const int maxLevels = 5;
-			const int startX = 32;
-			const int endX   = 608;
-			const double radius = (endX - startX) / 2.0;
-			const int centerX = (startX + endX) / 2;
-			const int baseY = 64;
-			double t = M_PI * (level - 1) / (maxLevels - 1);
-			int x = (int)(centerX + radius * cos(t));
-			int y = (int)(baseY - radius * sin(t));
-			// use sprite register 1 for sun
-			write_sprite_to_kernel(1, y, x, 20, 1);
-		}
+		// Draw sun moving linearly across top based on level (1–5)
+void update_sun(int level) {
+    const int maxLevels = 5;
+    const int startX = 32;
+    const int endX   = 608;
+    const int baseY  = 64;
+    // linear interpolation: level 1→startX, level max→endX
+    double frac = (double)(level - 1) / (maxLevels - 1);
+    int x = startX + (int)((endX - startX) * frac + 0.5);
+    int y = baseY;
+    // sprite register 1 for sun
+    write_sprite_to_kernel(1, y, x, SUN_TILE, 1);
+}
 
 int main(void) {
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) return -1;
