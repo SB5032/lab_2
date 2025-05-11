@@ -1,6 +1,4 @@
-// screamjump_dynamic_start.c
-// Adds a start screen: displays title and "Press any key to start"
-
+// screamjump_dynamic_start_double_buffered.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -8,56 +6,107 @@
 #include <pthread.h>
 #include <time.h>
 #include <fcntl.h>
+#include <string.h>
 #include "usbcontroller.h"
 #include "vga_interface.h"
 #include "audio_interface.h"
 
 // ───── screen & physics ──────────────────────────────────────────────────────
-#define LENGTH            640   // VGA width (pixels)
-#define WIDTH             480   // VGA height (pixels)
-#define TILE_SIZE          16   // background tile size (pixels)
-#define WALL               16   // top/bottom margin (pixels)
-#define GRAVITY            +1
+#define LENGTH            640
+#define WIDTH             480
+#define TILE_SIZE         16
+#define WALL              16
+#define GRAVITY           +1
 
-// ───── sprite dimensions ─────────────────────────────────────────────────────
+// ───── sprite dimensions ────────────────────────────────────────────────────
 #define CHICKEN_W         32
 #define CHICKEN_H         32
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
-#define CHICKEN_STAND      8   // chicken standing tile
-#define CHICKEN_JUMP       11   // chicken jumping tile
-#define TOWER_TILE_IDX     42   // static tower tile
+#define CHICKEN_STAND      8
+#define CHICKEN_JUMP       11
+#define TOWER_TILE_IDX     42
 
-// ───── static tower ─────────────────────────────────────────────────────────
-#define TOWER_X           16
-#define TOWER_WIDTH      CHICKEN_W
-#define TOWER_HEIGHT       3    // stacked 3 sprites high
-#define PLATFORM_H        32
-#define TOWER_BASE_Y    (WIDTH - WALL - PLATFORM_H)
+// ───── static tower & bars ──────────────────────────────────────────────────
+#define PLATFORM_H         32
+#define TOWER_HEIGHT       3
+#define BAR_COUNT          4
+#define BAR_HEIGHT_ROWS    2
+#define BAR_SPEED_BASE     4
+#define MIN_BAR_TILES      3
+#define MAX_BAR_TILES     10
+#define BAR_TILE_IDX      39
 
-// ───── lives/score & controller ──────────────────────────────────────────────
+// ───── initial game params ──────────────────────────────────────────────────
 #define INITIAL_LIVES      5
-#define INIT_JUMP_VY     -20    // base jump velocity
-#define BASE_DELAY       2000   // base jump delay (µs)
+#define INIT_JUMP_VY     -20
+#define BASE_DELAY       2000
 
-// ───── bar-config limits ─────────────────────────────────────────────────────
-#define BAR_COUNT          4     // number of moving bars on-screen
-#define BAR_HEIGHT_ROWS    2     // each bar is 2 tiles tall
-#define BAR_SPEED_BASE     4     // start speed (pixels/frame)
-#define MIN_BAR_TILES      3     // shortest bar: 3 tiles
-#define MAX_BAR_TILES     10     // longest bar: 10 tiles
-#define BAR_TILE_IDX      39     // tile index for bars
+// ───── double buffering for sprites ─────────────────────────────────────────
+#define MAX_SPRITES_BUF   16
+typedef struct { int y, x, tile, reg; } SpriteEntry;
+static SpriteEntry spriteBuf[MAX_SPRITES_BUF];
+static int spriteBufLen = 0;
+static inline void beginSprites() {
+    spriteBufLen = 0;
+}
+static inline void addSprite(int y, int x, int tile, int reg) {
+    if (spriteBufLen < MAX_SPRITES_BUF)
+        spriteBuf[spriteBufLen++] = (SpriteEntry){y, x, tile, reg};
+}
+static inline void flushSprites() {
+    clearSprites();
+    for (int i = 0; i < spriteBufLen; i++)
+        write_sprite_to_kernel(1, spriteBuf[i].y, spriteBuf[i].x, spriteBuf[i].tile, spriteBuf[i].reg);
+}
 
-// ───── bar Y-bounds ─────────────────────────────────────────────────────────
-#define BAR_MIN_Y         (WALL + 40)
-#define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL)
+// ───── double buffering for tiles ───────────────────────────────────────────
+#define MAX_TILE_BUF     1024
+typedef struct { int row, col, idx; } TileEntry;
+static TileEntry tileBuf[MAX_TILE_BUF];
+static int tileBufLen = 0;
+static inline void beginTiles() { tileBufLen = 0; }
+static inline void addTile(int row, int col, int idx) {
+    if (tileBufLen < MAX_TILE_BUF)
+        tileBuf[tileBufLen++] = (TileEntry){row, col, idx};
+}
+static inline void flushTiles() {
+    for (int i = 0; i < tileBufLen; i++)
+        write_tile_to_kernel(tileBuf[i].row, tileBuf[i].col, tileBuf[i].idx);
+}
 
-int vga_fd, audio_fd;
-struct controller_output_packet controller_state;
-bool towerEnabled = true;
+// ───── helper: random bar Y ──────────────────────────────────────────────────
+static inline int randBarY(void) {
+    return (rand() % ((WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL) - (WALL + 40) + 1)) + (WALL + 40);
+}
 
-typedef struct { int x, y, vy; bool jumping; }       Chicken;
-typedef struct { int x; int y_px; int length; } MovingBar;
+// ───── data structures ──────────────────────────────────────────────────────
+typedef struct { int x, y, vy; bool jumping; } Chicken;
+typedef struct { int x, y_px, length; } MovingBar;
+
+// ───── encapsulated bar logic ───────────────────────────────────────────────
+void generateBars(MovingBar bars[], int barCount, int barSpeed) {
+    static int spawnCounter = 0;
+    int cols = LENGTH / TILE_SIZE;
+    for (int i = 0; i < barCount; i++) {
+        bars[i].x -= barSpeed;
+        if (bars[i].x + bars[i].length * TILE_SIZE <= 0) {
+            bars[i].x = LENGTH + (spawnCounter++ % barCount) * (LENGTH / barCount);
+            bars[i].y_px = randBarY();
+            bars[i].length = MIN_BAR_TILES + rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1);
+        }
+        int col0 = bars[i].x / TILE_SIZE;
+        int row0 = bars[i].y_px / TILE_SIZE;
+        for (int r = 0; r < BAR_HEIGHT_ROWS; r++)
+            for (int j = 0; j < bars[i].length; j++) {
+                int c = col0 + j;
+                if (c >= 0 && c < cols)
+                    addTile(row0 + r, c, BAR_TILE_IDX);
+            }
+    }
+}
+
+extern struct controller_output_packet controller_state;
 
 void *controller_input_thread(void *arg) {
     uint8_t ep;
@@ -73,67 +122,49 @@ void *controller_input_thread(void *arg) {
 
 void initChicken(Chicken *c) {
     c->x = 32;
-    c->y = 304; // atop the tower TOWER_BASE_Y - CHICKEN_H * TOWER_HEIGHT;
+    c->y = WIDTH - WALL - PLATFORM_H - CHICKEN_H * TOWER_HEIGHT;
     c->vy = 0;
     c->jumping = false;
 }
 
 void moveChicken(Chicken *c) {
-    if (!c->jumping && towerEnabled) return;
+    if (!c->jumping) return;
     c->y += c->vy;
     c->vy += GRAVITY;
 }
 
-// uniform random Y within safe landing band
-static inline int randBarY(void) {
-    return (rand() % (BAR_MAX_Y - BAR_MIN_Y + 1)) + BAR_MIN_Y;
-}
-
 int main(void) {
-    if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) return -1;
-    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) return -1;
+    int vga_fd = open("/dev/vga_top", O_RDWR);
+    int audio_fd = open("/dev/fpga_audio", O_RDWR);
+    if (vga_fd < 0 || audio_fd < 0) return -1;
     pthread_t tid;
     pthread_create(&tid, NULL, controller_input_thread, NULL);
 
     // ── start screen ──────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("scream",   6, 13, 13);
-    write_text("jump",     4, 13, 20);
-    write_text("press",    5, 19,  8);
-    write_text("any",      3, 19, 14);
-    write_text("key",      3, 19, 20);
-    write_text("to",       2, 19, 26);
-    write_text("start",    5, 19, 29);
+    write_text("scream", 6, 13, 13);
+    write_text("jump", 4, 13, 20);
+    write_text("press", 5, 19,  8);
+    write_text("any",   3, 19, 14);
+    write_text("key",   3, 19, 20);
+    write_text("to",    2, 19, 26);
+    write_text("start", 5, 19, 29);
     while (!(controller_state.a || controller_state.b || controller_state.start))
         usleep(10000);
 
-    // ── init game ──────────────────────────────────────────────────────────────
+    // ── init game ─────────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    int score = 0, lives = INITIAL_LIVES, level = 1;
-    int jumpVy    = INIT_JUMP_VY;
-    int jumpDelay = BASE_DELAY;
-
-    // compute columns & center for HUD
-    const int cols   = LENGTH / TILE_SIZE;  // e.g. 40
-    const int offset = 3;                  // half HUD width
-
-    // spawn spacing & counter
-    const int spawnInterval = LENGTH / BAR_COUNT;
-    static int spawnCounter = 0;
-
-    // init chicken
+    int lives = INITIAL_LIVES, score = 0, level = 1;
+    int jumpVy = INIT_JUMP_VY, jumpDelay = BASE_DELAY;
+    const int cols = LENGTH / TILE_SIZE;
+    const int offset = 2;
     Chicken chicken; initChicken(&chicken);
-    bool landed = false;
-    int minY = WALL + 40;
-
-    // init bars
     MovingBar bars[BAR_COUNT];
     srand(time(NULL));
     for (int i = 0; i < BAR_COUNT; i++) {
-        bars[i].x      = LENGTH + i * spawnInterval;
-        bars[i].y_px   = randBarY();
-        bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
-                         + MIN_BAR_TILES;
+        bars[i].x = LENGTH + i * (LENGTH / BAR_COUNT);
+        bars[i].y_px = randBarY();
+        bars[i].length = MIN_BAR_TILES + rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1);
     }
 
     // ── main loop ─────────────────────────────────────────────────────────────
@@ -142,36 +173,30 @@ int main(void) {
 
         // jump
         if (controller_state.b && !chicken.jumping) {
-            chicken.vy      = jumpVy;
+            chicken.vy = jumpVy;
             chicken.jumping = true;
-            landed          = false;
-            play_sfx(0);
+            usleep(jumpDelay);
         }
 
         int prevY = chicken.y;
         moveChicken(&chicken);
-        if (chicken.y < minY) chicken.y = minY;
+        if (chicken.y < WALL + 40) chicken.y = WALL + 40;
 
         // bar collision & scoring
         if (chicken.vy > 0) {
-            towerEnabled = false;
             for (int b = 0; b < BAR_COUNT; b++) {
                 int by   = bars[b].y_px;
                 int botP = prevY + CHICKEN_H;
                 int botN = chicken.y + CHICKEN_H;
                 int wPx  = bars[b].length * TILE_SIZE;
-
                 if (botP <= by + BAR_HEIGHT_ROWS * TILE_SIZE &&
                     botN >= by &&
                     chicken.x + CHICKEN_W > bars[b].x &&
                     chicken.x < bars[b].x + wPx) {
-                    chicken.y       = by - CHICKEN_H;
-                    chicken.vy      = 0;
+                    chicken.y = by - CHICKEN_H;
+                    chicken.vy = 0;
                     chicken.jumping = false;
-                    if (!landed) {
-                        score++;
-                        landed = true;
-                    }
+                    score++;
                     usleep(jumpDelay);
                     break;
                 }
@@ -181,71 +206,39 @@ int main(void) {
         // lose life if fallen
         if (chicken.y > WIDTH) {
             lives--;
-            towerEnabled = true;
             initChicken(&chicken);
-            landed = false;
             usleep(3000000);
             continue;
         }
 
-        // redraw background + top-centre HUD
+        // ── draw frame ─────────────────────────────────────────────────────────
         clearSprites();
         fill_sky_and_grass();
 
+        // HUD
         write_text("lives", 5, 1, offset);
         write_number(lives, 1, offset + 6);
-        write_text("score", 5, 1, offset + 15);
-        write_number(score, 1, offset + 21);
-        write_text("level", 5, 1, offset + 30);
-        write_number(level, 1, offset + 36);
+        write_text("score", 5, 1, offset + 12);
+        write_number(score, 1, offset + 18);
+        write_text("level", 5, 1, offset + 28);
+        write_number(level, 1, offset + 34);
 
-        // move & draw bars (spawn only from right)
-        for (int b = 0; b < BAR_COUNT; b++) {
-            bars[b].x -= barSpeed;
-            int wPx = bars[b].length * TILE_SIZE;
+        // bars & movement (double-buffered)
+        beginTiles();
+        generateBars(bars, BAR_COUNT, barSpeed);
+        flushTiles();
 
-            if (bars[b].x + wPx <= 0) {
-                // respawn at right edge, evenly spaced
-                bars[b].x      = LENGTH + (spawnCounter % BAR_COUNT) * spawnInterval;
-                spawnCounter++;
-                bars[b].y_px   = randBarY();
-                bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
-                                 + MIN_BAR_TILES;
-                wPx = bars[b].length * TILE_SIZE;
-            }
+        // tower
+        for (int r = 21; r <= 29; r++)
+            for (int c = 0; c <= 4; c++)
+                write_tile_to_kernel(r, c, TOWER_TILE_IDX);
 
-            int col0 = bars[b].x / TILE_SIZE;
-            int row0 = bars[b].y_px / TILE_SIZE;
-            int row1 = row0 + BAR_HEIGHT_ROWS - 1;
-            int maxC = cols;
-
-            for (int r = row0; r <= row1; r++) {
-                for (int i = 0; i < bars[b].length; i++) {
-                    int c = col0 + i;
-                    if (c >= 0 && c < maxC)
-                        write_tile_to_kernel(r, c, BAR_TILE_IDX);
-                }
-            }
-        }
-
-// draw tower
-        for (int r = 21; //(TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
-             r <= 29; r++){ //TOWER_BASE_Y / TILE_SIZE; r++) {
-            for (int c = 0; //TOWER_X / TILE_SIZE;
-                 c <= 4; c++){ //(TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
-                write_tile_to_kernel(r, c,
-                    towerEnabled ? TOWER_TILE_IDX : 0);
-            }
-        }
-
-        // draw chicken (sprite 0)
-        write_sprite_to_kernel(
-            1,
-            chicken.y,
-            chicken.x,
-            chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            0
-        );
+        // sprites (double-buffered)
+        beginSprites();
+        addSprite(chicken.y, chicken.x,
+                  chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
+                  0);
+        flushSprites();
 
         usleep(16666);
     }
