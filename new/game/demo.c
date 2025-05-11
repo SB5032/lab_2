@@ -87,7 +87,7 @@ typedef struct { int x, y, vy; bool jumping; } Chicken;
 typedef struct { int x, y_px, length; } MovingBar;
 
 // ───── encapsulated bar logic ───────────────────────────────────────────────
-void generateBars(MovingBar bars[], int barCount, int barSpeed) {
+static void generateBars(MovingBar bars[], int barCount, int barSpeed) {
     static int spawnCounter = 0;
     int cols = LENGTH / TILE_SIZE;
     for (int i = 0; i < barCount; i++) {
@@ -134,7 +134,6 @@ void moveChicken(Chicken *c) {
 }
 
 int main(void) {
-    // open global devices
     vga_fd = open("/dev/vga_top", O_RDWR);
     audio_fd = open("/dev/fpga_audio", O_RDWR);
     if (vga_fd < 0 || audio_fd < 0) return -1;
@@ -172,28 +171,24 @@ int main(void) {
     while (lives > 0) {
         int barSpeed = BAR_SPEED_BASE + (level - 1);
 
-        // jump
+        // handle jump & physics
         if (controller_state.b && !chicken.jumping) {
             chicken.vy = jumpVy;
             chicken.jumping = true;
             usleep(jumpDelay);
         }
-
         int prevY = chicken.y;
         moveChicken(&chicken);
         if (chicken.y < WALL + 40) chicken.y = WALL + 40;
-
-        // bar collision & scoring
+        // collision & scoring
         if (chicken.vy > 0) {
             for (int b = 0; b < BAR_COUNT; b++) {
                 int by   = bars[b].y_px;
                 int botP = prevY + CHICKEN_H;
                 int botN = chicken.y + CHICKEN_H;
                 int wPx  = bars[b].length * TILE_SIZE;
-                if (botP <= by + BAR_HEIGHT_ROWS * TILE_SIZE &&
-                    botN >= by &&
-                    chicken.x + CHICKEN_W > bars[b].x &&
-                    chicken.x < bars[b].x + wPx) {
+                if (botP <= by + BAR_HEIGHT_ROWS * TILE_SIZE && botN >= by &&
+                    chicken.x + CHICKEN_W > bars[b].x && chicken.x < bars[b].x + wPx) {
                     chicken.y = by - CHICKEN_H;
                     chicken.vy = 0;
                     chicken.jumping = false;
@@ -203,18 +198,12 @@ int main(void) {
                 }
             }
         }
-
-        // lose life if fallen
-        if (chicken.y > WIDTH) {
-            lives--;
-            initChicken(&chicken);
-            usleep(3000000);
-            continue;
-        }
+        if (chicken.y > WIDTH) { lives--; initChicken(&chicken); usleep(3000000); continue; }
 
         // ── draw frame ─────────────────────────────────────────────────────────
-        clearSprites();
-        fill_sky_and_grass();
+        cleartiles();             // fully clear tilemap each frame
+        clearSprites();           // clear sprite layer
+        fill_sky_and_grass();     // redraw background
 
         // HUD
         write_text("lives", 5, 1, offset);
@@ -237,8 +226,7 @@ int main(void) {
         // sprites (double-buffered)
         beginSprites();
         addSprite(chicken.y, chicken.x,
-                  chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-                  0);
+                  chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0);
         flushSprites();
 
         usleep(16666);
