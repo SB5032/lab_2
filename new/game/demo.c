@@ -56,6 +56,7 @@
 #define BAR_MAX_Y_POS         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL - CHICKEN_H - TILE_SIZE) // Max Y for bar top, ensuring chicken can stand
 #define BAR_MIN_Y_POS         (WALL + 60) // Min Y for bar top
 #define BAR_RANDOM_Y_RANGE    120      // Max +/- random offset for group B in random levels
+#define BAR_INITIAL_X_STAGGER_GROUP_B 96 // Initial X offset for the entire Group B wave
 
 // Global variables
 int vga_fd; 
