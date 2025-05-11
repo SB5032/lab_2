@@ -41,16 +41,15 @@
 #define BASE_DELAY       2000   // base jump delay (µs)
 
 // ───── bar-config limits ─────────────────────────────────────────────────────
-#define BAR_COUNT          4     // # of moving bars on-screen
+#define BAR_COUNT          4     // number of moving bars on-screen
 #define BAR_HEIGHT_ROWS    2     // each bar is 2 tiles tall
 #define BAR_SPEED_BASE     4     // start speed (pixels/frame)
 #define MIN_BAR_TILES      3     // shortest bar: 3 tiles
 #define MAX_BAR_TILES     10     // longest bar: 10 tiles
-#define BAR_GAP_BASE     128    // initial pixel gap between bars
-#define BAR_TILE_IDX      39    // tile index for bars
+#define BAR_TILE_IDX      39     // tile index for bars
 
-// ───── bar Y‐bounds ─────────────────────────────────────────────────────────
-#define BAR_MIN_Y         (WALL + 40)                       // top safe + margin
+// ───── bar vertical bounds ───────────────────────────────────────────────────
+#define BAR_MIN_Y         (WALL + 40)                           // top safe
 #define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL)
 
 int vga_fd, audio_fd;
@@ -66,7 +65,8 @@ void *controller_input_thread(void *arg) {
     struct libusb_device_handle *ctrl = opencontroller(&ep);
     if (!ctrl) pthread_exit(NULL);
     while (1) {
-        unsigned char buf[GAMEPAD_READ_LENGTH]; int transferred;
+        unsigned char buf[GAMEPAD_READ_LENGTH];
+        int transferred;
         if (libusb_interrupt_transfer(ctrl, ep, buf, GAMEPAD_READ_LENGTH, &transferred, 0) == 0)
             usb_to_output(&controller_state, buf);
     }
@@ -85,21 +85,22 @@ void moveChicken(Chicken *c) {
     c->vy += GRAVITY;
 }
 
-static inline int randBarY() {
-    // uniform between BAR_MIN_Y and BAR_MAX_Y
+// random Y between BAR_MIN_Y and BAR_MAX_Y inclusive
+static inline int randBarY(void) {
     return (rand() % (BAR_MAX_Y - BAR_MIN_Y + 1)) + BAR_MIN_Y;
 }
 
 int main(void) {
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) return -1;
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) return -1;
-    pthread_t tid; pthread_create(&tid, NULL, controller_input_thread, NULL);
+    pthread_t tid;
+    pthread_create(&tid, NULL, controller_input_thread, NULL);
 
     // ── start screen ──────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
     write_text("scream", 6, 13, 13);
     write_text("jump",   4, 13, 20);
-    write_text("press",  5, 19, 8);
+    write_text("press",  5, 19,  8);
     write_text("any",    3, 19, 14);
     write_text("key",    3, 19, 20);
     write_text("to",     2, 19, 26);
@@ -113,19 +114,21 @@ int main(void) {
     int jumpVy    = INIT_JUMP_VY;
     int jumpDelay = BASE_DELAY;
 
-    write_text("Lives", 0, 0, 1);   write_number(lives, 6, 7);
-    write_text("Score", 0, 10, 15); write_number(score, 0, 21);
-    write_text("Level", 0, 20, 31); write_number(level, 26, 38);
+    write_text("Lives", 0, 0, 1);   write_number(lives, 6,  7);
+    write_text("Score", 0, 10,15);  write_number(score, 0, 21);
+    write_text("Level", 0, 20,31);  write_number(level,26, 38);
 
-    Chicken chicken; initChicken(&chicken);
+    Chicken chicken;
+    initChicken(&chicken);
     bool landed = false;
     int minY = WALL + 40;
 
     // ── initialize moving bars ───────────────────────────────────────────────
     MovingBar bars[BAR_COUNT];
     srand(time(NULL));
+    int spawnInterval = LENGTH / BAR_COUNT;
     for (int i = 0; i < BAR_COUNT; i++) {
-        bars[i].x      = LENGTH + i * BAR_GAP_BASE;
+        bars[i].x      = LENGTH + i * spawnInterval;
         bars[i].y_px   = randBarY();
         bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
                          + MIN_BAR_TILES;
@@ -133,8 +136,6 @@ int main(void) {
 
     // ── main loop ─────────────────────────────────────────────────────────────
     while (lives > 0) {
-        // update per‐level bar parameters
-        int barGapPx = BAR_GAP_BASE + (level - 1) * TILE_SIZE * 2;
         int barSpeed = BAR_SPEED_BASE + (level - 1);
 
         // jump input
@@ -153,15 +154,15 @@ int main(void) {
         if (chicken.vy > 0) {
             towerEnabled = false;
             for (int b = 0; b < BAR_COUNT; b++) {
-                int by   = bars[b].y_px;
-                int botP = prevY + CHICKEN_H;
-                int botN = chicken.y + CHICKEN_H;
-                int wPx  = bars[b].length * TILE_SIZE;
+                int by    = bars[b].y_px;
+                int botP  = prevY + CHICKEN_H;
+                int botN  = chicken.y + CHICKEN_H;
+                int width = bars[b].length * TILE_SIZE;
 
                 if (botP <= by + BAR_HEIGHT_ROWS * TILE_SIZE &&
                     botN >= by &&
                     chicken.x + CHICKEN_W > bars[b].x &&
-                    chicken.x < bars[b].x + wPx) {
+                    chicken.x < bars[b].x + width) {
                     chicken.y       = by - CHICKEN_H;
                     chicken.vy      = 0;
                     chicken.jumping = false;
@@ -193,22 +194,22 @@ int main(void) {
         // draw & move bars
         for (int b = 0; b < BAR_COUNT; b++) {
             bars[b].x -= barSpeed;
-            int wPx = bars[b].length * TILE_SIZE;
+            int widthPx = bars[b].length * TILE_SIZE;
 
-            if (bars[b].x + wPx <= 0) {
-                // respawn off right side
+            if (bars[b].x + widthPx <= 0) {
+                // respawn off the right edge, evenly spaced
                 int prev = (b + BAR_COUNT - 1) % BAR_COUNT;
-                bars[b].x      = bars[prev].x + barGapPx;
+                bars[b].x      = bars[prev].x + spawnInterval;
                 bars[b].y_px   = randBarY();
                 bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
                                  + MIN_BAR_TILES;
-                wPx = bars[b].length * TILE_SIZE;
+                widthPx = bars[b].length * TILE_SIZE;
             }
 
             int startCol = bars[b].x / TILE_SIZE;
-            int maxCols  = LENGTH / TILE_SIZE;
             int row0     = bars[b].y_px / TILE_SIZE;
             int row1     = row0 + BAR_HEIGHT_ROWS - 1;
+            int maxCols  = LENGTH / TILE_SIZE;
 
             for (int r = row0; r <= row1; r++) {
                 for (int i = 0; i < bars[b].length; i++) {
