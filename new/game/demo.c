@@ -24,8 +24,8 @@
 #define CHICKEN_H         32
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
-#define CHICKEN_STAND      20    // chicken standing tile
-#define CHICKEN_JUMP      21   // chicken jumping tile
+#define CHICKEN_STAND      8    // chicken standing tile
+#define CHICKEN_JUMP      11    // chicken jumping tile
 #define TOWER_TILE_IDX    42    // static tower tile
 
 // ───── static tower ─────────────────────────────────────────────────────────
@@ -46,9 +46,10 @@
 #define BAR_SPEED_BASE     4     // start speed (pixels/frame)
 #define MIN_BAR_TILES      3     // shortest bar: 3 tiles
 #define MAX_BAR_TILES     10     // longest bar: 10 tiles
-#define BAR_Y_PX1        200    // vertical position of bar #0
-#define BAR_Y_PX2        300    // vertical position of bar #1
-#define BAR_GAP_BASE     128  // initial pixel gap between bars
+#define BAR_GAP_BASE     128    // initial pixel gap between bars
+#define BAR_TILE_IDX      39    // tile index for bars
+#define BAR_MIN_Y         40    // bars never above this
+#define BAR_MAX_Y       (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE)
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
@@ -80,6 +81,12 @@ void moveChicken(Chicken *c) {
     if (!c->jumping && towerEnabled) return;
     c->y += c->vy;
     c->vy += GRAVITY;
+}
+
+int clamp(int v, int lo, int hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
 }
 
 int main(void) {
@@ -116,17 +123,44 @@ int main(void) {
     // ── initialize moving bars ───────────────────────────────────────────────
     MovingBar bars[BAR_COUNT];
     srand(time(NULL));
-    for (int i = 0; i < BAR_COUNT; i++) {
-        bars[i].x      = LENGTH + i * BAR_GAP_BASE;
-        bars[i].y_px   = (i == 0 ? BAR_Y_PX1 : BAR_Y_PX2);
-        bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
-                         + MIN_BAR_TILES;
+
+    // compute initial gap (level=1)
+    int barGapPx = BAR_GAP_BASE;
+    // first bar: from right edge
+    bars[0].x = LENGTH;
+    bars[0].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
+    {
+        int low  = clamp(chicken.y - 150, BAR_MIN_Y, BAR_MAX_Y);
+        int high = clamp(chicken.y + 150, BAR_MIN_Y, BAR_MAX_Y);
+        bars[0].y_px = rand() % (high - low + 1) + low;
+    }
+    // subsequent bars
+    for (int i = 1; i < BAR_COUNT; i++) {
+        bars[i].x = bars[i-1].x + barGapPx;
+        bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
+
+        int prevY = bars[i-1].y_px;
+        int low, high;
+        if (prevY < 100) {
+            // if previous near top, pick any lower position
+            low  = prevY;
+            high = BAR_MAX_Y;
+        } else if (prevY > WIDTH - 100) {
+            // if previous near bottom, stay within +150 px
+            low  = prevY;
+            high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
+        } else {
+            // otherwise +-150
+            low  = clamp(prevY - 150, BAR_MIN_Y, BAR_MAX_Y);
+            high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
+        }
+        bars[i].y_px = rand() % (high - low + 1) + low;
     }
 
     // ── main loop ─────────────────────────────────────────────────────────────
     while (lives > 0) {
         // update per‐level bar parameters
-        int barGapPx = BAR_GAP_BASE + (level - 1) * TILE_SIZE * 2;
+        barGapPx = BAR_GAP_BASE + (level - 1) * TILE_SIZE * 2;
         int barSpeed = BAR_SPEED_BASE + (level - 1);
 
         // jump input
@@ -145,17 +179,16 @@ int main(void) {
         if (chicken.vy > 0) {
             towerEnabled = false;
             for (int b = 0; b < BAR_COUNT; b++) {
-                int barY_px = bars[b].y_px;
-                int botPrev = prevY + CHICKEN_H;
-                int botNow  = chicken.y + CHICKEN_H;
-                int widthPx = bars[b].length * TILE_SIZE;
+                int by   = bars[b].y_px;
+                int botP = prevY + CHICKEN_H;
+                int botN = chicken.y + CHICKEN_H;
+                int wPx  = bars[b].length * TILE_SIZE;
 
-                if (botPrev <= barY_px + BAR_HEIGHT_ROWS * TILE_SIZE &&
-                    botNow  >= barY_px &&
+                if (botP <= by + BAR_HEIGHT_ROWS * TILE_SIZE &&
+                    botN >= by &&
                     chicken.x + CHICKEN_W > bars[b].x &&
-                    chicken.x < bars[b].x + widthPx) {
-
-                    chicken.y       = barY_px - CHICKEN_H;
+                    chicken.x < bars[b].x + wPx) {
+                    chicken.y       = by - CHICKEN_H;
                     chicken.vy      = 0;
                     chicken.jumping = false;
                     if (!landed) {
@@ -186,57 +219,17 @@ int main(void) {
         // draw & move bars
         for (int b = 0; b < BAR_COUNT; b++) {
             bars[b].x -= barSpeed;
-            int widthPx = bars[b].length * TILE_SIZE;
+            int wPx = bars[b].length * TILE_SIZE;
 
-            if (bars[b].x + widthPx <= 0) {
-                // respawn behind the farthest bar
+            if (bars[b].x + wPx <= 0) {
+                // respawn off right side
                 int prev = (b + BAR_COUNT - 1) % BAR_COUNT;
                 bars[b].x = bars[prev].x + barGapPx;
-                // new random length
-                bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
-                                 + MIN_BAR_TILES;
-                widthPx = bars[b].length * TILE_SIZE;
-            }
+                bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
 
-            int startCol = bars[b].x / TILE_SIZE;
-            int maxCols  = LENGTH / TILE_SIZE;
-            int barRow   = bars[b].y_px / TILE_SIZE;
-            int endRow   = barRow + BAR_HEIGHT_ROWS - 1;
-
-            for (int r = barRow; r <= endRow; r++) {
-                for (int i = 0; i < bars[b].length; i++) {
-                    int col = startCol + i;
-                    if (col >= 0 && col < maxCols)
-                        write_tile_to_kernel(r, col, 23); //BAR_TILE_IDX);
-                }
-            }
-        }
-
-        // draw tower
-        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
-             r <= TOWER_BASE_Y / TILE_SIZE; r++) {
-            for (int c = TOWER_X / TILE_SIZE;
-                 c <= (TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
-                write_tile_to_kernel(r, c,
-                    towerEnabled ? TOWER_TILE_IDX : 0);
-            }
-        }
-
-        // draw chicken (sprite 0)
-        write_sprite_to_kernel(
-            1,
-            chicken.y,
-            chicken.x,
-            chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
-            0
-        );
-
-        usleep(16666);
-    }
-
-    // ── game over ────────────────────────────────────────────────────────────
-    cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("gameover", 8, 12, 16);
-    sleep(2);
-    return 0;
-}
+                // vertical logic same as init
+                int prevY = bars[prev].y_px;
+                int low, high;
+                if (prevY < 100) {
+                    low  = prevY;
+                    high =
