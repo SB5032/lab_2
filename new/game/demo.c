@@ -25,7 +25,7 @@
 #define CHICKEN_H         32
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
-#define CHICKEN_STAND     8     // chicken standing tile
+#define CHICKEN_STAND     15     // chicken standing tile
 #define CHICKEN_JUMP     11     // chicken jumping tile
 #define PLATFORM_TILE    15     // normal platform tile
 #define SPECIAL_TILE     15     // special falling tile
