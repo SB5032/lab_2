@@ -29,6 +29,7 @@
 #define CHICKEN_STAND      8   // chicken standing tile
 #define CHICKEN_JUMP       11   // chicken jumping tile
 #define TOWER_TILE_IDX     42   // static tower tile
+#define SUN_TILE           20
 
 // ───── static tower ─────────────────────────────────────────────────────────
 #define TOWER_X           16
