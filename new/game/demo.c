@@ -232,4 +232,57 @@ int main(void) {
                 int low, high;
                 if (prevY < 100) {
                     low  = prevY;
-                    high =
+                    high = BAR_MAX_Y;
+                } else if (prevY > WIDTH - 100) {
+                    low  = prevY;
+                    high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
+                } else {
+                    low  = clamp(prevY - 150, BAR_MIN_Y, BAR_MAX_Y);
+                    high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
+                }
+                bars[b].y_px = rand() % (high - low + 1) + low;
+                wPx = bars[b].length * TILE_SIZE;
+            }
+
+            int startCol = bars[b].x / TILE_SIZE;
+            int maxCols  = LENGTH / TILE_SIZE;
+            int row0     = bars[b].y_px / TILE_SIZE;
+            int row1     = row0 + BAR_HEIGHT_ROWS - 1;
+
+            for (int r = row0; r <= row1; r++) {
+                for (int i = 0; i < bars[b].length; i++) {
+                    int c = startCol + i;
+                    if (c >= 0 && c < maxCols)
+                        write_tile_to_kernel(r, c, BAR_TILE_IDX);
+                }
+            }
+        }
+
+        // draw tower
+        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
+             r <= TOWER_BASE_Y / TILE_SIZE; r++) {
+            for (int c = TOWER_X / TILE_SIZE;
+                 c <= (TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
+                write_tile_to_kernel(r, c,
+                    towerEnabled ? TOWER_TILE_IDX : 0);
+            }
+        }
+
+        // draw chicken (sprite 0)
+        write_sprite_to_kernel(
+            1,
+            chicken.y,
+            chicken.x,
+            chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND,
+            0
+        );
+
+        usleep(16666);
+    }
+
+    // ── game over ────────────────────────────────────────────────────────────
+    cleartiles(); clearSprites(); fill_sky_and_grass();
+    write_text("gameover", 8, 12, 16);
+    sleep(2);
+    return 0;
+}
