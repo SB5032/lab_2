@@ -24,8 +24,8 @@
 #define CHICKEN_H         32
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
-#define CHICKEN_STAND      20   // chicken standing tile
-#define CHICKEN_JUMP       21   // chicken jumping tile
+#define CHICKEN_STAND      8   // chicken standing tile
+#define CHICKEN_JUMP       11   // chicken jumping tile
 #define TOWER_TILE_IDX     42   // static tower tile
 
 // ───── static tower ─────────────────────────────────────────────────────────
