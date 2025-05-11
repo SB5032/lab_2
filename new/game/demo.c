@@ -24,9 +24,9 @@
 #define CHICKEN_H         32
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
-#define CHICKEN_STAND      8    // chicken standing tile
-#define CHICKEN_JUMP      11    // chicken jumping tile
-#define TOWER_TILE_IDX    42    // static tower tile
+#define CHICKEN_STAND      20   // chicken standing tile
+#define CHICKEN_JUMP       21   // chicken jumping tile
+#define TOWER_TILE_IDX     42   // static tower tile
 
 // ───── static tower ─────────────────────────────────────────────────────────
 #define TOWER_X           16
@@ -48,8 +48,10 @@
 #define MAX_BAR_TILES     10     // longest bar: 10 tiles
 #define BAR_GAP_BASE     128    // initial pixel gap between bars
 #define BAR_TILE_IDX      39    // tile index for bars
-#define BAR_MIN_Y         40    // bars never above this
-#define BAR_MAX_Y       (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE)
+
+// ───── bar Y‐bounds ─────────────────────────────────────────────────────────
+#define BAR_MIN_Y         (WALL + 40)                       // top safe + margin
+#define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL)
 
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
@@ -83,10 +85,9 @@ void moveChicken(Chicken *c) {
     c->vy += GRAVITY;
 }
 
-int clamp(int v, int lo, int hi) {
-    if (v < lo) return lo;
-    if (v > hi) return hi;
-    return v;
+static inline int randBarY() {
+    // uniform between BAR_MIN_Y and BAR_MAX_Y
+    return (rand() % (BAR_MAX_Y - BAR_MIN_Y + 1)) + BAR_MIN_Y;
 }
 
 int main(void) {
@@ -123,44 +124,17 @@ int main(void) {
     // ── initialize moving bars ───────────────────────────────────────────────
     MovingBar bars[BAR_COUNT];
     srand(time(NULL));
-
-    // compute initial gap (level=1)
-    int barGapPx = BAR_GAP_BASE;
-    // first bar: from right edge
-    bars[0].x = LENGTH;
-    bars[0].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
-    {
-        int low  = clamp(chicken.y - 150, BAR_MIN_Y, BAR_MAX_Y);
-        int high = clamp(chicken.y + 150, BAR_MIN_Y, BAR_MAX_Y);
-        bars[0].y_px = rand() % (high - low + 1) + low;
-    }
-    // subsequent bars
-    for (int i = 1; i < BAR_COUNT; i++) {
-        bars[i].x = bars[i-1].x + barGapPx;
-        bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
-
-        int prevY = bars[i-1].y_px;
-        int low, high;
-        if (prevY < 100) {
-            // if previous near top, pick any lower position
-            low  = prevY;
-            high = BAR_MAX_Y;
-        } else if (prevY > WIDTH - 100) {
-            // if previous near bottom, stay within +150 px
-            low  = prevY;
-            high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
-        } else {
-            // otherwise +-150
-            low  = clamp(prevY - 150, BAR_MIN_Y, BAR_MAX_Y);
-            high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
-        }
-        bars[i].y_px = rand() % (high - low + 1) + low;
+    for (int i = 0; i < BAR_COUNT; i++) {
+        bars[i].x      = LENGTH + i * BAR_GAP_BASE;
+        bars[i].y_px   = randBarY();
+        bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
+                         + MIN_BAR_TILES;
     }
 
     // ── main loop ─────────────────────────────────────────────────────────────
     while (lives > 0) {
         // update per‐level bar parameters
-        barGapPx = BAR_GAP_BASE + (level - 1) * TILE_SIZE * 2;
+        int barGapPx = BAR_GAP_BASE + (level - 1) * TILE_SIZE * 2;
         int barSpeed = BAR_SPEED_BASE + (level - 1);
 
         // jump input
@@ -224,23 +198,10 @@ int main(void) {
             if (bars[b].x + wPx <= 0) {
                 // respawn off right side
                 int prev = (b + BAR_COUNT - 1) % BAR_COUNT;
-                bars[b].x = bars[prev].x + barGapPx;
-                bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1) + MIN_BAR_TILES;
-
-                // vertical logic same as init
-                int prevY = bars[prev].y_px;
-                int low, high;
-                if (prevY < 100) {
-                    low  = prevY;
-                    high = BAR_MAX_Y;
-                } else if (prevY > WIDTH - 100) {
-                    low  = prevY;
-                    high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
-                } else {
-                    low  = clamp(prevY - 150, BAR_MIN_Y, BAR_MAX_Y);
-                    high = clamp(prevY + 150, BAR_MIN_Y, BAR_MAX_Y);
-                }
-                bars[b].y_px = rand() % (high - low + 1) + low;
+                bars[b].x      = bars[prev].x + barGapPx;
+                bars[b].y_px   = randBarY();
+                bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
+                                 + MIN_BAR_TILES;
                 wPx = bars[b].length * TILE_SIZE;
             }
 
