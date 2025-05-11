@@ -11,9 +11,9 @@
 
 // Shadow tilemap to keep track of the current state of tiles on screen
 // This helps in reducing redundant ioctl calls.
-static unsigned char shadow_tilemap[TILE_ROWS][TILE_COLS];
+unsigned char shadow_tilemap[TILE_ROWS][TILE_COLS];
 // Flag to ensure shadow map is initialized
-static bool shadow_map_initialized = false;
+bool shadow_map_initialized = false;
 
 // NEW: Initialization function for the VGA interface and shadow tilemap
 void init_vga_interface(void) {
