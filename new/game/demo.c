@@ -38,7 +38,7 @@
 #define BASE_DELAY       2000   // base jump delay (µs)
 
 // ───── bar-config limits ─────────────────────────────────────────────────────
-#define BAR_COUNT          4     // bars per group
+#define BAR_COUNT          6     // bars per group
 #define BAR_HEIGHT_ROWS    2     // tiles tall
 #define BAR_SPEED_BASE     4     // pixels/frame
 #define MIN_BAR_TILES      3
@@ -202,12 +202,12 @@ int main(void) {
     const int offset = 12;
 
     // prepare two bar-groups
-    MovingBar barsA[BAR_COUNT], barsB[BAR_COUNT];
-    static int spawnCounterA = 0, spawnCounterB = 0;
+    MovingBar barsA[BAR_COUNT]; //, barsB[BAR_COUNT];
+    static int spawnCounterA = 0 ; //, spawnCounterB = 0;
 
     // launch group A low, group B higher
     initBars(barsA, BAR_COUNT, BAR_MIN_Y,       BAR_SPEED_BASE);
-    initBars(barsB, BAR_COUNT, BAR_MIN_Y + 80,  BAR_SPEED_BASE + 1);
+   // initBars(barsB, BAR_COUNT, BAR_MIN_Y + 80,  BAR_SPEED_BASE + 1);
 
     // init chicken
     Chicken chicken; initChicken(&chicken);
@@ -235,7 +235,8 @@ int main(void) {
     if (chicken.vy > 0) {
         towerEnabled = false;
         // first group
-        if (!handleBarCollision(
+     //   if (!
+            handleBarCollision(
                 barsA, BAR_COUNT,
                 prevY,
                 &chicken,
@@ -243,17 +244,17 @@ int main(void) {
                 &landed,
                 jumpDelay
             ))
-        {
-            // then second group
-            handleBarCollision(
-                barsB, BAR_COUNT,
-                prevY,
-                &chicken,
-                &score,
-                &landed,
-                jumpDelay
-            );
-        }
+        // {
+        //     // then second group
+        //     handleBarCollision(
+        //         barsB, BAR_COUNT,
+        //         prevY,
+        //         &chicken,
+        //         &score,
+        //         &landed,
+        //         jumpDelay
+        //     );
+        // }
     }
 
 
@@ -267,22 +268,25 @@ int main(void) {
 
         // redraw background + HUD
         clearSprites(); fill_sky_and_grass();
-        write_text("Lives", 5, 1, center - offset);
+        write_text("lives", 5, 1, center - offset);
         write_number(lives, 1, center - offset + 6);
-        write_text("Score", 5, 1, center - offset + 12);
+        write_text("score", 5, 1, center - offset + 12);
         write_number(score, 1, center - offset + 18);
-        write_text("Level", 5, 1, center - offset + 24);
+        write_text("level", 5, 1, center - offset + 24);
         write_number(level, 1, center - offset + 30);
 
         // **now just two calls**—no loops or tile logic in main
         updateAndDrawBars(barsA, BAR_COUNT, baseSpeed,     &spawnCounterA);
-        updateAndDrawBars(barsB, BAR_COUNT, baseSpeed + 1, &spawnCounterB);
+        //updateAndDrawBars(barsB, BAR_COUNT, baseSpeed + 1, &spawnCounterB);
 
         // draw tower & chicken & sun…
-        for (int r = (TOWER_BASE_Y/TILE_SIZE - 2); r <= TOWER_BASE_Y/TILE_SIZE; r++)
-            for (int c = 0; c < CHICKEN_W/TILE_SIZE; c++)
-                write_tile_to_kernel(r, c,
-                    towerEnabled ? TOWER_TILE_IDX : 0);
+            for (int r = row0; r <= row1; r++) {
+                for (int i = 0; i < bars[b].length; i++) {
+                    int c = col0 + i;
+                    if (c >= 0 && c < maxC)
+                        write_tile_to_kernel(r, c, BAR_TILE_IDX);
+                }
+            }
 
         write_sprite_to_kernel(
             1, chicken.y, chicken.x,
