@@ -24,8 +24,8 @@
 #define CHICKEN_H         32
 
 // ───── MIF indices ───────────────────────────────────────────────────────────
-#define CHICKEN_STAND      8   // chicken standing tile
-#define CHICKEN_JUMP       11   // chicken jumping tile
+#define CHICKEN_STAND      20   // chicken standing tile
+#define CHICKEN_JUMP       21   // chicken jumping tile
 #define TOWER_TILE_IDX     42   // static tower tile
 
 // ───── static tower ─────────────────────────────────────────────────────────
@@ -46,11 +46,10 @@
 #define BAR_SPEED_BASE     4     // start speed (pixels/frame)
 #define MIN_BAR_TILES      3     // shortest bar: 3 tiles
 #define MAX_BAR_TILES     10     // longest bar: 10 tiles
-#define BAR_GAP_BASE     128    // initial pixel gap between bars
-#define BAR_TILE_IDX      39    // tile index for bars
+#define BAR_TILE_IDX      39     // tile index for bars
 
-// ───── bar Y-bounds ──────────────────────────────────────────────────────────
-#define BAR_MIN_Y         (WALL + 40)                       // top safe + margin
+// ───── bar Y-bounds ─────────────────────────────────────────────────────────
+#define BAR_MIN_Y         (WALL + 40)
 #define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL)
 
 int vga_fd, audio_fd;
@@ -98,13 +97,13 @@ int main(void) {
 
     // ── start screen ──────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("scream",5,13,13);
-    write_text("jump",4,13,20);
-    write_text("press",5,19, 8);
-    write_text("any",3,19,14);
-    write_text("key",3,19,20);
-    write_text("to",2,19,26);
-    write_text("start",5,19,29);
+    write_text("scream",   6, 13, 13);
+    write_text("jump",     4, 13, 20);
+    write_text("press",    5, 19,  8);
+    write_text("any",      3, 19, 14);
+    write_text("key",      3, 19, 20);
+    write_text("to",       2, 19, 26);
+    write_text("start",    5, 19, 29);
     while (!(controller_state.a || controller_state.b || controller_state.start))
         usleep(10000);
 
@@ -114,21 +113,25 @@ int main(void) {
     int jumpVy    = INIT_JUMP_VY;
     int jumpDelay = BASE_DELAY;
 
-    // compute screen-columns and center offset
-    const int cols    = LENGTH / TILE_SIZE;  // 40
-    const int center  = cols / 2;            // 20
-    const int offset  = 12;                  // half of HUD text width
+    // compute columns & center for HUD
+    const int cols   = LENGTH / TILE_SIZE;  // e.g. 40
+    const int center = cols / 2;            // e.g. 20
+    const int offset = 12;                  // half HUD width
 
-    // initialize chicken
+    // spawn spacing & counter
+    const int spawnInterval = LENGTH / BAR_COUNT;
+    static int spawnCounter = 0;
+
+    // init chicken
     Chicken chicken; initChicken(&chicken);
     bool landed = false;
     int minY = WALL + 40;
 
-    // initialize moving bars
+    // init bars
     MovingBar bars[BAR_COUNT];
     srand(time(NULL));
     for (int i = 0; i < BAR_COUNT; i++) {
-        bars[i].x      = LENGTH + i * BAR_GAP_BASE;
+        bars[i].x      = LENGTH + i * spawnInterval;
         bars[i].y_px   = randBarY();
         bars[i].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
                          + MIN_BAR_TILES;
@@ -137,9 +140,8 @@ int main(void) {
     // ── main loop ─────────────────────────────────────────────────────────────
     while (lives > 0) {
         int barSpeed = BAR_SPEED_BASE + (level - 1);
-        int barGapPx = BAR_GAP_BASE + (level - 1) * TILE_SIZE * 2;
 
-        // handle jump
+        // jump
         if (controller_state.b && !chicken.jumping) {
             chicken.vy      = jumpVy;
             chicken.jumping = true;
@@ -151,7 +153,7 @@ int main(void) {
         moveChicken(&chicken);
         if (chicken.y < minY) chicken.y = minY;
 
-        // collision & scoring on bars
+        // bar collision & scoring
         if (chicken.vy > 0) {
             towerEnabled = false;
             for (int b = 0; b < BAR_COUNT; b++) {
@@ -177,7 +179,7 @@ int main(void) {
             }
         }
 
-        // lose life if fallen off
+        // lose life if fallen
         if (chicken.y > WIDTH) {
             lives--;
             towerEnabled = true;
@@ -187,26 +189,26 @@ int main(void) {
             continue;
         }
 
-        // redraw background + HUD
+        // redraw background + top-centre HUD
         clearSprites();
         fill_sky_and_grass();
 
-        // top-centre HUD
-        write_text("Lives",5, 0, center - offset);
-        write_number(lives, 0, center - offset + 6);
-        write_text("Score",5, 0, center -  offset + 12);
-        write_number(score,  0, center - offset + 18);
-        write_text("Level",5, 0, center -  offset + 24);
-        write_number(level,  0, center - offset + 30);
+        write_text("Lives", 5, 1, center - offset);
+        write_number(lives, 1, center - offset + 6);
+        write_text("Score", 5, 1, center - offset + 12);
+        write_number(score, 1, center - offset + 18);
+        write_text("Level", 5, 1, center - offset + 24);
+        write_number(level, 1, center - offset + 30);
 
-        // move & draw bars
+        // move & draw bars (spawn only from right)
         for (int b = 0; b < BAR_COUNT; b++) {
             bars[b].x -= barSpeed;
             int wPx = bars[b].length * TILE_SIZE;
 
             if (bars[b].x + wPx <= 0) {
-                int prev = (b + BAR_COUNT - 1) % BAR_COUNT;
-                bars[b].x      = bars[prev].x + barGapPx;
+                // respawn at right edge, evenly spaced
+                bars[b].x      = LENGTH + (spawnCounter % BAR_COUNT) * spawnInterval;
+                spawnCounter++;
                 bars[b].y_px   = randBarY();
                 bars[b].length = rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1)
                                  + MIN_BAR_TILES;
@@ -227,7 +229,7 @@ int main(void) {
             }
         }
 
-        // draw tower
+// draw tower
         for (int r = 21; //(TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
              r <= 29; r++){ //TOWER_BASE_Y / TILE_SIZE; r++) {
             for (int c = 0; //TOWER_X / TILE_SIZE;
@@ -237,7 +239,7 @@ int main(void) {
             }
         }
 
-        // draw chicken
+        // draw chicken (sprite 0)
         write_sprite_to_kernel(
             1,
             chicken.y,
@@ -251,7 +253,7 @@ int main(void) {
 
     // ── game over ────────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("gameover",8,12,16);
+    write_text("gameover", 8, 12, 16);
     sleep(2);
     return 0;
 }
