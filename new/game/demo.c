@@ -155,7 +155,7 @@ void *controller_input_thread(void *arg) {
 
 void initChicken(Chicken *c) {
     c->x = 32;
-    c->y = 288; // atop the tower
+    c->y = 256; // atop the tower
     c->vy = 0;
     c->jumping = false;
 }
