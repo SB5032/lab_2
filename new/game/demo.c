@@ -1,4 +1,4 @@
-// screamjump_dynamic_start_double_buffered.c
+// screamjump_dynamic_start_double_buffered_vsync.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -7,6 +7,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include "usbcontroller.h"
 #include "vga_interface.h"
 #include "audio_interface.h"
@@ -14,6 +15,14 @@
 // ───── global handles & state ──────────────────────────────────────────────
 int vga_fd, audio_fd;
 struct controller_output_packet controller_state;
+
+// ───── VSYNC ioctl definitions ──────────────────────────────────────────────
+#ifndef VGA_WAIT_VSYNC
+#define VGA_WAIT_VSYNC _IO('V', 0x01)
+#endif
+static inline void wait_for_vsync() {
+    ioctl(vga_fd, VGA_WAIT_VSYNC, 0);
+}
 
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH            640
@@ -50,7 +59,7 @@ struct controller_output_packet controller_state;
 #define MAX_SPRITES_BUF   16
 typedef struct { int y, x, tile, reg; } SpriteEntry;
 static SpriteEntry spriteBuf[MAX_SPRITES_BUF];
-static int spriteBufLen = 0;
+static int spriteBufLen;
 static inline void beginSprites() { spriteBufLen = 0; }
 static inline void addSprite(int y, int x, int tile, int reg) {
     if (spriteBufLen < MAX_SPRITES_BUF)
@@ -58,23 +67,30 @@ static inline void addSprite(int y, int x, int tile, int reg) {
 }
 static inline void flushSprites() {
     clearSprites();
-    for (int i = 0; i < spriteBufLen; i++)
-        write_sprite_to_kernel(1, spriteBuf[i].y, spriteBuf[i].x, spriteBuf[i].tile, spriteBuf[i].reg);
+    for (int i = 0; i < spriteBufLen; ++i)
+        write_sprite_to_kernel(1,
+            spriteBuf[i].y,
+            spriteBuf[i].x,
+            spriteBuf[i].tile,
+            spriteBuf[i].reg);
 }
 
 // ───── double buffering for tiles ───────────────────────────────────────────
 #define MAX_TILE_BUF     1024
 typedef struct { int row, col, idx; } TileEntry;
 static TileEntry tileBuf[MAX_TILE_BUF];
-static int tileBufLen = 0;
+static int tileBufLen;
 static inline void beginTiles() { tileBufLen = 0; }
 static inline void addTile(int row, int col, int idx) {
     if (tileBufLen < MAX_TILE_BUF)
         tileBuf[tileBufLen++] = (TileEntry){row, col, idx};
 }
 static inline void flushTiles() {
-    for (int i = 0; i < tileBufLen; i++)
-        write_tile_to_kernel(tileBuf[i].row, tileBuf[i].col, tileBuf[i].idx);
+    for (int i = 0; i < tileBufLen; ++i)
+        write_tile_to_kernel(
+            tileBuf[i].row,
+            tileBuf[i].col,
+            tileBuf[i].idx);
 }
 
 // ───── helper: random bar Y ──────────────────────────────────────────────────
@@ -88,21 +104,19 @@ typedef struct { int x, y_px, length; } MovingBar;
 
 // ───── encapsulated bar logic ───────────────────────────────────────────────
 static void generateBars(MovingBar bars[], int barCount, int barSpeed) {
-    static int spawnCounter = 0;
+    static int spawnCounter;
     int cols = LENGTH / TILE_SIZE;
-    for (int i = 0; i < barCount; i++) {
-        // move and respawn
+    for (int i = 0; i < barCount; ++i) {
         bars[i].x -= barSpeed;
         if (bars[i].x + bars[i].length * TILE_SIZE <= 0) {
             bars[i].x = LENGTH + (spawnCounter++ % barCount) * (LENGTH / barCount);
             bars[i].y_px = randBarY();
             bars[i].length = MIN_BAR_TILES + rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1);
         }
-        // enqueue tiles
         int col0 = bars[i].x / TILE_SIZE;
         int row0 = bars[i].y_px / TILE_SIZE;
-        for (int r = 0; r < BAR_HEIGHT_ROWS; r++)
-            for (int j = 0; j < bars[i].length; j++) {
+        for (int r = 0; r < BAR_HEIGHT_ROWS; ++r)
+            for (int j = 0; j < bars[i].length; ++j) {
                 int c = col0 + j;
                 if (c >= 0 && c < cols)
                     addTile(row0 + r, c, BAR_TILE_IDX);
@@ -114,7 +128,7 @@ void *controller_input_thread(void *arg) {
     uint8_t ep;
     struct libusb_device_handle *ctrl = opencontroller(&ep);
     if (!ctrl) pthread_exit(NULL);
-    while (1) {
+    while (true) {
         unsigned char buf[GAMEPAD_READ_LENGTH];
         int transferred;
         if (libusb_interrupt_transfer(ctrl, ep, buf, GAMEPAD_READ_LENGTH, &transferred, 0) == 0)
@@ -143,11 +157,10 @@ int main(void) {
     pthread_t tid;
     pthread_create(&tid, NULL, controller_input_thread, NULL);
 
-    // ── initial background & HUD ─────────────────────────────────────────────
+    // ── initial draw ─────────────────────────────────────────────────────────
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    // initial HUD blank values (will update each frame)
 
-    // ── init game entities ───────────────────────────────────────────────────
+    // ── init game ─────────────────────────────────────────────────────────────
     int lives = INITIAL_LIVES, score = 0, level = 1;
     int jumpVy = INIT_JUMP_VY, jumpDelay = BASE_DELAY;
     const int cols = LENGTH / TILE_SIZE;
@@ -155,7 +168,7 @@ int main(void) {
     Chicken chicken; initChicken(&chicken);
     MovingBar bars[BAR_COUNT];
     srand(time(NULL));
-    for (int i = 0; i < BAR_COUNT; i++) {
+    for (int i = 0; i < BAR_COUNT; ++i) {
         bars[i].x = LENGTH + i * (LENGTH / BAR_COUNT);
         bars[i].y_px = randBarY();
         bars[i].length = MIN_BAR_TILES + rand() % (MAX_BAR_TILES - MIN_BAR_TILES + 1);
@@ -165,68 +178,55 @@ int main(void) {
     while (lives > 0) {
         int barSpeed = BAR_SPEED_BASE + (level - 1);
 
-        // handle jump & physics
+        // input & physics
         if (controller_state.b && !chicken.jumping) {
-            chicken.vy = jumpVy;
-            chicken.jumping = true;
-            usleep(jumpDelay);
+            chicken.vy = jumpVy; chicken.jumping = true; usleep(jumpDelay);
         }
         int prevY = chicken.y;
         moveChicken(&chicken);
         if (chicken.y < WALL + 40) chicken.y = WALL + 40;
 
-        // collision & scoring
+        // collision & score
         if (chicken.vy > 0) {
-            for (int b = 0; b < BAR_COUNT; b++) {
-                int by   = bars[b].y_px;
+            for (int b = 0; b < BAR_COUNT; ++b) {
+                int by = bars[b].y_px;
                 int botP = prevY + CHICKEN_H;
                 int botN = chicken.y + CHICKEN_H;
-                int wPx  = bars[b].length * TILE_SIZE;
-                if (botP <= by + BAR_HEIGHT_ROWS * TILE_SIZE && botN >= by &&
-                    chicken.x + CHICKEN_W > bars[b].x && chicken.x < bars[b].x + wPx) {
+                int wPx = bars[b].length * TILE_SIZE;
+                if (botP <= by + BAR_HEIGHT_ROWS*TILE_SIZE && botN >= by &&
+                    chicken.x+CHICKEN_W > bars[b].x && chicken.x < bars[b].x+wPx) {
                     chicken.y = by - CHICKEN_H;
                     chicken.vy = 0;
                     chicken.jumping = false;
-                    score++;
-                    usleep(jumpDelay);
+                    score++; usleep(jumpDelay);
                     break;
                 }
             }
         }
         if (chicken.y > WIDTH) { lives--; initChicken(&chicken); usleep(3000000); continue; }
 
-        // ── clear only sprite layer ────────────────────────────────────────────
+        // render: HUD only clears sprites
         clearSprites();
+        write_text("lives",5,1,offset); write_number(lives,1,offset+6);
+        write_text("score",5,1,offset+12); write_number(score,1,offset+18);
+        write_text("level",5,1,offset+28); write_number(level,1,offset+34);
 
-        // ── update HUD ─────────────────────────────────────────────────────────
-        write_text("lives", 5, 1, offset);
-        write_number(lives, 1, offset + 6);
-        write_text("score", 5, 1, offset + 12);
-        write_number(score, 1, offset + 18);
-        write_text("level", 5, 1, offset + 28);
-        write_number(level, 1, offset + 34);
-
-        // ── draw bars & tower ──────────────────────────────────────────────────
-        beginTiles();
-        generateBars(bars, BAR_COUNT, barSpeed);
-        // tower as part of same buffer
-        for (int r = 21; r <= 29; r++)
-            for (int c = 0; c <= 4; c++)
-                addTile(r, c, TOWER_TILE_IDX);
+        // tiles (bars + tower)
+        beginTiles(); generateBars(bars,BAR_COUNT,barSpeed);
+        for (int r=21;r<=29;++r)for(int c=0;c<=4;++c) addTile(r,c,TOWER_TILE_IDX);
         flushTiles();
 
-        // ── draw sprites (chicken) ────────────────────────────────────────────
-        beginSprites();
-        addSprite(chicken.y, chicken.x,
-                  chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0);
+        // sprites
+        beginSprites(); addSprite(chicken.y,chicken.x,
+            chicken.jumping?CHICKEN_JUMP:CHICKEN_STAND,0);
         flushSprites();
 
-        usleep(16666);
+        // wait for next frame
+        wait_for_vsync();
     }
 
-    // ── game over ────────────────────────────────────────────────────────────
+    // game over
     cleartiles(); clearSprites(); fill_sky_and_grass();
-    write_text("gameover", 8, 12, 16);
-    sleep(2);
+    write_text("gameover",8,12,16); sleep(2);
     return 0;
 }
