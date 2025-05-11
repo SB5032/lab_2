@@ -74,7 +74,7 @@ void *controller_input_thread(void *arg) {
 
 void initChicken(Chicken *c) {
     c->x = 32;
-    c->y = TOWER_BASE_Y - CHICKEN_H * TOWER_HEIGHT;
+    c->y = 304; // atop the tower TOWER_BASE_Y - CHICKEN_H * TOWER_HEIGHT;
     c->vy = 0;
     c->jumping = false;
 }
@@ -228,10 +228,10 @@ int main(void) {
         }
 
         // draw tower
-        for (int r = (TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
-             r <= TOWER_BASE_Y / TILE_SIZE; r++) {
-            for (int c = TOWER_X / TILE_SIZE;
-                 c <= (TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
+        for (int r = 21; //(TOWER_BASE_Y - TOWER_HEIGHT * PLATFORM_H) / TILE_SIZE;
+             r <= 29; r++){ //TOWER_BASE_Y / TILE_SIZE; r++) {
+            for (int c = 0; //TOWER_X / TILE_SIZE;
+                 c <= 4; c++){ //(TOWER_X + TOWER_WIDTH) / TILE_SIZE; c++) {
                 write_tile_to_kernel(r, c,
                     towerEnabled ? TOWER_TILE_IDX : 0);
             }
