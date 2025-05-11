@@ -46,7 +46,7 @@
 #define BAR_TILE_IDX      39
 
 // ───── bar Y-bounds ─────────────────────────────────────────────────────────
-#define BAR_MIN_Y         (WALL + 40)
+#define BAR_MIN_Y         (WALL + 120)
 #define BAR_MAX_Y         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL)
 
 int vga_fd, audio_fd;
