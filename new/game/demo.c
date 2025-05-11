@@ -1,5 +1,6 @@
 // screamjump_dynamic_start.c
 // Uses software double buffering via vga_interface.c
+// Adjusted game parameters for difficulty.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,13 +41,16 @@
 #define BASE_DELAY       2000   // base jump delay (µs)
 
 // Bar properties
-#define BAR_ARRAY_SIZE     10    // Max bars stored per group (A or B)
-#define BAR_COUNT_PER_WAVE 5     // Number of bars spawned in a single wave
-#define BAR_INTER_SPACING_PX 100 // Horizontal distance between start of bars in a wave
+#define BAR_ARRAY_SIZE     10    // Max bars stored per group (A or B) - Should be >= BAR_COUNT_PER_WAVE
+// MODIFICATION: Reduced number of bars per wave
+#define BAR_COUNT_PER_WAVE 3     // Number of bars spawned in a single wave (was 5)
+// MODIFICATION: Increased spacing between bars
+#define BAR_INTER_SPACING_PX 150 // Horizontal distance between start of bars in a wave (was 100)
 #define WAVE_SWITCH_TRIGGER_OFFSET_PX 100 // How far the last bar of a wave moves *onto the screen* before next group activates
 
 #define BAR_HEIGHT_ROWS    2     // tiles tall
-#define BAR_SPEED_BASE     4     // pixels/frame
+// MODIFICATION: Increased base speed of bars
+#define BAR_SPEED_BASE     6     // pixels/frame (was 4)
 #define MIN_BAR_TILES      3     // Min length in tiles (3 * 16px = 48px)
 #define MAX_BAR_TILES      6     // Max length in tiles (6 * 16px = 96px)
 #define BAR_TILE_IDX      39    // Tile index for the bars - USER MUST VERIFY THIS VALUE
