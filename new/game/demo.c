@@ -27,7 +27,7 @@
 // ───── MIF indices ───────────────────────────────────────────────────────────
 #define CHICKEN_STAND     8     // chicken standing tile
 #define CHICKEN_JUMP     11     // chicken jumping tile
-#define PLATFORM_TILE    14     // normal platform tile
+#define PLATFORM_TILE    15     // normal platform tile
 #define SPECIAL_TILE     15     // special falling tile
 #define TOWER_TILE_IDX   42     // static tower tile
 
