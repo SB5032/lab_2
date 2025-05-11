@@ -97,8 +97,8 @@ void wait_for_restart() {
 void run_game() {
     cleartiles(); clearSprites(); fill_sky_and_grass();
     int score=0, lives=INITIAL_LIVES;
-    write_text("Lives",0,0); write_number(lives,0,6);
-    write_text("Score",0,10); write_number(score,0,16);
+    // write_text("Lives",0,0); write_number(lives,0,6);
+    // write_text("Score",0,10); write_number(score,0,16);
     Chicken chicken; initChicken(&chicken);
 
     int sprite_regs[8] = {2,3,4,5,6,7,8};
