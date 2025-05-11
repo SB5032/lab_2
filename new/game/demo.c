@@ -99,6 +99,47 @@ void updateAndDrawBars(MovingBar bars[], int count, int speed, int *spawnCounter
     }
 }
 
+// returns true if we landed on a bar
+bool handleBarCollision(
+    MovingBar bars[], int count,
+    int prevY,
+    Chicken *chicken,
+    int *score,
+    bool *landed,
+    int jumpDelay
+) {
+    // only check when falling
+    if (chicken->vy <= 0) return false;
+
+    for (int b = 0; b < count; b++) {
+        int by   = bars[b].y_px;
+        int botP = prevY + CHICKEN_H;
+        int botN = chicken->y + CHICKEN_H;
+        int wPx  = bars[b].length * TILE_SIZE;
+
+        if (botP <= by + BAR_HEIGHT_ROWS * TILE_SIZE &&
+            botN >= by &&
+            chicken->x + CHICKEN_W > bars[b].x &&
+            chicken->x < bars[b].x + wPx) {
+
+            // snap chicken to bar top
+            chicken->y       = by - CHICKEN_H;
+            chicken->vy      = 0;
+            chicken->jumping = false;
+
+            // increment only once per landing
+            if (!*landed) {
+                (*score)++;
+                *landed = true;
+            }
+            usleep(jumpDelay);
+            return true;
+        }
+    }
+    return false;
+}
+
+
 void *controller_input_thread(void *arg) {
     uint8_t ep;
     struct libusb_device_handle *ctrl = opencontroller(&ep);
@@ -184,17 +225,37 @@ int main(void) {
             play_sfx(0);
         }
 
-        int prevY = chicken.y;
-        moveChicken(&chicken);
         if (chicken.y < WALL + 40) chicken.y = WALL + 40;
 
         // collision & score on descending
-        if (chicken.vy > 0) {
-            towerEnabled = false;
-            // you could also encapsulate collision, but left inline
-            // for clarity…
-            // … same as before …
+    int prevY = chicken.y;
+    moveChicken(&chicken);
+
+    // if falling, try each bar‐group
+    if (chicken.vy > 0) {
+        towerEnabled = false;
+        // first group
+        if (!handleBarCollision(
+                barsA, BAR_COUNT,
+                prevY,
+                &chicken,
+                &score,
+                &landed,
+                jumpDelay
+            ))
+        {
+            // then second group
+            handleBarCollision(
+                barsB, BAR_COUNT,
+                prevY,
+                &chicken,
+                &score,
+                &landed,
+                jumpDelay
+            );
         }
+    }
+
 
         // fallen off?
         if (chicken.y > WIDTH) {
