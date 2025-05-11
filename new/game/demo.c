@@ -11,6 +11,10 @@
 #include "vga_interface.h"
 #include "audio_interface.h"
 
+// ───── global handles & state ──────────────────────────────────────────────
+int vga_fd, audio_fd;
+struct controller_output_packet controller_state;
+
 // ───── screen & physics ──────────────────────────────────────────────────────
 #define LENGTH            640
 #define WIDTH             480
@@ -47,9 +51,7 @@
 typedef struct { int y, x, tile, reg; } SpriteEntry;
 static SpriteEntry spriteBuf[MAX_SPRITES_BUF];
 static int spriteBufLen = 0;
-static inline void beginSprites() {
-    spriteBufLen = 0;
-}
+static inline void beginSprites() { spriteBufLen = 0; }
 static inline void addSprite(int y, int x, int tile, int reg) {
     if (spriteBufLen < MAX_SPRITES_BUF)
         spriteBuf[spriteBufLen++] = (SpriteEntry){y, x, tile, reg};
@@ -106,8 +108,6 @@ void generateBars(MovingBar bars[], int barCount, int barSpeed) {
     }
 }
 
-extern struct controller_output_packet controller_state;
-
 void *controller_input_thread(void *arg) {
     uint8_t ep;
     struct libusb_device_handle *ctrl = opencontroller(&ep);
@@ -134,8 +134,9 @@ void moveChicken(Chicken *c) {
 }
 
 int main(void) {
-    int vga_fd = open("/dev/vga_top", O_RDWR);
-    int audio_fd = open("/dev/fpga_audio", O_RDWR);
+    // open global devices
+    vga_fd = open("/dev/vga_top", O_RDWR);
+    audio_fd = open("/dev/fpga_audio", O_RDWR);
     if (vga_fd < 0 || audio_fd < 0) return -1;
     pthread_t tid;
     pthread_create(&tid, NULL, controller_input_thread, NULL);
