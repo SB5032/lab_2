@@ -254,7 +254,7 @@ int main(void) {
         //         &landed,
         //         jumpDelay
         //     );
-        // }
+       //  }
     }
 
 
@@ -285,6 +285,7 @@ int main(void) {
                     write_tile_to_kernel(r, c,
                         towerEnabled ? TOWER_TILE_IDX : 0);
                 }
+            }
 
         write_sprite_to_kernel(
             1, chicken.y, chicken.x,
