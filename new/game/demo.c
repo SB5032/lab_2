@@ -1,6 +1,7 @@
 // screamjump_dynamic_start.c
 // Uses software double buffering via vga_interface.c
 // Implements level-based difficulty, fixes multi-digit score display, and adds coin collection.
+// Includes printf statements for debugging coin spawning/drawing.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,7 +32,7 @@
 #define CHICKEN_JUMP       11  // chicken jumping tile
 #define TOWER_TILE_IDX     42  // static tower tile
 #define SUN_TILE           20
-#define COIN_SPRITE_IDX    11   // Sprite ID for the coin, as requested
+#define COIN_SPRITE_IDX    8   // Sprite ID for the coin, as requested
 // SKY_TILE_IDX, GRASS_TILE_IDX are defined in vga_interface.h (ensure they are set correctly!)
 
 // Tower properties
@@ -42,7 +43,7 @@
 #define INITIAL_LIVES      5
 #define INIT_JUMP_VY     -20    // base jump velocity
 #define BASE_DELAY       2000   // base jump delay (µs)
-#define SCORE_PER_LEVEL    10     // Points needed to advance to the next level
+#define SCORE_PER_LEVEL    5     // Points needed to advance to the next level
 #define MAX_GAME_LEVEL     5     // Maximum number of levels
 #define MAX_SCORE_DISPLAY_DIGITS 3 // For displaying score like 000 to 999
 
@@ -65,8 +66,8 @@
 // Coin properties
 #define MAX_COINS_ON_SCREEN 5       // Max active coins at a time
 #define COIN_POINTS          10     // Points for collecting a coin
-#define COIN_SPAWN_LEVEL     2      // Level at which coins start spawning
-#define COIN_SPAWN_CHANCE    100     // Percentage chance (0-100) to spawn a coin on a new bar
+#define COIN_SPAWN_LEVEL     3      // Level at which coins start spawning
+#define COIN_SPAWN_CHANCE    100     // Percentage chance (0-100) to spawn a coin on a new bar (user mentioned setting this to 100 for testing)
 #define COIN_COLLECT_DELAY_US (500000) // 0.5 seconds in microseconds to stay on bar for collection
 #define FIRST_COIN_SPRITE_REGISTER 2 // Sprite registers 0 (chicken) and 1 (sun) are used.
 
@@ -143,6 +144,8 @@ void move_all_active_bars(MovingBar bars_a[], MovingBar bars_b[], int array_size
                 // If bar goes inactive, and it had a coin, deactivate the coin
                 if (current_bar_group[b].has_coin && current_bar_group[b].coin_idx != -1) {
                     if (active_coins[current_bar_group[b].coin_idx].active) {
+                        // printf("DEBUG: Deactivating coin %d (sprite_reg %d) because parent bar %d (group %d) went off-screen.\n", 
+                        //        current_bar_group[b].coin_idx, active_coins[current_bar_group[b].coin_idx].sprite_register, b, group);
                         active_coins[current_bar_group[b].coin_idx].active = false;
                         write_sprite_to_kernel(0, 0, 0, 0, active_coins[current_bar_group[b].coin_idx].sprite_register); // Deactivate sprite
                     }
@@ -174,12 +177,12 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
             }
             // Check for coin on this bar
             if (bars[b].has_coin && bars[b].coin_idx != -1 && active_coins[bars[b].coin_idx].active) {
+                // printf("DEBUG: Chicken landed on bar %d (group %d) with active coin %d.\n", b, bar_group_id, bars[b].coin_idx);
                 chicken->collecting_coin_idx = bars[b].coin_idx;
                 chicken->on_bar_collect_timer_us = 0; // Start/reset timer
             } else {
                 chicken->collecting_coin_idx = -1; // No coin, or already collected
             }
-            // usleep(BASE_DELAY); // Original base_delay might be too long here, consider removing or reducing if stuttery
             return true; 
         }
     }
@@ -224,34 +227,43 @@ void resetBarArray(MovingBar bars[], int array_size) {
 }
 
 void init_all_coins(void) {
+    // printf("DEBUG: init_all_coins called.\n");
     for (int i = 0; i < MAX_COINS_ON_SCREEN; i++) {
         active_coins[i].active = false;
         active_coins[i].bar_idx = -1;
         active_coins[i].bar_group_id = -1;
         active_coins[i].sprite_register = FIRST_COIN_SPRITE_REGISTER + i;
-        // Deactivate corresponding hardware sprite
         write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
     }
 }
 
 void draw_active_coins(MovingBar bars_a[], MovingBar bars_b[]) {
+    // printf("DEBUG: draw_active_coins called.\n");
     for (int i = 0; i < MAX_COINS_ON_SCREEN; i++) {
         if (active_coins[i].active) {
+            // printf("DEBUG: Coin %d is active. Bar group: %d, bar_idx: %d. Sprite reg: %d\n", 
+            //        i, active_coins[i].bar_group_id, active_coins[i].bar_idx, active_coins[i].sprite_register);
+
             MovingBar *parent_bar_array = (active_coins[i].bar_group_id == 0) ? bars_a : bars_b;
             int bar_idx = active_coins[i].bar_idx;
 
-            if (bar_idx != -1 && parent_bar_array[bar_idx].x != BAR_INACTIVE_X) {
+            if (bar_idx != -1 && bar_idx < BAR_ARRAY_SIZE && parent_bar_array[bar_idx].x != BAR_INACTIVE_X) {
                 int bar_center_x = parent_bar_array[bar_idx].x + (parent_bar_array[bar_idx].length * TILE_SIZE) / 2;
                 int coin_x = bar_center_x - (COIN_SPRITE_W / 2);
-                int coin_y = parent_bar_array[bar_idx].y_px - COIN_SPRITE_H - (TILE_SIZE / 4) ; // Position coin above the bar
+                int coin_y = parent_bar_array[bar_idx].y_px - COIN_SPRITE_H - (TILE_SIZE / 4) ; 
+                // printf("DEBUG: Coin %d calculated pos: x=%d, y=%d. Parent bar x=%d, y_px=%d\n", 
+                //        i, coin_x, coin_y, parent_bar_array[bar_idx].x, parent_bar_array[bar_idx].y_px);
 
                 if (coin_x + COIN_SPRITE_W > 0 && coin_x < LENGTH && coin_y + COIN_SPRITE_H > 0 && coin_y < WIDTH) {
                      write_sprite_to_kernel(1, coin_y, coin_x, COIN_SPRITE_IDX, active_coins[i].sprite_register);
-                } else { // Coin moved off screen with bar
-                    active_coins[i].active = false; // Deactivate coin if its calculated position is off-screen
+                     // printf("DEBUG: Coin %d DRAWN at x=%d, y=%d.\n", i, coin_x, coin_y);
+                } else { 
+                    // printf("DEBUG: Coin %d NOT drawn (calculated pos off-screen).\n", i);
+                    active_coins[i].active = false; 
                     write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
                 }
-            } else { // Parent bar became inactive or invalid
+            } else { 
+                 // printf("DEBUG: Coin %d NOT drawn (parent bar inactive or invalid bar_idx %d).\n", i, bar_idx);
                  active_coins[i].active = false;
                  write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
             }
@@ -265,7 +277,7 @@ int main(void) {
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     
     init_vga_interface(); 
-    init_all_coins(); // Initialize coin states
+    init_all_coins(); 
 
     pthread_t controller_thread_id;
     if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
@@ -287,7 +299,7 @@ int main(void) {
     int score = 0;
     int game_level = 1; 
     int lives = INITIAL_LIVES;
-    int jump_velocity = INIT_JUMP_VY; int jump_pause_delay = BASE_DELAY; // jump_pause_delay not used currently
+    int jump_velocity = INIT_JUMP_VY; int jump_pause_delay = BASE_DELAY; 
     const int hud_center_col = TILE_COLS / 2; const int hud_offset = 12; 
 
     MovingBar barsA[BAR_ARRAY_SIZE]; MovingBar barsB[BAR_ARRAY_SIZE];
@@ -302,45 +314,45 @@ int main(void) {
     bool group_A_is_active_spawner = true; bool needs_to_spawn_wave_A = true; bool needs_to_spawn_wave_B = false;
     int next_bar_slot_A = 0; int next_bar_slot_B = 0; 
     int watching_bar_idx_A = -1; int watching_bar_idx_B = -1; 
-    unsigned int frame_counter = 0; // For timing coin collection
+    // unsigned int frame_counter = 0; // Not strictly needed for coin collection with usleep timer
 
     while (lives > 0) {
-        frame_counter++;
+        // frame_counter++; // Not strictly needed
         game_level = 1 + (score / SCORE_PER_LEVEL);
         if (game_level > MAX_GAME_LEVEL) game_level = MAX_GAME_LEVEL;
 
         switch (game_level) {
-            case 1: /* ... same as before ... */ 
+            case 1: 
                 current_min_bar_tiles = 5; current_max_bar_tiles = 8; current_bar_count_per_wave = 4;
                 current_bar_speed_base = 3; current_bar_inter_spacing_px = 180; 
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A;
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
                 break;
-            case 2: /* ... same as before ... */
+            case 2: 
                 current_min_bar_tiles = 4; current_max_bar_tiles = 7; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 3; current_bar_inter_spacing_px = 160;
+                current_bar_speed_base = 4; current_bar_inter_spacing_px = 160;
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
                 break;
-            case 3: /* ... same as before, with random Y ... */
+            case 3: 
                 current_min_bar_tiles = 3; current_max_bar_tiles = 6; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; current_bar_inter_spacing_px = 150;
+                current_bar_speed_base = 5; current_bar_inter_spacing_px = 150;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
                 if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
                 break;
-            case 4: /* ... same as before, with random Y ... */
+            case 4: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 5; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; current_bar_inter_spacing_px = 140;
+                current_bar_speed_base = 6; current_bar_inter_spacing_px = 140;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
                 if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
                 break;
-            case 5: default: /* ... same as before, with random Y ... */
+            case 5: default: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 4; current_bar_count_per_wave = 2;
-                current_bar_speed_base = 5; current_bar_inter_spacing_px = 130;
+                current_bar_speed_base = 7; current_bar_inter_spacing_px = 130;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
@@ -354,7 +366,7 @@ int main(void) {
         if (controller_state.b && !chicken.jumping) {
             chicken.vy = jump_velocity; chicken.jumping = true;
             has_landed_this_jump = false; towerEnabled = false; play_sfx(0); 
-            if(chicken.collecting_coin_idx != -1) { // If was collecting a coin, reset
+            if(chicken.collecting_coin_idx != -1) { 
                 chicken.on_bar_collect_timer_us = 0;
                 chicken.collecting_coin_idx = -1;
             }
@@ -363,8 +375,8 @@ int main(void) {
         int prevY_chicken = chicken.y; moveChicken(&chicken);      
         move_all_active_bars(barsA, barsB, BAR_ARRAY_SIZE, actual_bar_speed);
         
-        // Wave Spawning Logic - MODIFIED to potentially spawn coins
         if (group_A_is_active_spawner && needs_to_spawn_wave_A) {
+            // printf("DEBUG: Group A spawning wave. Game Level: %d\n", game_level);
             int spawned_count = 0, last_idx = -1;
             for (int i = 0; i < current_bar_count_per_wave; i++) {
                 int slot = -1;
@@ -376,28 +388,28 @@ int main(void) {
                     barsA[slot].x = LENGTH + (i * current_bar_inter_spacing_px); 
                     barsA[slot].y_px = current_y_pos_A;
                     barsA[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
-                    barsA[slot].has_coin = false; barsA[slot].coin_idx = -1; // Reset coin state for new bar
-
-                    // Coin spawning logic for Group A
+                    barsA[slot].has_coin = false; barsA[slot].coin_idx = -1;
                     if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
+                        // printf("DEBUG: Coin spawn triggered for bar A[%d].\n", slot);
                         for (int c_idx = 0; c_idx < MAX_COINS_ON_SCREEN; c_idx++) {
                             if (!active_coins[c_idx].active) {
-                                active_coins[c_idx].active = true;
-                                active_coins[c_idx].bar_idx = slot;
-                                active_coins[c_idx].bar_group_id = 0; // 0 for barsA
-                                barsA[slot].has_coin = true;
-                                barsA[slot].coin_idx = c_idx;
+                                active_coins[c_idx].active = true; active_coins[c_idx].bar_idx = slot;
+                                active_coins[c_idx].bar_group_id = 0; 
+                                barsA[slot].has_coin = true; barsA[slot].coin_idx = c_idx;
+                                // printf("DEBUG: Spawning coin: c_idx=%d on barA[%d], sprite_reg=%d\n", 
+                                //        c_idx, slot, active_coins[c_idx].sprite_register);
                                 break; 
                             }
                         }
                     }
                     last_idx = slot; spawned_count++;
-                } else break;
+                } else { /*printf("DEBUG: No free slot in barsA for new bar.\n");*/ break; }
             }
             if (spawned_count > 0) { watching_bar_idx_A = last_idx; next_bar_slot_A = (last_idx + 1) % BAR_ARRAY_SIZE; }
             needs_to_spawn_wave_A = false;
         } 
         else if (!group_A_is_active_spawner && needs_to_spawn_wave_B) {
+            // printf("DEBUG: Group B spawning wave. Game Level: %d\n", game_level);
             int spawned_count = 0, last_idx = -1;
             for (int i = 0; i < current_bar_count_per_wave; i++) {
                 int slot = -1;
@@ -409,23 +421,22 @@ int main(void) {
                     barsB[slot].x = LENGTH + current_bar_initial_x_stagger_group_B + (i * current_bar_inter_spacing_px);
                     barsB[slot].y_px = current_y_pos_B;
                     barsB[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
-                    barsB[slot].has_coin = false; barsB[slot].coin_idx = -1; // Reset
-
-                    // Coin spawning logic for Group B
+                    barsB[slot].has_coin = false; barsB[slot].coin_idx = -1;
                     if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
+                        // printf("DEBUG: Coin spawn triggered for bar B[%d].\n", slot);
                         for (int c_idx = 0; c_idx < MAX_COINS_ON_SCREEN; c_idx++) {
                             if (!active_coins[c_idx].active) {
-                                active_coins[c_idx].active = true;
-                                active_coins[c_idx].bar_idx = slot;
-                                active_coins[c_idx].bar_group_id = 1; // 1 for barsB
-                                barsB[slot].has_coin = true;
-                                barsB[slot].coin_idx = c_idx;
+                                active_coins[c_idx].active = true; active_coins[c_idx].bar_idx = slot;
+                                active_coins[c_idx].bar_group_id = 1; 
+                                barsB[slot].has_coin = true; barsB[slot].coin_idx = c_idx;
+                                // printf("DEBUG: Spawning coin: c_idx=%d on barB[%d], sprite_reg=%d\n", 
+                                //        c_idx, slot, active_coins[c_idx].sprite_register);
                                 break;
                             }
                         }
                     }
                     last_idx = slot; spawned_count++;
-                } else break;
+                } else { /*printf("DEBUG: No free slot in barsB for new bar.\n");*/ break; }
             }
             if (spawned_count > 0) { watching_bar_idx_B = last_idx; next_bar_slot_B = (last_idx + 1) % BAR_ARRAY_SIZE; }
             needs_to_spawn_wave_B = false;
@@ -442,39 +453,32 @@ int main(void) {
             }
         }
 
-        // Coin Collection Timer Update
         if (chicken.collecting_coin_idx != -1 && !chicken.jumping) {
-            chicken.on_bar_collect_timer_us += 16666; // Add approx 1 frame time in microseconds
+            chicken.on_bar_collect_timer_us += 16666; 
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
-                if (coin_to_collect->active) { // Check if coin is still active
+                if (coin_to_collect->active) {
+                    // printf("DEBUG: Coin %d collected! Points: +%d. Sprite reg: %d\n", 
+                    //        chicken.collecting_coin_idx, COIN_POINTS, coin_to_collect->sprite_register);
                     score += COIN_POINTS;
-                    play_sfx(3); // Placeholder for coin collect sound effect index
+                    play_sfx(3); 
                     coin_to_collect->active = false;
-                    write_sprite_to_kernel(0,0,0,0, coin_to_collect->sprite_register); // Deactivate sprite
-
-                    // Remove coin association from the bar
+                    write_sprite_to_kernel(0,0,0,0, coin_to_collect->sprite_register); 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
-                    if(coin_to_collect->bar_idx != -1 && parent_bars[coin_to_collect->bar_idx].coin_idx == chicken.collecting_coin_idx) {
+                    if(coin_to_collect->bar_idx != -1 && coin_to_collect->bar_idx < BAR_ARRAY_SIZE && parent_bars[coin_to_collect->bar_idx].coin_idx == chicken.collecting_coin_idx) {
                         parent_bars[coin_to_collect->bar_idx].has_coin = false;
                         parent_bars[coin_to_collect->bar_idx].coin_idx = -1;
                     }
                 }
-                chicken.collecting_coin_idx = -1;
-                chicken.on_bar_collect_timer_us = 0;
+                chicken.collecting_coin_idx = -1; chicken.on_bar_collect_timer_us = 0;
             }
         } else if (chicken.collecting_coin_idx != -1 && chicken.jumping) {
-             // If chicken jumps while collecting, reset timer and collection attempt
-            chicken.on_bar_collect_timer_us = 0;
-            chicken.collecting_coin_idx = -1;
+            chicken.on_bar_collect_timer_us = 0; chicken.collecting_coin_idx = -1;
         }
 
-
-        if (chicken.vy > 0) { // Pass bar_group_id to handleBarCollision
+        if (chicken.vy > 0) {
             bool landed_on_A = handleBarCollision(barsA, 0, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump);
-            if (!landed_on_A) {
-                handleBarCollision(barsB, 1, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump);
-            }
+            if (!landed_on_A) handleBarCollision(barsB, 1, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump);
         }
         
         if (chicken.y < WALL + 40 && chicken.jumping) { chicken.y = WALL + 40; if (chicken.vy < 0) chicken.vy = 0; }
@@ -483,7 +487,7 @@ int main(void) {
             group_A_is_active_spawner = true; needs_to_spawn_wave_A = true; needs_to_spawn_wave_B = false;
             watching_bar_idx_A = -1; watching_bar_idx_B = -1; next_bar_slot_A = 0; next_bar_slot_B = 0;
             resetBarArray(barsA, BAR_ARRAY_SIZE); resetBarArray(barsB, BAR_ARRAY_SIZE);
-            init_all_coins(); // Deactivate all coins on death
+            init_all_coins(); 
             cleartiles(); fill_sky_and_grass(); clearSprites(); 
             vga_present_frame(); 
             if (lives > 0) { play_sfx(1); usleep(2000000); } 
@@ -512,7 +516,7 @@ int main(void) {
         clearSprites(); 
         write_sprite_to_kernel(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0);
         update_sun_sprite(game_level); 
-        draw_active_coins(barsA, barsB); // Draw coins as sprites
+        draw_active_coins(barsA, barsB); 
 
         usleep(16666); 
     }
