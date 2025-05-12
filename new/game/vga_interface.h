@@ -47,15 +47,13 @@ void cleartiles();
 void clearSprites_buffered();
 
 
-#define SKY_TILE_IDX 37  // Example tile index for sky - USER MUST VERIFY/UPDATE
-// MODIFICATION: Define multiple grass tile IDs
+#define SKY_TILE_IDX 37  
 #define GRASS_TILE_1_IDX 41 // User-defined
 #define GRASS_TILE_2_IDX 42 // User-defined
-#define GRASS_TILE_3_IDX 38 // User-defined
-// #define GRASS_TILE_IDX 51 // Old single grass tile - commented out or remove
-
-#define GRASS_ROW_START 25 // Example row where grass starts - USER MUST VERIFY/UPDATE
+#define GRASS_ROW_START 25 
 
 void fill_sky_and_grass(void); 
+// NEW: Declaration for updating grass scroll offset
+void update_grass_scroll(int scroll_speed_px);
 
 #endif // VGA_INTERFACE_H
