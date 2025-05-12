@@ -298,8 +298,8 @@ int main(void) {
 
 
                 current_bar_count_per_wave = 4;
-                current_bar_speed_base = 2.5; 
-                current_bar_inter_spacing_px = 170; // MODIFICATION
+                current_bar_speed_base = 3; 
+                current_bar_inter_spacing_px = 130; // MODIFICATION
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A;
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
@@ -313,7 +313,7 @@ int main(void) {
 
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
-                current_bar_inter_spacing_px = 180; // MODIFICATION
+                current_bar_inter_spacing_px = 150; // MODIFICATION
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
@@ -324,7 +324,7 @@ int main(void) {
                 current_max_bar_tiles = 5; // Same as L2
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3.5; 
-                current_bar_inter_spacing_px = 180; // MODIFICATION
+                current_bar_inter_spacing_px = 160; // MODIFICATION
                 current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L3; 
                 current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
                 current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range_for_level + 1)) - current_random_y_range_for_level;
@@ -346,7 +346,7 @@ int main(void) {
                 current_max_bar_tiles = 3; // Shortest
                 current_bar_count_per_wave = 2;
                 current_bar_speed_base = 4.5; 
-                current_bar_inter_spacing_px = 200; // MODIFICATION
+                current_bar_inter_spacing_px = 190; // MODIFICATION
                 current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L4_L5; 
                 current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
                 current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range_for_level + 1)) - current_random_y_range_for_level;
