@@ -238,7 +238,7 @@ void init_all_coins(void) {
 }
 
 void draw_active_coins(MovingBar bars_a[], MovingBar bars_b[]) {
-     printf("DEBUG: draw_active_coins called.\n");
+    // printf("DEBUG: draw_active_coins called.\n");
     for (int i = 0; i < MAX_COINS_ON_SCREEN; i++) {
         if (active_coins[i].active) {
              printf("DEBUG: Coin %d is active. Bar group: %d, bar_idx: %d. Sprite reg: %d\n", 
@@ -256,6 +256,7 @@ void draw_active_coins(MovingBar bars_a[], MovingBar bars_b[]) {
 
                 if (coin_x + COIN_SPRITE_W > 0 && coin_x < LENGTH && coin_y + COIN_SPRITE_H > 0 && coin_y < WIDTH) {
                      write_sprite_to_kernel(1, coin_y, coin_x, COIN_SPRITE_IDX, active_coins[i].sprite_register);
+                    printf("COIN_PRINTEDD");
                       printf("DEBUG: Coin %d DRAWN at x=%d, y=%d.\n", i, coin_x, coin_y);
                 } else { 
                      printf("DEBUG: Coin %d NOT drawn (calculated pos off-screen).\n", i);
