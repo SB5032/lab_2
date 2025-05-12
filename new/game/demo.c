@@ -286,7 +286,6 @@ int main(void) {
         perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
     
-    game_restart_point: ; 
     int score = 0; int game_level = 1; int lives = INITIAL_LIVES;
     coins_collected_this_game = 0; 
     init_all_coins(); 
@@ -303,6 +302,7 @@ int main(void) {
     vga_present_frame(); 
     while (!(controller_state.a || controller_state.b || controller_state.start)) { usleep(10000); }
 
+	game_restart_point: ; 
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); 
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
@@ -555,26 +555,33 @@ int main(void) {
     printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
     cleartiles(); fill_sky_and_grass(); 
     clearSprites_buffered(); 
-    
-    unsigned char game_over_text_str[] = "game over"; 
-    unsigned char final_score_text_str[] = "score "; 
-    unsigned char coins_collected_text_str[] = "coins collected "; 
-    unsigned char restart_prompt_text_str[] = "press any key to restart"; 
-    int text_row = 10; 
-    write_text(game_over_text_str, sizeof(game_over_text_str) - 1, text_row, (TILE_COLS - (sizeof(game_over_text_str) - 1)) / 2);
-    text_row += 2;
-    int score_line_len = (sizeof(final_score_text_str)-1) + MAX_SCORE_DISPLAY_DIGITS;
-    int score_start_col = (TILE_COLS - score_line_len) / 2;
-    write_text(final_score_text_str, sizeof(final_score_text_str)-1, text_row, score_start_col);
-    write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, text_row, score_start_col + sizeof(final_score_text_str)-1);
-    text_row += 2;
-    int coins_line_len = (sizeof(coins_collected_text_str)-1) + MAX_COINS_DISPLAY_DIGITS;
-    int coins_start_col = (TILE_COLS - coins_line_len) / 2;
-    write_text(coins_collected_text_str, sizeof(coins_collected_text_str)-1, text_row, coins_start_col);
-    write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, text_row, coins_start_col + sizeof(coins_collected_text_str)-1);
-    text_row += 3;
-    write_text(restart_prompt_text_str, sizeof(restart_prompt_text_str)-1, text_row, (TILE_COLS - (sizeof(restart_prompt_text_str)-1)) / 2);
-    vga_present_frame(); present_sprites(); play_sfx(2); 
+    write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
+    write_text((unsigned char *)"score", 5, 15, 13); write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 15, 19);
+	write_text((unsigned char *)"coins", 5, 17, 8); write_text((unsigned char *)"collected", 9, 17, 14); write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, 17, 24);
+	write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"any", 3, 19, 14); 
+    write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
+    write_text((unsigned char *)"start", 5, 19, 29);
+    vga_present_frame(); present_sprites();
+    // unsigned char game_over_text_str[] = "game over"; 
+    // unsigned char final_score_text_str[] = "score "; 
+    // unsigned char coins_collected_text_str[] = "coins collected "; 
+    // unsigned char restart_prompt_text_str[] = "press any key to restart"; 
+    // int text_row = 10; 
+    // write_text(game_over_text_str, sizeof(game_over_text_str) - 1, text_row, (TILE_COLS - (sizeof(game_over_text_str) - 1)) / 2);
+    // text_row += 2;
+    // int score_line_len = (sizeof(final_score_text_str)-1) + MAX_SCORE_DISPLAY_DIGITS;
+    // int score_start_col = (TILE_COLS - score_line_len) / 2;
+    // write_text(final_score_text_str, sizeof(final_score_text_str)-1, text_row, score_start_col);
+    // write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, text_row, score_start_col + sizeof(final_score_text_str)-1);
+    // text_row += 2;
+    // int coins_line_len = (sizeof(coins_collected_text_str)-1) + MAX_COINS_DISPLAY_DIGITS;
+    // int coins_start_col = (TILE_COLS - coins_line_len) / 2;
+    // write_text(coins_collected_text_str, sizeof(coins_collected_text_str)-1, text_row, coins_start_col);
+    // write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, text_row, coins_start_col + sizeof(coins_collected_text_str)-1);
+    // text_row += 3;
+    // write_text(restart_prompt_text_str, sizeof(restart_prompt_text_str)-1, text_row, (TILE_COLS - (sizeof(restart_prompt_text_str)-1)) / 2);
+    // vga_present_frame(); present_sprites(); play_sfx(2); 
+	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
     while(1) {
         if (controller_state.a || controller_state.b || controller_state.start || controller_state.x || controller_state.y || controller_state.select) {
