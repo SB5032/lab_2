@@ -65,8 +65,8 @@
 // Coin properties
 #define MAX_COINS_ON_SCREEN 5       // Max active coins at a time
 #define COIN_POINTS          10     // Points for collecting a coin
-#define COIN_SPAWN_LEVEL     3      // Level at which coins start spawning
-#define COIN_SPAWN_CHANCE    50     // Percentage chance (0-100) to spawn a coin on a new bar
+#define COIN_SPAWN_LEVEL     2      // Level at which coins start spawning
+#define COIN_SPAWN_CHANCE    80     // Percentage chance (0-100) to spawn a coin on a new bar
 #define COIN_COLLECT_DELAY_US (500000) // 0.5 seconds in microseconds to stay on bar for collection
 #define FIRST_COIN_SPRITE_REGISTER 2 // Sprite registers 0 (chicken) and 1 (sun) are used.
 
@@ -318,13 +318,13 @@ int main(void) {
                 break;
             case 2: /* ... same as before ... */
                 current_min_bar_tiles = 4; current_max_bar_tiles = 7; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; current_bar_inter_spacing_px = 160;
+                current_bar_speed_base = 3; current_bar_inter_spacing_px = 160;
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
                 break;
             case 3: /* ... same as before, with random Y ... */
                 current_min_bar_tiles = 3; current_max_bar_tiles = 6; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 5; current_bar_inter_spacing_px = 150;
+                current_bar_speed_base = 4; current_bar_inter_spacing_px = 150;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
@@ -332,7 +332,7 @@ int main(void) {
                 break;
             case 4: /* ... same as before, with random Y ... */
                 current_min_bar_tiles = 2; current_max_bar_tiles = 5; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 6; current_bar_inter_spacing_px = 140;
+                current_bar_speed_base = 4; current_bar_inter_spacing_px = 140;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
@@ -340,7 +340,7 @@ int main(void) {
                 break;
             case 5: default: /* ... same as before, with random Y ... */
                 current_min_bar_tiles = 2; current_max_bar_tiles = 4; current_bar_count_per_wave = 2;
-                current_bar_speed_base = 7; current_bar_inter_spacing_px = 130;
+                current_bar_speed_base = 5; current_bar_inter_spacing_px = 130;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
