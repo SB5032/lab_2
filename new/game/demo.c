@@ -570,6 +570,8 @@ int main(void) {
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
 	libusb_close(controller_handler);
+	libusb_exit(NULL);
+    pthread_exit(NULL);
 	goto game_restart_point; 
 
     close(vga_fd); close(audio_fd);
