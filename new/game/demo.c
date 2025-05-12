@@ -569,7 +569,7 @@ int main(void) {
     vga_present_frame(); present_sprites();
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
-	close(vga_fd); close(audio_fd);
+	libusb_close(controller);
 	goto game_restart_point; 
 
     close(vga_fd); close(audio_fd);
