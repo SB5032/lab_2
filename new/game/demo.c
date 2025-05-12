@@ -193,18 +193,36 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
     return false; 
 }
 
-void *controller_input_thread(void *arg) {
+void *controller_input_thread(void *arg)
+{
     uint8_t endpoint_address;
-    struct libusb_device_handle *controller_handle = opencontroller(&endpoint_address);
-    if (!controller_handle) { perror("USB controller open failed in thread"); pthread_exit(NULL); }
-    unsigned char buffer[GAMEPAD_READ_LENGTH]; int actual_length_transferred;
-    while (1) { 
-        int status = libusb_interrupt_transfer(controller_handle, endpoint_address, buffer, GAMEPAD_READ_LENGTH, &actual_length_transferred, 0);
-        if (status == 0 && actual_length_transferred == GAMEPAD_READ_LENGTH) usb_to_output(&controller_state, buffer); 
-        else usleep(10000); 
+    struct libusb_device_handle *controller = opencontroller(&endpoint_address);
+    if (controller == NULL)
+    {
+        fprintf(stderr, "Failed to open USB controller device.\n");
+        pthread_exit(NULL);
     }
-	libusb_close(controller_handle);
-	libusb_exit(NULL);
+
+    while (1)
+    {
+        unsigned char output_buffer[GAMEPAD_READ_LENGTH];
+        int bytes_transferred;
+
+        int result = libusb_interrupt_transfer(controller, endpoint_address, output_buffer, GAMEPAD_READ_LENGTH, &bytes_transferred, 0);
+
+        if (result == 0)
+        {
+
+            usb_to_output(&controller_state, output_buffer);
+        }
+        if (restart == false)
+        {
+            break;
+        }
+    }
+
+    libusb_close(controller);
+    libusb_exit(NULL);
     pthread_exit(NULL);
 }
 
@@ -298,9 +316,11 @@ int main(void) {
     vga_present_frame(); 
 
 	game_restart_point: ;
-	pthread_t controller_thread_id;
-    if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
-        perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
+	pthread_t controller_thread;
+    if (pthread_create(&controller_thread, NULL, controller_input_thread, NULL) != 0)
+    {
+        fprintf(stderr, "Failed to create controller input thread.\n");
+        return 1;
     }
 	while (controller_state.x) { usleep(10000); printf("test");}
 	while (!(controller_state.x)) {
@@ -576,7 +596,7 @@ int main(void) {
     vga_present_frame(); present_sprites();
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
-	close(vga_fd); close(audio_fd);
+	pthread_join(controller_thread, NULL); //close(vga_fd); close(audio_fd);
 	goto game_restart_point; 
 
    
