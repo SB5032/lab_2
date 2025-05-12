@@ -285,13 +285,6 @@ int main(void) {
     if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
         perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
-    
-    int score = 0; int game_level = 1; int lives = INITIAL_LIVES;
-    coins_collected_this_game = 0; 
-    init_all_coins(); 
-    static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
-    static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
-    static bool first_random_wave_this_session = true;
 
 
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); vga_present_frame(); present_sprites();   
@@ -303,6 +296,14 @@ int main(void) {
     while (!(controller_state.a || controller_state.b || controller_state.start)) { usleep(10000); }
 
 	game_restart_point: ; 
+
+	int score = 0; int game_level = 1; int lives = INITIAL_LIVES;
+    coins_collected_this_game = 0; 
+    init_all_coins(); 
+    static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
+    static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
+    static bool first_random_wave_this_session = true;
+	
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); 
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
