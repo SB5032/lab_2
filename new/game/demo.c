@@ -10,7 +10,7 @@
 // Implemented relative Y-positioning between bar groups for levels 3+.
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
-// Corrected Y-reset on death for L3+ and coin scoring.
+// Added scrolling grass.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,10 +42,10 @@
 // MIF indices
 #define CHICKEN_STAND      8
 #define CHICKEN_JUMP       9  
-#define TOWER_TILE_IDX     40
+#define TOWER_TILE_IDX     42
 #define SUN_TILE           20
 #define COIN_SPRITE_IDX    22 
-// SKY_TILE_IDX, GRASS_TILE_IDX are defined in vga_interface.h
+// SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
 
 // Tower properties
 #define TOWER_TOP_VISIBLE_ROW 21 
@@ -82,7 +82,7 @@
 
 // Coin properties
 #define MAX_COINS_ON_SCREEN 5
-#define COIN_POINTS          10 // Total points for getting a coin (includes the 1 point for landing)
+#define COIN_POINTS          10 
 #define COIN_SPAWN_LEVEL     3
 #define COIN_SPAWN_CHANCE    100
 #define COIN_COLLECT_DELAY_US (500000)
@@ -113,7 +113,6 @@ void update_sun_sprite_buffered(int current_level_display);
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
-// MODIFICATION: Added first_random_wave_flag parameter
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag);
 
 
@@ -175,7 +174,7 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
         if (chicken_bottom_prev <= bar_top_y && chicken_bottom_curr >= bar_top_y && chicken_bottom_curr <= bar_bottom_y && chicken_right_x > bar_left_x && chicken->x < bar_right_x) {          
             chicken->y = bar_top_y - CHICKEN_H; chicken->vy = 0; chicken->jumping = false;                 
             if (!(*has_landed_this_jump)) { 
-                (*score)++; // MODIFICATION: Always score 1 for landing
+                (*score)++; 
                 *has_landed_this_jump = true; 
             }
             if (bars[b].has_coin && bars[b].coin_idx != -1 && active_coins[bars[b].coin_idx].active) {
@@ -257,7 +256,6 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
-// MODIFICATION: Added first_random_wave_flag to reset it
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag) {
     initChicken(c); 
     *tEnabled = true;
@@ -266,10 +264,8 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *grpA_act = true; *needs_A = true; *needs_B = false;
     *wA_idx = -1; *wB_idx = -1;
     *next_sA = 0; *next_sB = 0;
-    // MODIFICATION: Reset last Ys to Level 1 hardcoded values for a fresh attempt
     *last_y_A = LEVEL1_2_BAR_Y_A; 
     *last_y_B = LEVEL1_2_BAR_Y_B;
-    // MODIFICATION: Reset the flag so the first wave after death in L3+ is predictable
     *first_random_wave_flag = true; 
     cleartiles(); fill_sky_and_grass(); clearSprites_buffered(); 
 }
@@ -369,6 +365,9 @@ int main(void) {
         current_bar_initial_x_stagger_group_B = BAR_INITIAL_X_STAGGER_GROUP_B;
         int actual_bar_speed = current_bar_speed_base; 
 
+        // MODIFICATION: Call update_grass_scroll with the current bar speed
+        update_grass_scroll(actual_bar_speed);
+
         if (controller_state.b && !chicken.jumping) {
             chicken.vy = jump_velocity; chicken.jumping = true;
             has_landed_this_jump = false; towerEnabled = false; play_sfx(0); 
@@ -384,9 +383,9 @@ int main(void) {
         if (group_A_is_active_spawner && needs_to_spawn_wave_A) {
             int determined_y_A;
             if (game_level >= 3) { 
-                if (first_random_wave_this_session) { // MODIFICATION: Use fixed Y for first random wave
+                if (first_random_wave_this_session) { 
                     determined_y_A = LEVEL1_2_BAR_Y_A; 
-                    first_random_wave_this_session = false; // Only do this once per game session
+                    first_random_wave_this_session = false; 
                 } else {
                     determined_y_A = last_actual_y_B + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
                 }
@@ -481,7 +480,7 @@ int main(void) {
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
                 if (coin_to_collect->active) { 
-                    score += (COIN_POINTS - 1); // MODIFICATION: Add 9 points (1 was already added on land)
+                    score += (COIN_POINTS - 1); 
                     coins_collected_this_game++; play_sfx(3); 
                     coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
@@ -508,7 +507,7 @@ int main(void) {
                 reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
                                   &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
                                   &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B,
-                                  &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session); // MODIFICATION: Pass flag
+                                  &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session); 
                 vga_present_frame(); present_sprites();   
                 play_sfx(1); usleep(2000000); 
                 continue; 
