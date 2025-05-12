@@ -393,14 +393,14 @@ int main(void) {
                 break;
             case 2: 
                 current_min_bar_tiles = 4; current_max_bar_tiles = 7; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; current_bar_inter_spacing_px = 160;
+                current_bar_speed_base = 3; current_bar_inter_spacing_px = 160;
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 3: 
                 current_min_bar_tiles = 3; current_max_bar_tiles = 6; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 5; current_bar_inter_spacing_px = 150;
+                current_bar_speed_base = 4; current_bar_inter_spacing_px = 150;
                 current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_A = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
@@ -409,7 +409,7 @@ int main(void) {
                 break;
             case 4: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 5; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 6; current_bar_inter_spacing_px = 140;
+                current_bar_speed_base = 4; current_bar_inter_spacing_px = 140;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
@@ -418,7 +418,7 @@ int main(void) {
                 break;
             case 5: default: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 4; current_bar_count_per_wave = 2;
-                current_bar_speed_base = 7; current_bar_inter_spacing_px = 130;
+                current_bar_speed_base = 5; current_bar_inter_spacing_px = 130;
                 current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
                 current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
