@@ -203,7 +203,7 @@ void *controller_input_thread(void *arg) {
         if (status == 0 && actual_length_transferred == GAMEPAD_READ_LENGTH) usb_to_output(&controller_state, buffer); 
         else usleep(10000); 
     }
-	libusb_close(controller_handler);
+	libusb_close(controller_handle);
 	libusb_exit(NULL);
     pthread_exit(NULL);
 }
