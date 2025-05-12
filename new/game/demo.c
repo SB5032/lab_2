@@ -11,7 +11,7 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// Added debug printf for coin collection.
+// Enhanced debug printf for coin collection.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -477,12 +477,15 @@ int main(void) {
 
         if (chicken.collecting_coin_idx != -1 && !chicken.jumping) {
             chicken.on_bar_collect_timer_us += 16666; 
+            // MODIFICATION: Added more debug prints for coin collection
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
+                // printf("DEBUG: Coin collection timer met for coin_idx: %d. Chicken not jumping.\n", chicken.collecting_coin_idx);
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
+                // printf("DEBUG: Coin to collect status: active = %s\n", coin_to_collect->active ? "true" : "false");
                 if (coin_to_collect->active) { 
-                    score += (COIN_POINTS - 1); // MODIFICATION: Add (COIN_POINTS - 1) as 1 point is already given for landing
+                    score += (COIN_POINTS - 1); 
                     coins_collected_this_game++; 
-                    printf("DEBUG: Coin collected! Total coins_collected_this_game = %d\n", coins_collected_this_game); // DEBUG
+                    printf("DEBUG: Coin collected! Total coins_collected_this_game = %d\n", coins_collected_this_game); 
                     play_sfx(3); 
                     coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
