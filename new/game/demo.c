@@ -289,13 +289,15 @@ int main(void) {
 
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); vga_present_frame(); present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
-    write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"any", 3, 19, 14); 
+    write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"start", 5, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); 
-    while (!(controller_state.a || controller_state.b || controller_state.start)) { usleep(10000); }
 
-	game_restart_point: ; 
+	game_restart_point: ;
+    while (!(controller_state.a || controller_state.b || controller_state.select)) { usleep(10000); }
+
+	 
 
 	int score = 0; int game_level = 1; int lives = INITIAL_LIVES;
     coins_collected_this_game = 0; 
@@ -303,7 +305,7 @@ int main(void) {
     static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
     static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
     static bool first_random_wave_this_session = true;
-	
+
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); 
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
@@ -584,15 +586,16 @@ int main(void) {
     // vga_present_frame(); present_sprites(); play_sfx(2); 
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
-    while(1) {
-        if (controller_state.a || controller_state.b || controller_state.start || controller_state.x || controller_state.y || controller_state.select) {
-            last_actual_y_A = LEVEL1_2_BAR_Y_A; 
-            last_actual_y_B = LEVEL1_2_BAR_Y_B; 
-            first_random_wave_this_session = true; 
-            goto game_restart_point; 
-        }
-        usleep(50000); 
-    }
+	goto game_restart_point; 
+    // while(1) {
+    //     if (controller_state.a || controller_state.b || controller_state.start || controller_state.x || controller_state.y || controller_state.select) {
+    //         last_actual_y_A = LEVEL1_2_BAR_Y_A; 
+    //         last_actual_y_B = LEVEL1_2_BAR_Y_B; 
+    //         first_random_wave_this_session = true; 
+    //         goto game_restart_point; 
+    //     }
+    //     usleep(50000); 
+    // }
     close(vga_fd); close(audio_fd);
     return 0;
 }
