@@ -95,6 +95,7 @@ int audio_fd;
 struct controller_output_packet controller_state; 
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
+bool restart = true;
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
