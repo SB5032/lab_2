@@ -139,12 +139,16 @@ void move_all_active_bars(MovingBar bars_a[], MovingBar bars_b[], int array_size
             if (current_bar_group[b].x == BAR_INACTIVE_X) continue;
             current_bar_group[b].x -= speed;
             int bar_pixel_width = current_bar_group[b].length * TILE_SIZE;
-            if (current_bar_group[b].x + bar_pixel_width <= 0) {
+            if (current_bar_group[b].x + bar_pixel_width <= 0) { // Bar has moved completely off-screen to the left
                 current_bar_group[b].x = BAR_INACTIVE_X; 
+                // If bar goes inactive, and it had a coin, deactivate the coin
                 if (current_bar_group[b].has_coin && current_bar_group[b].coin_idx != -1) {
-                    if (active_coins[current_bar_group[b].coin_idx].active) {
-                        active_coins[current_bar_group[b].coin_idx].active = false;
-                        write_sprite_to_kernel(0, 0, 0, 0, active_coins[current_bar_group[b].coin_idx].sprite_register); 
+                    int coin_to_deactivate_idx = current_bar_group[b].coin_idx;
+                    if (coin_to_deactivate_idx >= 0 && coin_to_deactivate_idx < MAX_COINS_ON_SCREEN && active_coins[coin_to_deactivate_idx].active) {
+                        // printf("DEBUG: Deactivating coin %d (sprite_reg %d) because parent bar %d (group %d) went off-screen.\n", 
+                        //        coin_to_deactivate_idx, active_coins[coin_to_deactivate_idx].sprite_register, b, group);
+                        active_coins[coin_to_deactivate_idx].active = false;
+                        write_sprite_to_kernel(0, 0, 0, 0, active_coins[coin_to_deactivate_idx].sprite_register); // Deactivate hardware sprite
                     }
                     current_bar_group[b].has_coin = false;
                     current_bar_group[b].coin_idx = -1;
@@ -231,47 +235,50 @@ void init_all_coins(void) {
 }
 
 void draw_active_coins(MovingBar bars_a[], MovingBar bars_b[]) {
-    // printf("DEBUG: draw_active_coins called.\n"); // Keep this for overall check
     for (int i = 0; i < MAX_COINS_ON_SCREEN; i++) {
         if (active_coins[i].active) {
-            // printf("DEBUG: Coin %d is active. Bar group: %d, bar_idx: %d. Sprite reg: %d\n", 
-            //        i, active_coins[i].bar_group_id, active_coins[i].bar_idx, active_coins[i].sprite_register);
-
             MovingBar *parent_bar_array = (active_coins[i].bar_group_id == 0) ? bars_a : bars_b;
             int bar_idx = active_coins[i].bar_idx;
 
+            // Check if the parent bar is valid and active
             if (bar_idx != -1 && bar_idx < BAR_ARRAY_SIZE && parent_bar_array[bar_idx].x != BAR_INACTIVE_X) {
                 int bar_center_x = parent_bar_array[bar_idx].x + (parent_bar_array[bar_idx].length * TILE_SIZE) / 2;
                 int coin_x = bar_center_x - (COIN_SPRITE_W / 2);
                 int coin_y = parent_bar_array[bar_idx].y_px - COIN_SPRITE_H - (TILE_SIZE / 4) ; 
-                // printf("DEBUG: Coin %d calculated pos: x=%d, y=%d. Parent bar x=%d, y_px=%d\n", 
-                //        i, coin_x, coin_y, parent_bar_array[bar_idx].x, parent_bar_array[bar_idx].y_px);
 
                 bool on_screen_x = (coin_x + COIN_SPRITE_W > 0) && (coin_x < LENGTH);
                 bool on_screen_y = (coin_y + COIN_SPRITE_H > 0) && (coin_y < WIDTH);
 
                 if (on_screen_x && on_screen_y) {
                      write_sprite_to_kernel(1, coin_y, coin_x, COIN_SPRITE_IDX, active_coins[i].sprite_register);
-                     // printf("DEBUG: Coin %d DRAWN at x=%d, y=%d.\n", i, coin_x, coin_y);
                 } else { 
-                    // MODIFICATION: More detailed printf for off-screen reasons
-                    printf("DEBUG: Coin %d NOT drawn (calculated pos off-screen). coin_x=%d, coin_y=%d. Screen L:0,R:%d, T:0,B:%d\n", 
-                           i, coin_x, coin_y, LENGTH, WIDTH);
-                    if (!on_screen_x) {
-                        if (!(coin_x + COIN_SPRITE_W > 0)) printf("   Reason: coin_x + COIN_SPRITE_W (%d) <= 0 (Left fail)\n", coin_x + COIN_SPRITE_W);
-                        if (!(coin_x < LENGTH))           printf("   Reason: coin_x (%d) >= LENGTH (%d) (Right fail)\n", coin_x, LENGTH);
-                    }
-                    if (!on_screen_y) {
-                        if (!(coin_y + COIN_SPRITE_H > 0)) printf("   Reason: coin_y + COIN_SPRITE_H (%d) <= 0 (Top fail)\n", coin_y + COIN_SPRITE_H);
-                        if (!(coin_y < WIDTH))            printf("   Reason: coin_y (%d) >= WIDTH (%d) (Bottom fail)\n", coin_y, WIDTH);
-                    }
-                    active_coins[i].active = false; 
-                    write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
+                    // MODIFICATION: Coin is active, its parent bar is active, but its current calculated position is off-screen.
+                    // Do not draw it this frame, and DO NOT deactivate it here.
+                    // Its hardware sprite (if previously on-screen) will just be positioned off-screen by the next
+                    // on-screen draw, or it will be turned off if the coin is collected or its parent bar goes inactive.
+                    // The printf is kept for debugging the "off-screen" calculation.
+                    // printf("DEBUG: Coin %d (sprite_reg %d) active, but calculated pos (x=%d, y=%d) is currently off-screen. Parent bar x=%d. Not drawing this frame.\n", 
+                    //       i, active_coins[i].sprite_register, coin_x, coin_y, parent_bar_array[bar_idx].x);
+                    // The detailed reason printfs can also be kept for debugging if needed:
+                    // if (!on_screen_x) {
+                    //     if (!(coin_x + COIN_SPRITE_W > 0)) printf("   Reason: coin_x + COIN_SPRITE_W (%d) <= 0 (Left fail)\n", coin_x + COIN_SPRITE_W);
+                    //     if (!(coin_x < LENGTH))           printf("   Reason: coin_x (%d) >= LENGTH (%d) (Right fail)\n", coin_x, LENGTH);
+                    // }
+                    // if (!on_screen_y) {
+                    //     if (!(coin_y + COIN_SPRITE_H > 0)) printf("   Reason: coin_y + COIN_SPRITE_H (%d) <= 0 (Top fail)\n", coin_y + COIN_SPRITE_H);
+                    //     if (!(coin_y < WIDTH))            printf("   Reason: coin_y (%d) >= WIDTH (%d) (Bottom fail)\n", coin_y, WIDTH);
+                    // }
                 }
             } else { 
-                 // printf("DEBUG: Coin %d NOT drawn (parent bar inactive or invalid bar_idx %d).\n", i, bar_idx);
-                 active_coins[i].active = false;
-                 write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
+                 // Parent bar is inactive or bar_idx is invalid.
+                 // The coin should have been deactivated when its parent bar went off-screen in move_all_active_bars.
+                 // If active_coins[i].active is still true here, it's an inconsistency.
+                 // Ensure its hardware sprite is off and mark the coin inactive.
+                 if (active_coins[i].active) {
+                    // printf("DEBUG: Coin %d (sprite_reg %d) is marked active, but its parent bar is not. Deactivating.\n", i, active_coins[i].sprite_register);
+                    write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
+                    active_coins[i].active = false; 
+                 }
             }
         }
     }
