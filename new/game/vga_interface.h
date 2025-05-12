@@ -59,8 +59,8 @@ void cleartiles(); // Now clears the current software back buffer for tiles
 void clearSprites_buffered();
 
 
-#define SKY_TILE_IDX 50  // Example tile index for sky - USER MUST VERIFY/UPDATE
-#define GRASS_TILE_IDX 51 // Example tile index for grass - USER MUST VERIFY/UPDATE
+#define SKY_TILE_IDX 37  // Example tile index for sky - USER MUST VERIFY/UPDATE
+#define GRASS_TILE_IDX 38 // Example tile index for grass - USER MUST VERIFY/UPDATE
 #define GRASS_ROW_START 25 // Example row where grass starts - USER MUST VERIFY/UPDATE
 
 void fill_sky_and_grass(void); // Now fills the current software back buffer for tiles
