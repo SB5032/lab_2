@@ -7,6 +7,7 @@
 // Adjusted bar Y randomization for levels 3+ and game over screen.
 // Added <string.h> for memset.
 // Updated per-level bar lengths, spacing, and Y-clamping.
+// Implemented relative Y-positioning between bar groups for levels 3+.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,15 +33,15 @@
 // Sprite dimensions
 #define CHICKEN_W         32
 #define CHICKEN_H         32
-#define COIN_SPRITE_W     32 
-#define COIN_SPRITE_H     32
+#define COIN_SPRITE_W     32 // User updated
+#define COIN_SPRITE_H     32 // User updated
 
 // MIF indices
 #define CHICKEN_STAND      8
-#define CHICKEN_JUMP       9
+#define CHICKEN_JUMP       9  // User updated
 #define TOWER_TILE_IDX     42
 #define SUN_TILE           20
-#define COIN_SPRITE_IDX    22
+#define COIN_SPRITE_IDX    22 // User updated
 // SKY_TILE_IDX, GRASS_TILE_IDX are defined in vga_interface.h
 
 // Tower properties
@@ -59,23 +60,22 @@
 
 // Bar properties
 #define BAR_ARRAY_SIZE     10
-#define WAVE_SWITCH_TRIGGER_OFFSET_PX 70
+#define WAVE_SWITCH_TRIGGER_OFFSET_PX 70 // User updated
 #define BAR_HEIGHT_ROWS    2
 #define BAR_TILE_IDX      39
 #define BAR_INACTIVE_X  -1000
 #define BAR_INITIAL_X_STAGGER_GROUP_B 96
 
-// MODIFICATION: New Y-position clamping based on user request
-#define EFFECTIVE_BAR_MIN_Y_POS  40 // 40 pixels from the top of the screen
-#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 16 - (BAR_HEIGHT_ROWS * TILE_SIZE)) // Bar top so bar bottom is 16px from screen bottom
+// Y-position clamping
+#define EFFECTIVE_BAR_MIN_Y_POS  40 
+#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 16 - (BAR_HEIGHT_ROWS * TILE_SIZE)) 
 
-// Default Bar positioning (used as a base for Levels 1 & 2, then overridden by random for L3+)
-#define DEFAULT_BAR_MIN_Y_GROUP_A (WALL + 120) 
-#define DEFAULT_BAR_Y_OFFSET_GROUP_B 170       
+// Default Bar positioning (base for Levels 1 & 2)
+#define DEFAULT_BAR_Y_A (WALL + 120) // User updated
+#define DEFAULT_BAR_Y_B (DEFAULT_BAR_Y_A + 170) // User updated, relative to A
 
-// Random Y ranges for levels 3+
-#define BAR_RANDOM_Y_RANGE_L3    80  // Gentler random Y offset for level 3
-#define BAR_RANDOM_Y_RANGE_L4_L5 120 // Larger random Y offset for levels 4 & 5
+// MODIFICATION: Relative Y offset for group spawns in random levels
+#define BAR_Y_RELATIVE_OFFSET 150 
 
 // Coin properties
 #define MAX_COINS_ON_SCREEN 5
@@ -98,6 +98,22 @@ typedef struct { int x, y_px, length; bool has_coin; int coin_idx; } MovingBar;
 typedef struct { int bar_idx; int bar_group_id; bool active; int sprite_register; } Coin;
 
 Coin active_coins[MAX_COINS_ON_SCREEN];
+
+// --- Function Prototypes (rest of the functions remain the same as previous version) ---
+void draw_all_active_bars_to_back_buffer(MovingBar bars_a[], MovingBar bars_b[], int array_size);
+void move_all_active_bars(MovingBar bars_a[], MovingBar bars_b[], int array_size, int speed);
+bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int prevY_chicken, Chicken *chicken, int *score, bool *has_landed_this_jump);
+void *controller_input_thread(void *arg);
+void initChicken(Chicken *c);
+void moveChicken(Chicken *c);
+void update_sun_sprite_buffered(int current_level_display);
+void resetBarArray(MovingBar bars[], int array_size);
+void init_all_coins(void);
+void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B);
+
+
+// --- Function Implementations (Only main and reset_for_level_attempt shown for brevity if no other changes) ---
 
 void draw_all_active_bars_to_back_buffer(MovingBar bars_a[], MovingBar bars_b[], int array_size) {
     MovingBar* current_bar_group;
@@ -234,7 +250,8 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
-void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB) {
+// MODIFICATION: Added last_y_A and last_y_B to parameters
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B) {
     initChicken(c); 
     *tEnabled = true;
     resetBarArray(bA, BAR_ARRAY_SIZE); resetBarArray(bB, BAR_ARRAY_SIZE);
@@ -242,6 +259,11 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *grpA_act = true; *needs_A = true; *needs_B = false;
     *wA_idx = -1; *wB_idx = -1;
     *next_sA = 0; *next_sB = 0;
+    // Initialize last Y positions for the start of an attempt (or when restarting after death)
+    // These will be updated by the first wave spawned in levels 1 or 2, or used by L3+ if they spawn first.
+    *last_y_A = DEFAULT_BAR_Y_A; 
+    *last_y_B = DEFAULT_BAR_Y_B;
+
     cleartiles(); fill_sky_and_grass(); clearSprites_buffered(); 
 }
 
@@ -259,6 +281,11 @@ int main(void) {
     coins_collected_this_game = 0; 
     init_all_coins(); 
 
+    // MODIFICATION: Static variables to store the Y position of the last spawned wave for each group
+    static int last_actual_y_A = DEFAULT_BAR_Y_A; 
+    static int last_actual_y_B = DEFAULT_BAR_Y_B;
+
+
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); vga_present_frame(); present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"any", 3, 19, 14); 
@@ -274,9 +301,11 @@ int main(void) {
     MovingBar barsA[BAR_ARRAY_SIZE]; MovingBar barsB[BAR_ARRAY_SIZE];
     resetBarArray(barsA, BAR_ARRAY_SIZE); resetBarArray(barsB, BAR_ARRAY_SIZE);
     int current_min_bar_tiles, current_max_bar_tiles, current_bar_count_per_wave, current_bar_speed_base;
-    int current_bar_inter_spacing_px, current_y_pos_A, current_y_pos_B;
+    int current_bar_inter_spacing_px;
+    // current_y_pos_A and current_y_pos_B will be determined dynamically for L3+ or fixed for L1/L2
+    int spawn_y_for_A, spawn_y_for_B; // Used to hold calculated Y for current wave
     int current_wave_switch_trigger_offset_px, current_bar_initial_x_stagger_group_B;
-    int current_jump_initiation_delay, current_random_y_range_for_level;
+    int current_jump_initiation_delay;
 
     Chicken chicken; initChicken(&chicken); 
     bool has_landed_this_jump = false; 
@@ -291,77 +320,49 @@ int main(void) {
 
         switch (game_level) {
             case 1: 
-                current_min_bar_tiles = (int)ceil((float)LENGTH / 12.0 / TILE_SIZE); // Approx 4 tiles
-                current_max_bar_tiles = (int)floor((float)LENGTH / 8.0 / TILE_SIZE); // Approx 5 tiles
-                if (current_min_bar_tiles > current_max_bar_tiles) current_min_bar_tiles = current_max_bar_tiles; // Ensure min <= max
-                if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
-
-
+                current_min_bar_tiles = 5; current_max_bar_tiles = 6; // Increased
                 current_bar_count_per_wave = 4;
                 current_bar_speed_base = 3; 
-                current_bar_inter_spacing_px = 130; // MODIFICATION
-                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A;
-                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
+                current_bar_inter_spacing_px = 170; // MODIFICATION
+                spawn_y_for_A = DEFAULT_BAR_Y_A; // Fixed Y for L1
+                spawn_y_for_B = DEFAULT_BAR_Y_B; // Fixed Y for L1
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
-                current_random_y_range_for_level = 0; 
                 break;
             case 2: 
-                current_min_bar_tiles = (int)ceil((float)LENGTH / 14.0 / TILE_SIZE); // Approx 3 tiles
-                current_max_bar_tiles = (int)floor((float)LENGTH / 8.0 / TILE_SIZE);  // Approx 5 tiles
-                if (current_min_bar_tiles > current_max_bar_tiles) current_min_bar_tiles = current_max_bar_tiles;
-                if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
-
+                current_min_bar_tiles = 4; current_max_bar_tiles = 6; // Increased
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
-                current_bar_inter_spacing_px = 150; // MODIFICATION
-                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
-                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
+                current_bar_inter_spacing_px = 180; // MODIFICATION
+                spawn_y_for_A = DEFAULT_BAR_Y_A - 20; // Fixed Y for L2
+                spawn_y_for_B = DEFAULT_BAR_Y_B - 50; // Fixed Y for L2
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
-                current_random_y_range_for_level = 0; 
                 break;
             case 3: 
-                current_min_bar_tiles = 3; // Same as L2
-                current_max_bar_tiles = 5; // Same as L2
+                current_min_bar_tiles = 4; current_max_bar_tiles = 6; // Increased
                 current_bar_count_per_wave = 3;
-                current_bar_speed_base = 3.5; 
-                current_bar_inter_spacing_px = 160; // MODIFICATION
-                current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L3; 
-                current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
-                current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range_for_level + 1)) - current_random_y_range_for_level;
+                current_bar_speed_base = 3; // User updated: 3.5 -> 3
+                current_bar_inter_spacing_px = 160; // User updated
+                // Y will be determined dynamically before spawning below
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 4: 
-                current_min_bar_tiles = 2; // Shorter
-                current_max_bar_tiles = 4; // Shorter
+                current_min_bar_tiles = 3; current_max_bar_tiles = 5; // Increased
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 4; 
-                current_bar_inter_spacing_px = 190; // MODIFICATION
-                current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L4_L5; 
-                current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
-                current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range_for_level + 1)) - current_random_y_range_for_level;
+                current_bar_inter_spacing_px = 190; 
                 current_jump_initiation_delay = BASE_JUMP_INITIATION_DELAY;
                 break;
             case 5: default: 
-                current_min_bar_tiles = 2; // Shortest
-                current_max_bar_tiles = 3; // Shortest
+                current_min_bar_tiles = 3; current_max_bar_tiles = 4; // Increased
                 current_bar_count_per_wave = 2;
-                current_bar_speed_base = 4.5; 
-                current_bar_inter_spacing_px = 190; // MODIFICATION
-                current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L4_L5; 
-                current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
-                current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range_for_level + 1)) - current_random_y_range_for_level;
+                current_bar_speed_base = 4; // User updated: 4.5 -> 4
+                current_bar_inter_spacing_px = 190; // User updated (was 200)
                 current_jump_initiation_delay = BASE_JUMP_INITIATION_DELAY;
                 break;
         }
-        // Clamp Y positions for all levels to ensure they are within the new effective screen limits
-        if (current_y_pos_A < EFFECTIVE_BAR_MIN_Y_POS) current_y_pos_A = EFFECTIVE_BAR_MIN_Y_POS;
-        if (current_y_pos_A > EFFECTIVE_BAR_MAX_Y_POS) current_y_pos_A = EFFECTIVE_BAR_MAX_Y_POS;
-        if (current_y_pos_B < EFFECTIVE_BAR_MIN_Y_POS) current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS;
-        if (current_y_pos_B > EFFECTIVE_BAR_MAX_Y_POS) current_y_pos_B = EFFECTIVE_BAR_MAX_Y_POS;
-
         current_wave_switch_trigger_offset_px = WAVE_SWITCH_TRIGGER_OFFSET_PX;
         current_bar_initial_x_stagger_group_B = BAR_INITIAL_X_STAGGER_GROUP_B;
-        int actual_bar_speed = current_bar_speed_base; // Removed + (game_level -1) as speed is now directly set per level
+        int actual_bar_speed = current_bar_speed_base; 
 
         if (controller_state.b && !chicken.jumping) {
             chicken.vy = jump_velocity; chicken.jumping = true;
@@ -376,6 +377,13 @@ int main(void) {
         move_all_active_bars(barsA, barsB, BAR_ARRAY_SIZE, actual_bar_speed);
         
         if (group_A_is_active_spawner && needs_to_spawn_wave_A) {
+            if (game_level >= 3) { // Dynamic Y for levels 3+
+                spawn_y_for_A = last_actual_y_B + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
+                if (spawn_y_for_A < EFFECTIVE_BAR_MIN_Y_POS) spawn_y_for_A = EFFECTIVE_BAR_MIN_Y_POS;
+                if (spawn_y_for_A > EFFECTIVE_BAR_MAX_Y_POS) spawn_y_for_A = EFFECTIVE_BAR_MAX_Y_POS;
+            } // For L1/L2, spawn_y_for_A is already set in the switch
+            last_actual_y_A = spawn_y_for_A; // Update last Y for this group
+
             int spawned_count = 0, last_idx = -1;
             for (int i = 0; i < current_bar_count_per_wave; i++) {
                 int slot = -1;
@@ -385,7 +393,7 @@ int main(void) {
                 }
                 if (slot != -1) {
                     barsA[slot].x = LENGTH + (i * current_bar_inter_spacing_px); 
-                    barsA[slot].y_px = current_y_pos_A;
+                    barsA[slot].y_px = spawn_y_for_A; // Use calculated/fixed Y
                     barsA[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
                     barsA[slot].has_coin = false; barsA[slot].coin_idx = -1;
                     if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
@@ -405,6 +413,13 @@ int main(void) {
             needs_to_spawn_wave_A = false;
         } 
         else if (!group_A_is_active_spawner && needs_to_spawn_wave_B) {
+            if (game_level >= 3) { // Dynamic Y for levels 3+
+                spawn_y_for_B = last_actual_y_A + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
+                if (spawn_y_for_B < EFFECTIVE_BAR_MIN_Y_POS) spawn_y_for_B = EFFECTIVE_BAR_MIN_Y_POS;
+                if (spawn_y_for_B > EFFECTIVE_BAR_MAX_Y_POS) spawn_y_for_B = EFFECTIVE_BAR_MAX_Y_POS;
+            } // For L1/L2, spawn_y_for_B is already set in the switch
+            last_actual_y_B = spawn_y_for_B; // Update last Y for this group
+
             int spawned_count = 0, last_idx = -1;
             for (int i = 0; i < current_bar_count_per_wave; i++) {
                 int slot = -1;
@@ -414,7 +429,7 @@ int main(void) {
                 }
                 if (slot != -1) {
                     barsB[slot].x = LENGTH + current_bar_initial_x_stagger_group_B + (i * current_bar_inter_spacing_px);
-                    barsB[slot].y_px = current_y_pos_B;
+                    barsB[slot].y_px = spawn_y_for_B; // Use calculated/fixed Y
                     barsB[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
                     barsB[slot].has_coin = false; barsB[slot].coin_idx = -1;
                     if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
@@ -475,7 +490,8 @@ int main(void) {
             if (lives > 0) { 
                 reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
                                   &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
-                                  &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B);
+                                  &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B,
+                                  &last_actual_y_A, &last_actual_y_B); // Pass last Ys
                 vga_present_frame(); present_sprites();   
                 play_sfx(1); usleep(2000000); 
                 continue; 
@@ -528,6 +544,9 @@ int main(void) {
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
     while(1) {
         if (controller_state.a || controller_state.b || controller_state.start || controller_state.x || controller_state.y || controller_state.select) {
+            // Reset last actual Ys for a full game restart
+            last_actual_y_A = DEFAULT_BAR_Y_A; 
+            last_actual_y_B = DEFAULT_BAR_Y_B; 
             goto game_restart_point; 
         }
         usleep(50000); 
