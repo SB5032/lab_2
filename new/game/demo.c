@@ -11,7 +11,7 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// Corrected Y-clamping to user's new specification.
+// Further enhanced debug printf for coin collection.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,9 +70,9 @@
 #define BAR_INACTIVE_X  -1000
 #define BAR_INITIAL_X_STAGGER_GROUP_B 96
 
-// MODIFICATION: Updated Y-position clamping
-#define EFFECTIVE_BAR_MIN_Y_POS  40  // Bar top cannot be less than 40px from screen top
-#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 25 - (BAR_HEIGHT_ROWS * TILE_SIZE)) // Bar top so bar bottom is 25px from screen bottom
+// Y-position clamping
+#define EFFECTIVE_BAR_MIN_Y_POS  40 
+#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 16 - (BAR_HEIGHT_ROWS * TILE_SIZE)) 
 
 // Hardcoded Y positions for Levels 1 & 2, and for reset after death
 #define LEVEL1_2_BAR_Y_A 240
@@ -86,7 +86,7 @@
 #define COIN_POINTS          10 
 #define COIN_SPAWN_LEVEL     3
 #define COIN_SPAWN_CHANCE    100
-#define COIN_COLLECT_DELAY_US (500000)
+#define COIN_COLLECT_DELAY_US (500)
 #define FIRST_COIN_SPRITE_REGISTER 2
 
 // Global variables
@@ -179,8 +179,14 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
                 *has_landed_this_jump = true; 
             }
             if (bars[b].has_coin && bars[b].coin_idx != -1 && active_coins[bars[b].coin_idx].active) {
+                printf("DEBUG: Chicken landed on bar with COIN. Coin index: %d, Coin active: true\n", bars[b].coin_idx); // NEW DEBUG
                 chicken->collecting_coin_idx = bars[b].coin_idx; chicken->on_bar_collect_timer_us = 0; 
-            } else { chicken->collecting_coin_idx = -1; }
+            } else {
+                if (bars[b].has_coin && bars[b].coin_idx != -1) {
+                     printf("DEBUG: Chicken landed on bar that HAD coin %d, but coin.active is now false.\n", bars[b].coin_idx); // NEW DEBUG
+                }
+                chicken->collecting_coin_idx = -1; 
+            }
             return true; 
         }
     }
@@ -305,7 +311,7 @@ int main(void) {
     resetBarArray(barsA, BAR_ARRAY_SIZE); resetBarArray(barsB, BAR_ARRAY_SIZE);
     int current_min_bar_tiles, current_max_bar_tiles, current_bar_count_per_wave, current_bar_speed_base;
     int current_bar_inter_spacing_px;
-    int spawn_y_for_A_level_fixed, spawn_y_for_B_level_fixed; // Y values set by level switch, before clamping
+    int spawn_y_for_A_fixed, spawn_y_for_B_fixed; 
     int current_wave_switch_trigger_offset_px, current_bar_initial_x_stagger_group_B;
     int current_jump_initiation_delay;
 
@@ -326,8 +332,8 @@ int main(void) {
                 current_bar_count_per_wave = 4;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 170; 
-                spawn_y_for_A_level_fixed = LEVEL1_2_BAR_Y_A; 
-                spawn_y_for_B_level_fixed = LEVEL1_2_BAR_Y_B; 
+                spawn_y_for_A_fixed = LEVEL1_2_BAR_Y_A; 
+                spawn_y_for_B_fixed = LEVEL1_2_BAR_Y_B; 
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 2: 
@@ -335,8 +341,8 @@ int main(void) {
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 180; 
-                spawn_y_for_A_level_fixed = LEVEL1_2_BAR_Y_A; 
-                spawn_y_for_B_level_fixed = LEVEL1_2_BAR_Y_B; 
+                spawn_y_for_A_fixed = LEVEL1_2_BAR_Y_A; 
+                spawn_y_for_B_fixed = LEVEL1_2_BAR_Y_B; 
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 3: 
@@ -345,7 +351,6 @@ int main(void) {
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 160; 
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
-                // Y for L3+ will be calculated dynamically below
                 break;
             case 4: 
                 current_min_bar_tiles = 4; current_max_bar_tiles = 6; 
@@ -391,9 +396,8 @@ int main(void) {
                     determined_y_A = last_actual_y_B + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
                 }
             } else { 
-                determined_y_A = spawn_y_for_A_level_fixed; 
+                determined_y_A = spawn_y_for_A_fixed; 
             }
-            // Apply final clamping
             if (determined_y_A < EFFECTIVE_BAR_MIN_Y_POS) determined_y_A = EFFECTIVE_BAR_MIN_Y_POS;
             if (determined_y_A > EFFECTIVE_BAR_MAX_Y_POS) determined_y_A = EFFECTIVE_BAR_MAX_Y_POS;
             last_actual_y_A = determined_y_A; 
@@ -431,9 +435,8 @@ int main(void) {
             if (game_level >= 3) { 
                 determined_y_B = last_actual_y_A + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
             } else { 
-                determined_y_B = spawn_y_for_B_level_fixed; 
+                determined_y_B = spawn_y_for_B_fixed; 
             }
-            // Apply final clamping
             if (determined_y_B < EFFECTIVE_BAR_MIN_Y_POS) determined_y_B = EFFECTIVE_BAR_MIN_Y_POS;
             if (determined_y_B > EFFECTIVE_BAR_MAX_Y_POS) determined_y_B = EFFECTIVE_BAR_MAX_Y_POS;
             last_actual_y_B = determined_y_B; 
@@ -478,17 +481,18 @@ int main(void) {
             }
         }
 
+        // MODIFICATION: Enhanced Coin Collection Debugging
         if (chicken.collecting_coin_idx != -1 && !chicken.jumping) {
             chicken.on_bar_collect_timer_us += 16666; 
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
-                // printf("DEBUG: Coin collection timer met for coin_idx: %d. Chicken not jumping.\n", chicken.collecting_coin_idx);
+                printf("DEBUG: Coin collection timer met for coin_idx: %d. Chicken not jumping.\n", chicken.collecting_coin_idx);
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
-                // printf("DEBUG: Coin to collect status: active = %s (bar_idx %d, group %d)\n",
-                //        coin_to_collect->active ? "true" : "false", coin_to_collect->bar_idx, coin_to_collect->bar_group_id);
+                printf("DEBUG: Coin to collect status: active = %s (bar_idx %d, group %d)\n",
+                       coin_to_collect->active ? "true" : "false", coin_to_collect->bar_idx, coin_to_collect->bar_group_id);
                 if (coin_to_collect->active) { 
                     score += (COIN_POINTS - 1); 
                     coins_collected_this_game++; 
-                    // printf("DEBUG: Coin collected! Total coins_collected_this_game = %d\n", coins_collected_this_game); 
+                    printf("DEBUG: Coin collected! Total coins_collected_this_game = %d\n", coins_collected_this_game); 
                     play_sfx(3); 
                     coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
@@ -497,7 +501,7 @@ int main(void) {
                         parent_bars[coin_to_collect->bar_idx].coin_idx = -1;
                     }
                 } else {
-                    //  printf("DEBUG: Coin collection FAILED for coin_idx %d because coin_to_collect->active was false.\n", chicken.collecting_coin_idx);
+                     printf("DEBUG: Coin collection FAILED for coin_idx %d because coin_to_collect->active was false.\n", chicken.collecting_coin_idx);
                 }
                 chicken.collecting_coin_idx = -1; chicken.on_bar_collect_timer_us = 0;
             }
@@ -548,7 +552,7 @@ int main(void) {
     }
 
     // --- Game Over Sequence ---
-    // printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
+    printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
     cleartiles(); fill_sky_and_grass(); 
     clearSprites_buffered(); 
     
