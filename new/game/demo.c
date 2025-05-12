@@ -289,13 +289,13 @@ int main(void) {
 
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); vga_present_frame(); present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
-    write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"a", 1, 19, 14); 
+    write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); 
 
 	game_restart_point: ;
-    while (!(controller_state.a)) { usleep(10000); }
+    while (!(controller_state.x)) { usleep(10000); }
 
 	 
 
@@ -561,7 +561,7 @@ int main(void) {
     write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
     write_text((unsigned char *)"score", 5, 15, 13); write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 15, 19);
 	write_text((unsigned char *)"coins", 5, 17, 8); write_text((unsigned char *)"collected", 9, 17, 14); write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, 17, 24);
-	write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"any", 3, 19, 14); 
+	write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 3, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); present_sprites();
