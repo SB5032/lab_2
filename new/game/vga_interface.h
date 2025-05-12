@@ -51,6 +51,7 @@ void clearSprites_buffered();
 #define SKY_TILE_IDX 37  
 #define GRASS_TILE_1_IDX 41 // User-defined
 #define GRASS_TILE_2_IDX 42 // User-defined
+#define GRASS_TILE_3_IDX 44 // User-defined
 #define GRASS_ROW_START 25 
 
 void fill_sky_and_grass(void); 
