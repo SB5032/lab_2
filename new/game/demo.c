@@ -295,7 +295,7 @@ int main(void) {
     vga_present_frame(); 
 
 	game_restart_point: ;
-    while (!(controller_state.x)) { int jump_velocity = 0; usleep(17000); }
+    while (!(controller_state.x)) { int jump_velocity = 0; usleep(300000); } //17000); }
 
 	 
 
