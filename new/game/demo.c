@@ -29,7 +29,7 @@
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
 #define WIDTH             480   // VGA height (pixels)
-#define TILE_SIZE          16   // background tile size (pixels)
+//#define TILE_SIZE          16   // background tile size (pixels)
 #define WALL               16   // top/bottom margin (pixels)
 #define GRAVITY            +1
 
