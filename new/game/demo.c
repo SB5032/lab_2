@@ -295,11 +295,11 @@ int main(void) {
     vga_present_frame(); 
 
 	game_restart_point: ;
-	
+	while (controller_state.x) { usleep(10000); printf("test");}
 	while (!(controller_state.x)) {
 		usleep(10000); 
 	}
-	while (controller_state.x) { usleep(10000); printf("test");}
+	// while (controller_state.x) { usleep(10000); printf("test");}
 
 	int score = 0; int game_level = 1; int lives = INITIAL_LIVES;
     coins_collected_this_game = 0; 
