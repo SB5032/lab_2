@@ -16,6 +16,7 @@
 #include "usbcontroller.h"  // Assumed to provide controller input functions
 #include "vga_interface.h" // Uses new sprite and tile buffering interface
 #include "audio_interface.h"  // Assumed to provide audio functions
+#include <string.h>
 
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
