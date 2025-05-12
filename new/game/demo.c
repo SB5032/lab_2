@@ -9,6 +9,7 @@
 // Updated per-level bar lengths, spacing, and Y-clamping.
 // Implemented relative Y-positioning between bar groups for levels 3+.
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
+// Ensured first randomized wave (L3+) starts at a predictable Y.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,7 +72,7 @@
 #define EFFECTIVE_BAR_MIN_Y_POS  40 
 #define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 16 - (BAR_HEIGHT_ROWS * TILE_SIZE)) 
 
-// MODIFICATION: Hardcoded Y positions for Levels 1 & 2
+// Hardcoded Y positions for Levels 1 & 2
 #define LEVEL1_2_BAR_Y_A 240
 #define LEVEL1_2_BAR_Y_B 200
 
@@ -259,7 +260,6 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *grpA_act = true; *needs_A = true; *needs_B = false;
     *wA_idx = -1; *wB_idx = -1;
     *next_sA = 0; *next_sB = 0;
-    // MODIFICATION: Initialize last Ys to Level 1 hardcoded values for a fresh attempt
     *last_y_A = LEVEL1_2_BAR_Y_A; 
     *last_y_B = LEVEL1_2_BAR_Y_B;
     cleartiles(); fill_sky_and_grass(); clearSprites_buffered(); 
@@ -278,9 +278,11 @@ int main(void) {
     int score = 0; int game_level = 1; int lives = INITIAL_LIVES;
     coins_collected_this_game = 0; 
     init_all_coins(); 
-    // MODIFICATION: Initialize last_actual_y variables to Level 1 hardcoded values
     static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
     static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
+    // MODIFICATION: Flag to ensure first random wave in a session starts predictably
+    static bool first_random_wave_this_session = true;
+
 
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); vga_present_frame(); present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
@@ -298,7 +300,7 @@ int main(void) {
     resetBarArray(barsA, BAR_ARRAY_SIZE); resetBarArray(barsB, BAR_ARRAY_SIZE);
     int current_min_bar_tiles, current_max_bar_tiles, current_bar_count_per_wave, current_bar_speed_base;
     int current_bar_inter_spacing_px;
-    int spawn_y_for_A_fixed, spawn_y_for_B_fixed; // For L1/L2 fixed Y values before clamping
+    int spawn_y_for_A_fixed, spawn_y_for_B_fixed; 
     int current_wave_switch_trigger_offset_px, current_bar_initial_x_stagger_group_B;
     int current_jump_initiation_delay;
 
@@ -315,9 +317,7 @@ int main(void) {
 
         switch (game_level) {
             case 1: 
-                current_min_bar_tiles = 6; current_max_bar_tiles = 7; // Increased
-                if (current_min_bar_tiles > current_max_bar_tiles) current_min_bar_tiles = current_max_bar_tiles;
-                if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
+                current_min_bar_tiles = 6; current_max_bar_tiles = 7; 
                 current_bar_count_per_wave = 4;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 170; 
@@ -326,9 +326,7 @@ int main(void) {
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 2: 
-                current_min_bar_tiles = 5; current_max_bar_tiles = 7; // Increased
-                if (current_min_bar_tiles > current_max_bar_tiles) current_min_bar_tiles = current_max_bar_tiles;
-                if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
+                current_min_bar_tiles = 5; current_max_bar_tiles = 7; 
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 180; 
@@ -337,27 +335,21 @@ int main(void) {
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 3: 
-                current_min_bar_tiles = 5; current_max_bar_tiles = 7; // Increased
-                if (current_min_bar_tiles > current_max_bar_tiles) current_min_bar_tiles = current_max_bar_tiles;
-                if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
+                current_min_bar_tiles = 5; current_max_bar_tiles = 7; 
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 160; 
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 4: 
-                current_min_bar_tiles = 4; current_max_bar_tiles = 6; // Increased
-                if (current_min_bar_tiles > current_max_bar_tiles) current_min_bar_tiles = current_max_bar_tiles;
-                if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
+                current_min_bar_tiles = 4; current_max_bar_tiles = 6; 
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 4; 
                 current_bar_inter_spacing_px = 190; 
                 current_jump_initiation_delay = BASE_JUMP_INITIATION_DELAY;
                 break;
             case 5: default: 
-                current_min_bar_tiles = 4; current_max_bar_tiles = 5; // Increased
-                if (current_min_bar_tiles > current_max_bar_tiles) current_min_bar_tiles = current_max_bar_tiles;
-                if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
+                current_min_bar_tiles = 4; current_max_bar_tiles = 5; 
                 current_bar_count_per_wave = 2;
                 current_bar_speed_base = 4; 
                 current_bar_inter_spacing_px = 190; 
@@ -384,11 +376,15 @@ int main(void) {
         if (group_A_is_active_spawner && needs_to_spawn_wave_A) {
             int determined_y_A;
             if (game_level >= 3) { 
-                determined_y_A = last_actual_y_B + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
-            } else { // Levels 1 & 2 use hardcoded Y
+                if (first_random_wave_this_session) {
+                    determined_y_A = LEVEL1_2_BAR_Y_A; // Start L3+ Group A predictably
+                    first_random_wave_this_session = false;
+                } else {
+                    determined_y_A = last_actual_y_B + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
+                }
+            } else { 
                 determined_y_A = spawn_y_for_A_fixed; 
             }
-            // Clamp Y for all levels
             if (determined_y_A < EFFECTIVE_BAR_MIN_Y_POS) determined_y_A = EFFECTIVE_BAR_MIN_Y_POS;
             if (determined_y_A > EFFECTIVE_BAR_MAX_Y_POS) determined_y_A = EFFECTIVE_BAR_MAX_Y_POS;
             last_actual_y_A = determined_y_A; 
@@ -425,10 +421,9 @@ int main(void) {
             int determined_y_B;
             if (game_level >= 3) { 
                 determined_y_B = last_actual_y_A + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
-            } else { // Levels 1 & 2 use hardcoded Y
+            } else { 
                 determined_y_B = spawn_y_for_B_fixed; 
             }
-            // Clamp Y for all levels
             if (determined_y_B < EFFECTIVE_BAR_MIN_Y_POS) determined_y_B = EFFECTIVE_BAR_MIN_Y_POS;
             if (determined_y_B > EFFECTIVE_BAR_MAX_Y_POS) determined_y_B = EFFECTIVE_BAR_MAX_Y_POS;
             last_actual_y_B = determined_y_B; 
@@ -557,8 +552,9 @@ int main(void) {
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
     while(1) {
         if (controller_state.a || controller_state.b || controller_state.start || controller_state.x || controller_state.y || controller_state.select) {
-            last_actual_y_A = LEVEL1_2_BAR_Y_A; // Reset last Ys for a full game restart
+            last_actual_y_A = LEVEL1_2_BAR_Y_A; 
             last_actual_y_B = LEVEL1_2_BAR_Y_B; 
+            first_random_wave_this_session = true; // MODIFICATION: Reset this flag for a new game
             goto game_restart_point; 
         }
         usleep(50000); 
