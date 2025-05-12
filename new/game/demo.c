@@ -281,10 +281,10 @@ int main(void) {
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open failed"); return -1; }
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     init_vga_interface(); 
-    // pthread_t controller_thread_id;
-    // if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
-    //     perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
-    // }
+    pthread_t controller_thread_id;
+    if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
+        perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
+    }
 
 
     cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); vga_present_frame(); present_sprites();   
@@ -295,11 +295,7 @@ int main(void) {
     vga_present_frame(); 
 
 	game_restart_point: ;
-	pthread_t controller_thread_id;
-    if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
-        perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
-    }
-	
+	while (controller_state.x) { usleep(10000); printf("test");}
 	while (!(controller_state.x)) {
 		usleep(10000); 
 	}
