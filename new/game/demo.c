@@ -11,7 +11,7 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// Enhanced debug printf for coin collection.
+// Further enhanced debug printf for coin collection.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,7 +86,7 @@
 #define COIN_POINTS          10 
 #define COIN_SPAWN_LEVEL     3
 #define COIN_SPAWN_CHANCE    100
-#define COIN_COLLECT_DELAY_US (500000)
+#define COIN_COLLECT_DELAY_US (500)
 #define FIRST_COIN_SPRITE_REGISTER 2
 
 // Global variables
@@ -179,8 +179,14 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
                 *has_landed_this_jump = true; 
             }
             if (bars[b].has_coin && bars[b].coin_idx != -1 && active_coins[bars[b].coin_idx].active) {
+                printf("DEBUG: Chicken landed on bar with COIN. Coin index: %d, Coin active: true\n", bars[b].coin_idx); // NEW DEBUG
                 chicken->collecting_coin_idx = bars[b].coin_idx; chicken->on_bar_collect_timer_us = 0; 
-            } else { chicken->collecting_coin_idx = -1; }
+            } else {
+                if (bars[b].has_coin && bars[b].coin_idx != -1) {
+                     printf("DEBUG: Chicken landed on bar that HAD coin %d, but coin.active is now false.\n", bars[b].coin_idx); // NEW DEBUG
+                }
+                chicken->collecting_coin_idx = -1; 
+            }
             return true; 
         }
     }
@@ -475,13 +481,14 @@ int main(void) {
             }
         }
 
+        // MODIFICATION: Enhanced Coin Collection Debugging
         if (chicken.collecting_coin_idx != -1 && !chicken.jumping) {
             chicken.on_bar_collect_timer_us += 16666; 
-            // MODIFICATION: Added more debug prints for coin collection
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
-                // printf("DEBUG: Coin collection timer met for coin_idx: %d. Chicken not jumping.\n", chicken.collecting_coin_idx);
+                printf("DEBUG: Coin collection timer met for coin_idx: %d. Chicken not jumping.\n", chicken.collecting_coin_idx);
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
-                // printf("DEBUG: Coin to collect status: active = %s\n", coin_to_collect->active ? "true" : "false");
+                printf("DEBUG: Coin to collect status: active = %s (bar_idx %d, group %d)\n",
+                       coin_to_collect->active ? "true" : "false", coin_to_collect->bar_idx, coin_to_collect->bar_group_id);
                 if (coin_to_collect->active) { 
                     score += (COIN_POINTS - 1); 
                     coins_collected_this_game++; 
@@ -493,6 +500,8 @@ int main(void) {
                         parent_bars[coin_to_collect->bar_idx].has_coin = false;
                         parent_bars[coin_to_collect->bar_idx].coin_idx = -1;
                     }
+                } else {
+                     printf("DEBUG: Coin collection FAILED for coin_idx %d because coin_to_collect->active was false.\n", chicken.collecting_coin_idx);
                 }
                 chicken.collecting_coin_idx = -1; chicken.on_bar_collect_timer_us = 0;
             }
@@ -543,7 +552,7 @@ int main(void) {
     }
 
     // --- Game Over Sequence ---
-    printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); // DEBUG
+    printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
     cleartiles(); fill_sky_and_grass(); 
     clearSprites_buffered(); 
     
