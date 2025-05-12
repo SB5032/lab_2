@@ -17,34 +17,23 @@
 #define SCORE_COORD_C 20
 #define SCORE_MAX_LENGTH 4
 
-// MODIFICATION: Define maximum number of hardware sprites
-#define MAX_HARDWARE_SPRITES 12 // Assuming 12 based on clearSprites
+#define MAX_HARDWARE_SPRITES 12 
 
-extern int vga_fd; // vga file descriptor, define in main file
+extern int vga_fd; 
 
-// Initialization function for the VGA interface (shadow tilemap and software buffers)
 void init_vga_interface(void);
 
-// MODIFICATION: Sprite state structure for buffering
 typedef struct {
     bool active;
     unsigned short r;
     unsigned short c;
     unsigned char n;
-    // register_n is the index in the array
 } SpriteHWState;
 
 
-// MODIFIED: Now writes to the current software back buffer for tiles
 void write_tile_to_kernel(unsigned char r, unsigned char c, unsigned char n);
-
-// MODIFICATION: Now updates a desired sprite state buffer, doesn't write to HW directly
 void write_sprite_to_kernel_buffered(unsigned char active, unsigned short r, unsigned short c, unsigned char n, unsigned short register_n);
-
-// NEW: Function to present the current tile back buffer to the screen
 void vga_present_frame(void);
-
-// NEW: Function to present the desired sprite states to the hardware
 void present_sprites(void);
 
 
@@ -54,15 +43,19 @@ void write_numbers(unsigned int nums, unsigned int digits, unsigned int row, uns
 void write_score(int new_score);
 void write_text(unsigned char *text, unsigned int length, unsigned int row, unsigned int col);
 
-void cleartiles(); // Now clears the current software back buffer for tiles
-// MODIFICATION: Now updates desired sprite states to inactive
+void cleartiles(); 
 void clearSprites_buffered();
 
 
 #define SKY_TILE_IDX 37  // Example tile index for sky - USER MUST VERIFY/UPDATE
-#define GRASS_TILE_IDX 38 // Example tile index for grass - USER MUST VERIFY/UPDATE
+// MODIFICATION: Define multiple grass tile IDs
+#define GRASS_TILE_1_IDX 41 // User-defined
+#define GRASS_TILE_2_IDX 42 // User-defined
+#define GRASS_TILE_3_IDX 38 // User-defined
+// #define GRASS_TILE_IDX 51 // Old single grass tile - commented out or remove
+
 #define GRASS_ROW_START 25 // Example row where grass starts - USER MUST VERIFY/UPDATE
 
-void fill_sky_and_grass(void); // Now fills the current software back buffer for tiles
+void fill_sky_and_grass(void); 
 
 #endif // VGA_INTERFACE_H
