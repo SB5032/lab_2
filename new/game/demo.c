@@ -24,8 +24,8 @@
 // Sprite dimensions
 #define CHICKEN_W         32
 #define CHICKEN_H         32
-#define COIN_SPRITE_W     16 // Assuming coin sprite is 16x16, adjust if different
-#define COIN_SPRITE_H     16
+#define COIN_SPRITE_W     32 // Assuming coin sprite is 16x16, adjust if different
+#define COIN_SPRITE_H     32
 
 // MIF indices
 #define CHICKEN_STAND      8   // chicken standing tile
