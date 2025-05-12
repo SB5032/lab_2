@@ -295,7 +295,7 @@ int main(void) {
     vga_present_frame(); 
 
 	game_restart_point: ;
-    while (!(controller_state.a || controller_state.b || controller_state.select)) { usleep(10000); }
+    while (!(controller_state.a || controller_state.b || controller_state.select != 0)) { usleep(10000); }
 
 	 
 
