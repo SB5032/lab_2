@@ -519,7 +519,7 @@ int main(void) {
             if (!landed_on_A) handleBarCollision(barsB, 1, BAR_ARRAY_SIZE, prevY_chicken, &chicken, &score, &has_landed_this_jump);
         }
         
-        if (chicken.y < WALL + 40 && chicken.jumping) { chicken.y = WALL + 40; if (chicken.vy < 0) chicken.vy = 0; }
+        if (chicken.y < WALL && chicken.jumping) { chicken.y = WALL; if (chicken.vy < 0) chicken.vy = 0; }
         if (chicken.y + CHICKEN_H > WIDTH - WALL) { 
             lives--; 
             if (lives > 0) { 

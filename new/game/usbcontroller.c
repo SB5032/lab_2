@@ -52,10 +52,7 @@ struct libusb_device_handle *opencontroller(uint8_t *endpoint_address) {
                             libusb_detach_kernel_driver(controller, i);
                         }
                         libusb_set_auto_detach_kernel_driver(controller, i);
-						r = libusb_detach_kernel_driver(controller, i);
-						r = libusb_claim_interface(controller, i);
-                        // if ((r = libusb_claim_interface(controller, i)) != 0) {
-						if (r != 0) {
+                        if ((r = libusb_claim_interface(controller, i)) != 0) {
                             fprintf(stderr, "claim interface failed: %s\n", libusb_error_name(r));
                             exit(1);
                         }
