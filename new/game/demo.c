@@ -42,7 +42,7 @@
 #define INITIAL_LIVES      5
 #define INIT_JUMP_VY     -20    // base jump velocity
 #define BASE_DELAY       2000   // base jump delay (µs)
-#define SCORE_PER_LEVEL    5     // Points needed to advance to the next level
+#define SCORE_PER_LEVEL    10     // Points needed to advance to the next level
 #define MAX_GAME_LEVEL     5     // Maximum number of levels
 #define MAX_SCORE_DISPLAY_DIGITS 3 // For displaying score like 000 to 999
 
@@ -66,7 +66,7 @@
 #define MAX_COINS_ON_SCREEN 5       // Max active coins at a time
 #define COIN_POINTS          10     // Points for collecting a coin
 #define COIN_SPAWN_LEVEL     2      // Level at which coins start spawning
-#define COIN_SPAWN_CHANCE    80     // Percentage chance (0-100) to spawn a coin on a new bar
+#define COIN_SPAWN_CHANCE    100     // Percentage chance (0-100) to spawn a coin on a new bar
 #define COIN_COLLECT_DELAY_US (500000) // 0.5 seconds in microseconds to stay on bar for collection
 #define FIRST_COIN_SPRITE_REGISTER 2 // Sprite registers 0 (chicken) and 1 (sun) are used.
 
