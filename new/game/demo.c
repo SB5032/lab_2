@@ -3,6 +3,8 @@
 // Implements level-based difficulty, enhanced game over screen with restart.
 // Includes level-dependent jump initiation delay.
 // Corrected lives decrement and restart logic.
+// Fixed label followed by declaration error.
+// Adjusted bar Y randomization for levels 3+ and game over screen.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,8 +27,8 @@
 // Sprite dimensions
 #define CHICKEN_W         32
 #define CHICKEN_H         32
-#define COIN_SPRITE_W     32 // Assuming coin sprite is 16x16, adjust if different
-#define COIN_SPRITE_H     32
+#define COIN_SPRITE_W     16 // Assuming coin sprite is 16x16, adjust if different
+#define COIN_SPRITE_H     16
 
 // MIF indices
 #define CHICKEN_STAND      8   // chicken standing tile
@@ -64,7 +66,9 @@
 #define DEFAULT_BAR_Y_OFFSET_GROUP_B 150       
 #define BAR_MAX_Y_POS         (WIDTH - BAR_HEIGHT_ROWS * TILE_SIZE - WALL - CHICKEN_H - TILE_SIZE - COIN_SPRITE_H) // Max Y for bar top
 #define BAR_MIN_Y_POS         (WALL + 60 + COIN_SPRITE_H) // Min Y for bar top
-#define BAR_RANDOM_Y_RANGE    120      // Max +/- random offset for group B in random levels
+// MODIFICATION: Different random ranges for Y positions based on level
+#define BAR_RANDOM_Y_RANGE_L3    80  // Gentler random Y offset for level 3
+#define BAR_RANDOM_Y_RANGE_L4_L5 120 // Larger random Y offset for levels 4 & 5
 
 // Coin properties
 #define MAX_COINS_ON_SCREEN 5       // Max active coins at a time
@@ -321,7 +325,7 @@ int main(void) {
         perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
     
-    game_restart_point: ; // Label for restarting the game from game over
+    game_restart_point: ; // Label for restarting the game (null statement added)
 
     // MODIFICATION: These are now explicitly set for a full game restart
     int score = 0;
@@ -365,6 +369,7 @@ int main(void) {
     int current_bar_inter_spacing_px, current_y_pos_A, current_y_pos_B;
     int current_wave_switch_trigger_offset_px, current_bar_initial_x_stagger_group_B;
     int current_jump_initiation_delay; 
+    int current_random_y_range; // MODIFICATION: For level-specific Y randomness
 
     Chicken chicken; initChicken(&chicken); 
     bool has_landed_this_jump = false; 
@@ -374,12 +379,9 @@ int main(void) {
 
     // --- Main Game Loop ---
     while (lives > 0) { // Loop continues as long as player has lives
-        // MODIFICATION: Game level calculation moved here to update based on current score
         int old_game_level = game_level;
         game_level = 1 + (score / SCORE_PER_LEVEL);
         if (game_level > MAX_GAME_LEVEL) game_level = MAX_GAME_LEVEL;
-        // Optional: Play a sound or show a message if level changes
-        // if (game_level != old_game_level) { play_sfx(LEVEL_UP_SOUND_IDX); }
 
 
         // Set parameters based on current game_level
@@ -390,37 +392,42 @@ int main(void) {
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A;
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
+                current_random_y_range = 0; // No random Y for level 1
                 break;
             case 2: 
                 current_min_bar_tiles = 4; current_max_bar_tiles = 7; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 3; current_bar_inter_spacing_px = 160;
+                current_bar_speed_base = 4; current_bar_inter_spacing_px = 160;
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
+                current_random_y_range = 0; // No random Y for level 2
                 break;
             case 3: 
                 current_min_bar_tiles = 3; current_max_bar_tiles = 6; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; current_bar_inter_spacing_px = 150;
-                current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
-                current_y_pos_A = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
+                current_bar_speed_base = 5; current_bar_inter_spacing_px = 150;
+                current_random_y_range = BAR_RANDOM_Y_RANGE_L3; // MODIFICATION: Gentler random Y
+                current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - current_random_y_range + 1);
+                current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range + 1)) - current_random_y_range;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
                 if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 4: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 5; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; current_bar_inter_spacing_px = 140;
-                current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
-                current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
+                current_bar_speed_base = 6; current_bar_inter_spacing_px = 140;
+                current_random_y_range = BAR_RANDOM_Y_RANGE_L4_L5; // MODIFICATION: Larger random Y
+                current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - current_random_y_range + 1);
+                current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range + 1)) - current_random_y_range;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
                 if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
                 current_jump_initiation_delay = BASE_JUMP_INITIATION_DELAY;
                 break;
             case 5: default: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 4; current_bar_count_per_wave = 2;
-                current_bar_speed_base = 5; current_bar_inter_spacing_px = 130;
-                current_y_pos_A = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - BAR_RANDOM_Y_RANGE + 1);
-                current_y_pos_B = current_y_pos_A + (rand() % (2 * BAR_RANDOM_Y_RANGE + 1)) - BAR_RANDOM_Y_RANGE;
+                current_bar_speed_base = 7; current_bar_inter_spacing_px = 130;
+                current_random_y_range = BAR_RANDOM_Y_RANGE_L4_L5; // MODIFICATION: Larger random Y
+                current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - current_random_y_range + 1);
+                current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range + 1)) - current_random_y_range;
                 if (current_y_pos_B < BAR_MIN_Y_POS) current_y_pos_B = BAR_MIN_Y_POS;
                 if (current_y_pos_B > BAR_MAX_Y_POS) current_y_pos_B = BAR_MAX_Y_POS;
                 current_jump_initiation_delay = BASE_JUMP_INITIATION_DELAY;
@@ -428,7 +435,7 @@ int main(void) {
         }
         current_wave_switch_trigger_offset_px = WAVE_SWITCH_TRIGGER_OFFSET_PX;
         current_bar_initial_x_stagger_group_B = BAR_INITIAL_X_STAGGER_GROUP_B;
-        int actual_bar_speed = current_bar_speed_base + (game_level -1); // Speed still slightly increases with actual level
+        int actual_bar_speed = current_bar_speed_base + (game_level -1); 
 
         // ───── 1. INPUT PROCESSING ─────
         if (controller_state.b && !chicken.jumping) {
@@ -437,7 +444,7 @@ int main(void) {
             if(chicken.collecting_coin_idx != -1) { 
                 chicken.on_bar_collect_timer_us = 0; chicken.collecting_coin_idx = -1;
             }
-            usleep(current_jump_initiation_delay); // Apply level-dependent jump delay
+            usleep(current_jump_initiation_delay); 
         }
 
         // ───── 2. UPDATE GAME STATE ─────
@@ -550,10 +557,9 @@ int main(void) {
         // Boundary and Death Checks
         if (chicken.y < WALL + 40 && chicken.jumping) { chicken.y = WALL + 40; if (chicken.vy < 0) chicken.vy = 0; }
         if (chicken.y + CHICKEN_H > WIDTH - WALL) { 
-            lives--; // MODIFICATION: Decrement lives
+            lives--; 
             
-            if (lives > 0) { // If player still has lives
-                // MODIFICATION: Call the new reset function for next attempt
+            if (lives > 0) { 
                 reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
                                   &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
                                   &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B);
@@ -563,10 +569,8 @@ int main(void) {
                 
                 play_sfx(1); 
                 usleep(2000000); 
-                continue; // Skip rest of loop, start next life attempt
+                continue; 
             }
-            // If lives is now 0, the 'if (lives > 0)' block is skipped.
-            // The main 'while (lives > 0)' loop condition will then fail, leading to the Game Over sequence.
         }
 
         // ───── 3. DRAW TO TILE BACK BUFFER ─────
@@ -604,45 +608,49 @@ int main(void) {
     cleartiles(); fill_sky_and_grass(); 
     clearSprites_buffered(); 
     
-    unsigned char game_over_text_str[] = "game over"; // Changed variable name
-    unsigned char final_score_text_str[] = "score"; 
-    unsigned char coins_collected_text_str[] = "coins collected"; 
-    unsigned char restart_prompt_text_str[] = "press start to restart";
+    unsigned char game_over_text_str[] = "game over"; 
+    unsigned char final_score_text_str[] = "score "; // Added space for colon
+    unsigned char coins_collected_text_str[] = "coins collected "; // Added space for colon
+    unsigned char restart_prompt_text_str[] = "press any key to restart"; // MODIFICATION
 
     int text_row = 10; 
+    // Center "game over"
     write_text(game_over_text_str, sizeof(game_over_text_str) - 1, text_row, (TILE_COLS - (sizeof(game_over_text_str) - 1)) / 2);
     
     text_row += 2;
-    write_text(final_score_text_str, sizeof(final_score_text_str)-1, text_row, (TILE_COLS - (sizeof(final_score_text_str)-1 + 1 + MAX_SCORE_DISPLAY_DIGITS)) / 2);
-    write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, text_row, (TILE_COLS - (sizeof(final_score_text_str)-1 + 1 + MAX_SCORE_DISPLAY_DIGITS)) / 2 + sizeof(final_score_text_str));
+    // Center "score : XXX"
+    int score_line_len = (sizeof(final_score_text_str)-1) + MAX_SCORE_DISPLAY_DIGITS;
+    int score_start_col = (TILE_COLS - score_line_len) / 2;
+    write_text(final_score_text_str, sizeof(final_score_text_str)-1, text_row, score_start_col);
+    write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, text_row, score_start_col + sizeof(final_score_text_str)-1);
 
     text_row += 2;
-    write_text(coins_collected_text_str, sizeof(coins_collected_text_str)-1, text_row, (TILE_COLS - (sizeof(coins_collected_text_str)-1 + 1 + MAX_COINS_DISPLAY_DIGITS)) / 2);
-    write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, text_row, (TILE_COLS - (sizeof(coins_collected_text_str)-1 + 1 + MAX_COINS_DISPLAY_DIGITS)) / 2 + sizeof(coins_collected_text_str));
+    // Center "coins collected : XX"
+    int coins_line_len = (sizeof(coins_collected_text_str)-1) + MAX_COINS_DISPLAY_DIGITS;
+    int coins_start_col = (TILE_COLS - coins_line_len) / 2;
+    write_text(coins_collected_text_str, sizeof(coins_collected_text_str)-1, text_row, coins_start_col);
+    write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, text_row, coins_start_col + sizeof(coins_collected_text_str)-1);
     
     text_row += 3;
+    // Center "press any key to restart"
     write_text(restart_prompt_text_str, sizeof(restart_prompt_text_str)-1, text_row, (TILE_COLS - (sizeof(restart_prompt_text_str)-1)) / 2);
 
     vga_present_frame(); 
     present_sprites(); 
     play_sfx(2); 
     
-    // Wait for START button to restart
-    while(1) {
-        if (controller_state.y) {
-            // MODIFICATION: Explicitly reset game-wide progress for a new game
-            score = 0;
-            game_level = 1;
-            lives = INITIAL_LIVES; // This is where lives are reset for a new game
-            coins_collected_this_game = 0;
+    // Wait for "any key" to restart
+    // Clear controller state once before checking to avoid immediate restart from a held button
+    memset(&controller_state, 0, sizeof(controller_state)); 
+    usleep(100000); // Small delay to ensure controller state is cleared
 
-            // MODIFICATION: Call the reset function for common elements
-            reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
-                                  &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
-                                  &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B);
-            goto game_restart_point; // Jump to the beginning of the game setup
+    while(1) {
+        // Check for a press on main action buttons or start/select
+        if (controller_state.a || controller_state.b || controller_state.start || 
+            controller_state.x || controller_state.y || controller_state.select) {
+            goto game_restart_point; 
         }
-        usleep(50000); // Check controller state every 50ms
+        usleep(50000); 
     }
 
     close(vga_fd); close(audio_fd);
