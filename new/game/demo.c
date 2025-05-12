@@ -330,7 +330,7 @@ int main(void) {
     //     return 1;
     // }
 	// while (controller_state.x) { usleep(10000); printf("test");}
-	while (!(controller_state.x)) {
+	while ((controller_state.x)) {
 		usleep(10000); 
 	}
 	// while (controller_state.x) { usleep(10000); printf("test");}
