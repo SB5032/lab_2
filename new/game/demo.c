@@ -59,7 +59,7 @@
 
 // Bar properties
 #define BAR_ARRAY_SIZE     10
-#define WAVE_SWITCH_TRIGGER_OFFSET_PX 100
+#define WAVE_SWITCH_TRIGGER_OFFSET_PX 70
 #define BAR_HEIGHT_ROWS    2
 #define BAR_TILE_IDX      39
 #define BAR_INACTIVE_X  -1000
