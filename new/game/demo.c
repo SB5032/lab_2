@@ -42,7 +42,7 @@
 // MIF indices
 #define CHICKEN_STAND      8
 #define CHICKEN_JUMP       9  
-#define TOWER_TILE_IDX     42
+#define TOWER_TILE_IDX     40 
 #define SUN_TILE           20
 #define COIN_SPRITE_IDX    22 
 // SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
