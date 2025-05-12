@@ -629,7 +629,7 @@ int main(void) {
     
     // Wait for START button to restart
     while(1) {
-        if (controller_state.start) {
+        if (controller_state.y) {
             // MODIFICATION: Explicitly reset game-wide progress for a new game
             score = 0;
             game_level = 1;
