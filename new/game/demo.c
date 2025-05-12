@@ -238,11 +238,11 @@ void init_all_coins(void) {
 }
 
 void draw_active_coins(MovingBar bars_a[], MovingBar bars_b[]) {
-    // printf("DEBUG: draw_active_coins called.\n");
+     printf("DEBUG: draw_active_coins called.\n");
     for (int i = 0; i < MAX_COINS_ON_SCREEN; i++) {
         if (active_coins[i].active) {
-            // printf("DEBUG: Coin %d is active. Bar group: %d, bar_idx: %d. Sprite reg: %d\n", 
-            //        i, active_coins[i].bar_group_id, active_coins[i].bar_idx, active_coins[i].sprite_register);
+             printf("DEBUG: Coin %d is active. Bar group: %d, bar_idx: %d. Sprite reg: %d\n", 
+                    i, active_coins[i].bar_group_id, active_coins[i].bar_idx, active_coins[i].sprite_register);
 
             MovingBar *parent_bar_array = (active_coins[i].bar_group_id == 0) ? bars_a : bars_b;
             int bar_idx = active_coins[i].bar_idx;
@@ -251,19 +251,19 @@ void draw_active_coins(MovingBar bars_a[], MovingBar bars_b[]) {
                 int bar_center_x = parent_bar_array[bar_idx].x + (parent_bar_array[bar_idx].length * TILE_SIZE) / 2;
                 int coin_x = bar_center_x - (COIN_SPRITE_W / 2);
                 int coin_y = parent_bar_array[bar_idx].y_px - COIN_SPRITE_H - (TILE_SIZE / 4) ; 
-                // printf("DEBUG: Coin %d calculated pos: x=%d, y=%d. Parent bar x=%d, y_px=%d\n", 
-                //        i, coin_x, coin_y, parent_bar_array[bar_idx].x, parent_bar_array[bar_idx].y_px);
+                 printf("DEBUG: Coin %d calculated pos: x=%d, y=%d. Parent bar x=%d, y_px=%d\n", 
+                        i, coin_x, coin_y, parent_bar_array[bar_idx].x, parent_bar_array[bar_idx].y_px);
 
                 if (coin_x + COIN_SPRITE_W > 0 && coin_x < LENGTH && coin_y + COIN_SPRITE_H > 0 && coin_y < WIDTH) {
                      write_sprite_to_kernel(1, coin_y, coin_x, COIN_SPRITE_IDX, active_coins[i].sprite_register);
-                     // printf("DEBUG: Coin %d DRAWN at x=%d, y=%d.\n", i, coin_x, coin_y);
+                      printf("DEBUG: Coin %d DRAWN at x=%d, y=%d.\n", i, coin_x, coin_y);
                 } else { 
-                    // printf("DEBUG: Coin %d NOT drawn (calculated pos off-screen).\n", i);
+                     printf("DEBUG: Coin %d NOT drawn (calculated pos off-screen).\n", i);
                     active_coins[i].active = false; 
                     write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
                 }
             } else { 
-                 // printf("DEBUG: Coin %d NOT drawn (parent bar inactive or invalid bar_idx %d).\n", i, bar_idx);
+                  printf("DEBUG: Coin %d NOT drawn (parent bar inactive or invalid bar_idx %d).\n", i, bar_idx);
                  active_coins[i].active = false;
                  write_sprite_to_kernel(0,0,0,0, active_coins[i].sprite_register);
             }
