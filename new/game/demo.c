@@ -28,15 +28,15 @@
 // Sprite dimensions
 #define CHICKEN_W         32
 #define CHICKEN_H         32
-#define COIN_SPRITE_W     16 // Assuming coin sprite is 16x16, adjust if different
-#define COIN_SPRITE_H     16
+#define COIN_SPRITE_W     32 // Assuming coin sprite is 16x16, adjust if different
+#define COIN_SPRITE_H     32
 
 // MIF indices
 #define CHICKEN_STAND      8   // chicken standing tile
-#define CHICKEN_JUMP       11  // chicken jumping tile
-#define TOWER_TILE_IDX     42  // static tower tile
+#define CHICKEN_JUMP       9  // chicken jumping tile
+#define TOWER_TILE_IDX     44  // static tower tile
 #define SUN_TILE           20  // Tile index for the sun sprite
-#define COIN_SPRITE_IDX    4   // Sprite ID for the coin, as requested
+#define COIN_SPRITE_IDX    22   // Sprite ID for the coin, as requested
 // SKY_TILE_IDX, GRASS_TILE_IDX are defined in vga_interface.h (ensure they are set correctly!)
 
 // Tower properties
@@ -389,15 +389,15 @@ int main(void) {
         switch (game_level) {
             case 1: 
                 current_min_bar_tiles = 5; current_max_bar_tiles = 8; current_bar_count_per_wave = 4;
-                current_bar_speed_base = 3; current_bar_inter_spacing_px = 180; 
-                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A;
-                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
+                current_bar_speed_base = 3; current_bar_inter_spacing_px = 200; 
+                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A- 30;
+                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 60;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 current_random_y_range = 0; // No random Y for level 1
                 break;
             case 2: 
                 current_min_bar_tiles = 4; current_max_bar_tiles = 7; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; current_bar_inter_spacing_px = 160;
+                current_bar_speed_base = 4; current_bar_inter_spacing_px = 180;
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
@@ -405,7 +405,7 @@ int main(void) {
                 break;
             case 3: 
                 current_min_bar_tiles = 3; current_max_bar_tiles = 6; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 5; current_bar_inter_spacing_px = 150;
+                current_bar_speed_base = 5; current_bar_inter_spacing_px = 160;
                 current_random_y_range = BAR_RANDOM_Y_RANGE_L3; // MODIFICATION: Gentler random Y
                 current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - current_random_y_range + 1);
                 current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range + 1)) - current_random_y_range;
@@ -415,7 +415,7 @@ int main(void) {
                 break;
             case 4: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 5; current_bar_count_per_wave = 3;
-                current_bar_speed_base = 6; current_bar_inter_spacing_px = 140;
+                current_bar_speed_base = 6; current_bar_inter_spacing_px = 150;
                 current_random_y_range = BAR_RANDOM_Y_RANGE_L4_L5; // MODIFICATION: Larger random Y
                 current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - current_random_y_range + 1);
                 current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range + 1)) - current_random_y_range;
@@ -425,7 +425,7 @@ int main(void) {
                 break;
             case 5: default: 
                 current_min_bar_tiles = 2; current_max_bar_tiles = 4; current_bar_count_per_wave = 2;
-                current_bar_speed_base = 7; current_bar_inter_spacing_px = 130;
+                current_bar_speed_base = 7; current_bar_inter_spacing_px = 150;
                 current_random_y_range = BAR_RANDOM_Y_RANGE_L4_L5; // MODIFICATION: Larger random Y
                 current_y_pos_B = BAR_MIN_Y_POS + rand() % (BAR_MAX_Y_POS - BAR_MIN_Y_POS - current_random_y_range + 1);
                 current_y_pos_A = current_y_pos_A + (rand() % (2 * current_random_y_range + 1)) - current_random_y_range;
