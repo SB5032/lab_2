@@ -23,15 +23,15 @@
 // Sprite dimensions
 #define CHICKEN_W         32
 #define CHICKEN_H         32
-#define COIN_SPRITE_W     16 // Assuming coin sprite is 16x16, adjust if different
-#define COIN_SPRITE_H     16
+#define COIN_SPRITE_W     32 // Assuming coin sprite is 16x16, adjust if different
+#define COIN_SPRITE_H     32
 
 // MIF indices
 #define CHICKEN_STAND      8   // chicken standing tile
 #define CHICKEN_JUMP       11  // chicken jumping tile
 #define TOWER_TILE_IDX     42  // static tower tile
 #define SUN_TILE           20
-#define COIN_SPRITE_IDX    4   // Sprite ID for the coin, as requested
+#define COIN_SPRITE_IDX    11   // Sprite ID for the coin, as requested
 // SKY_TILE_IDX, GRASS_TILE_IDX are defined in vga_interface.h (ensure they are set correctly!)
 
 // Tower properties
