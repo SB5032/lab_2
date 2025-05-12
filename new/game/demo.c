@@ -37,10 +37,10 @@
 
 // MIF indices
 #define CHICKEN_STAND      8
-#define CHICKEN_JUMP       11
+#define CHICKEN_JUMP       9
 #define TOWER_TILE_IDX     42
 #define SUN_TILE           20
-#define COIN_SPRITE_IDX    4
+#define COIN_SPRITE_IDX    22
 // SKY_TILE_IDX, GRASS_TILE_IDX are defined in vga_interface.h
 
 // Tower properties
@@ -70,8 +70,8 @@
 #define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 16 - (BAR_HEIGHT_ROWS * TILE_SIZE)) // Bar top so bar bottom is 16px from screen bottom
 
 // Default Bar positioning (used as a base for Levels 1 & 2, then overridden by random for L3+)
-#define DEFAULT_BAR_MIN_Y_GROUP_A (WALL + 100) 
-#define DEFAULT_BAR_Y_OFFSET_GROUP_B 150       
+#define DEFAULT_BAR_MIN_Y_GROUP_A (WALL + 120) 
+#define DEFAULT_BAR_Y_OFFSET_GROUP_B 170       
 
 // Random Y ranges for levels 3+
 #define BAR_RANDOM_Y_RANGE_L3    80  // Gentler random Y offset for level 3
@@ -298,7 +298,7 @@ int main(void) {
 
 
                 current_bar_count_per_wave = 4;
-                current_bar_speed_base = 3.5; 
+                current_bar_speed_base = 2.5; 
                 current_bar_inter_spacing_px = 170; // MODIFICATION
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A;
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
@@ -312,7 +312,7 @@ int main(void) {
                 if (current_min_bar_tiles <=0) current_min_bar_tiles = 1;
 
                 current_bar_count_per_wave = 3;
-                current_bar_speed_base = 4; 
+                current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 180; // MODIFICATION
                 current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
                 current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
@@ -323,7 +323,7 @@ int main(void) {
                 current_min_bar_tiles = 3; // Same as L2
                 current_max_bar_tiles = 5; // Same as L2
                 current_bar_count_per_wave = 3;
-                current_bar_speed_base = 5; 
+                current_bar_speed_base = 3.5; 
                 current_bar_inter_spacing_px = 180; // MODIFICATION
                 current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L3; 
                 current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
@@ -334,7 +334,7 @@ int main(void) {
                 current_min_bar_tiles = 2; // Shorter
                 current_max_bar_tiles = 4; // Shorter
                 current_bar_count_per_wave = 3;
-                current_bar_speed_base = 6; 
+                current_bar_speed_base = 4; 
                 current_bar_inter_spacing_px = 190; // MODIFICATION
                 current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L4_L5; 
                 current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
@@ -345,7 +345,7 @@ int main(void) {
                 current_min_bar_tiles = 2; // Shortest
                 current_max_bar_tiles = 3; // Shortest
                 current_bar_count_per_wave = 2;
-                current_bar_speed_base = 7; 
+                current_bar_speed_base = 4.5; 
                 current_bar_inter_spacing_px = 200; // MODIFICATION
                 current_random_y_range_for_level = BAR_RANDOM_Y_RANGE_L4_L5; 
                 current_y_pos_B = EFFECTIVE_BAR_MIN_Y_POS + rand() % (EFFECTIVE_BAR_MAX_Y_POS - EFFECTIVE_BAR_MIN_Y_POS - current_random_y_range_for_level + 1);
