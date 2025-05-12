@@ -336,14 +336,14 @@ int main(void) {
             case 1: 
                 current_min_bar_tiles = 5; current_max_bar_tiles = 8; current_bar_count_per_wave = 4;
                 current_bar_speed_base = 3; current_bar_inter_spacing_px = 180; 
-                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A;
-                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B;
+                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A - 10; 
+                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 40;
                 break;
             case 2: 
                 current_min_bar_tiles = 4; current_max_bar_tiles = 7; current_bar_count_per_wave = 3;
                 current_bar_speed_base = 4; current_bar_inter_spacing_px = 160;
-                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A - 20; 
-                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 50;
+                current_y_pos_A = DEFAULT_BAR_MIN_Y_GROUP_A - 30; 
+                current_y_pos_B = DEFAULT_BAR_MIN_Y_GROUP_A + DEFAULT_BAR_Y_OFFSET_GROUP_B - 60;
                 break;
             case 3: 
                 current_min_bar_tiles = 3; current_max_bar_tiles = 6; current_bar_count_per_wave = 3;
