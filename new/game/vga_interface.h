@@ -6,6 +6,7 @@
 // Define screen dimensions in tiles
 #define TILE_ROWS 30
 #define TILE_COLS 40
+#define TILE_SIZE 16
 
 #define BLANKTILE 0 // img number of blank tile
 #define NUMBEROFFSET 1
