@@ -49,9 +49,9 @@ void clearSprites_buffered();
 
 
 #define SKY_TILE_IDX 37  
-#define GRASS_TILE_1_IDX 38 // User-defined
-#define GRASS_TILE_2_IDX 42 // User-defined
-#define GRASS_TILE_3_IDX 44 // User-defined
+#define GRASS_TILE_1_IDX 38 // User-defined 260 - grass plain
+#define GRASS_TILE_2_IDX 42 // User-defined 2a0 - flowers on grass
+#define GRASS_TILE_3_IDX 41 // User-defined 290 - grass with dark green thingy
 #define GRASS_ROW_START 25 
 
 void fill_sky_and_grass(void); 
