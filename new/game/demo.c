@@ -2,6 +2,7 @@
 // Uses software double buffering for tiles and sprite state buffering.
 // Implements level-based difficulty, enhanced game over screen with restart.
 // Includes level-dependent jump initiation delay.
+// Corrected lives decrement and restart logic.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,8 +25,8 @@
 // Sprite dimensions
 #define CHICKEN_W         32
 #define CHICKEN_H         32
-#define COIN_SPRITE_W     32 // Assuming coin sprite is 16x16, adjust if different
-#define COIN_SPRITE_H     32
+#define COIN_SPRITE_W     16 // Assuming coin sprite is 16x16, adjust if different
+#define COIN_SPRITE_H     16
 
 // MIF indices
 #define CHICKEN_STAND      8   // chicken standing tile
@@ -260,46 +261,38 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
         if (active_coins[i].active) {
             MovingBar *parent_bar_array = (active_coins[i].bar_group_id == 0) ? bars_a : bars_b;
             int bar_idx = active_coins[i].bar_idx;
-            // Check if the parent bar is valid and active
             if (bar_idx != -1 && bar_idx < BAR_ARRAY_SIZE && parent_bar_array[bar_idx].x != BAR_INACTIVE_X) {
                 int bar_center_x = parent_bar_array[bar_idx].x + (parent_bar_array[bar_idx].length * TILE_SIZE) / 2;
                 int coin_x = bar_center_x - (COIN_SPRITE_W / 2);
-                int coin_y = parent_bar_array[bar_idx].y_px - COIN_SPRITE_H - (TILE_SIZE / 4) ; // Position coin above the bar
-
+                int coin_y = parent_bar_array[bar_idx].y_px - COIN_SPRITE_H - (TILE_SIZE / 4) ; 
                 bool on_screen_x = (coin_x + COIN_SPRITE_W > 0) && (coin_x < LENGTH);
                 bool on_screen_y = (coin_y + COIN_SPRITE_H > 0) && (coin_y < WIDTH);
-
                 if (on_screen_x && on_screen_y) {
                      write_sprite_to_kernel_buffered(1, coin_y, coin_x, COIN_SPRITE_IDX, active_coins[i].sprite_register);
                 } else {
-                    // If coin's calculated position is off-screen but it's active, mark its desired state as inactive for this frame.
-                    // It will be properly deactivated if its parent bar goes off-screen.
                      write_sprite_to_kernel_buffered(0, 0, 0, 0, active_coins[i].sprite_register);
                 }
             } else { 
-                 // Parent bar is inactive or bar_idx is invalid. Mark desired state as inactive.
-                 if (active_coins[i].active) { // Should ideally already be inactive if parent bar is.
+                 if (active_coins[i].active) { 
                     write_sprite_to_kernel_buffered(0,0,0,0, active_coins[i].sprite_register); 
-                    active_coins[i].active = false; // Correct internal state if inconsistent
+                    active_coins[i].active = false; 
                  }
             }
-        } else { // If coin is not active, ensure its desired state is inactive
+        } else { 
             write_sprite_to_kernel_buffered(0,0,0,0, active_coins[i].sprite_register);
         }
     }
 }
 
-// Function to reset game state for restarting
-void reset_game_state_full(Chicken *c, MovingBar bA[], MovingBar bB[], int *scr, int *g_lvl, int *lvs, int *coins_collected_count, bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB) {
-    *scr = 0;
-    *g_lvl = 1;
-    *lvs = INITIAL_LIVES;
-    *coins_collected_count = 0; // Reset coin counter
+// MODIFICATION: Renamed from reset_game_state_full.
+// This function resets elements for a new attempt (e.g., after losing a life),
+// but DOES NOT reset score, game_level, lives count, or total_coins_collected.
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB) {
     initChicken(c); // Resets chicken position and coin collection state
     *tEnabled = true;
     resetBarArray(bA, BAR_ARRAY_SIZE);
     resetBarArray(bB, BAR_ARRAY_SIZE);
-    init_all_coins(); // Deactivates all coins and prepares their sprite desired states
+    init_all_coins(); // Deactivates all coins and prepares their sprite desired states for clearing
     *grpA_act = true;
     *needs_A = true;
     *needs_B = false;
@@ -308,11 +301,11 @@ void reset_game_state_full(Chicken *c, MovingBar bA[], MovingBar bB[], int *scr,
     *next_sA = 0;
     *next_sB = 0;
     
-    // Prepare screen for restart
+    // Prepare screen buffers for the next attempt
     cleartiles(); // Clear tile back buffer
     fill_sky_and_grass(); // Draw background to tile back buffer
     clearSprites_buffered(); // Set all desired sprite states to inactive
-    // The first frame of the restarted game will call vga_present_frame() and present_sprites()
+    // The main loop will then call vga_present_frame() and present_sprites()
 }
 
 
@@ -330,34 +323,37 @@ int main(void) {
     
     game_restart_point: // Label for restarting the game from game over
 
+    // MODIFICATION: These are now explicitly set for a full game restart
+    int score = 0;
+    int game_level = 1; 
+    int lives = INITIAL_LIVES;
+    coins_collected_this_game = 0; 
+
     init_all_coins(); // Initialize/reset coin states at the start of each game attempt
-    coins_collected_this_game = 0; // Reset coins collected for this specific game attempt
 
     // --- Start Screen Setup ---
-    cleartiles(); // Clears current software tile back buffer
-    clearSprites_buffered(); // Sets desired sprite states to inactive
-    fill_sky_and_grass(); // Fills current software tile back buffer
-    vga_present_frame(); // Presents the initial empty screen with background tiles
-    present_sprites();   // Presents the (inactive) sprite states
+    cleartiles(); 
+    clearSprites_buffered(); 
+    fill_sky_and_grass(); 
+    vga_present_frame(); 
+    present_sprites();   
 
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"any", 3, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
-    vga_present_frame(); // Present the start screen text (sprites still largely inactive)
+    vga_present_frame(); 
     
     while (!(controller_state.a || controller_state.b || controller_state.start)) { usleep(10000); }
 
-    // --- Game Initialization ---
+    // --- Game Initialization (after start screen) ---
     cleartiles(); 
     clearSprites_buffered(); 
     fill_sky_and_grass(); 
     // Initial game state will be drawn and presented in the first iteration of the game loop.
 
     srand(time(NULL)); 
-    int score = 0;
-    int game_level = 1; 
-    int lives = INITIAL_LIVES;
+    // Score, game_level, lives, coins_collected_this_game are already set for a new game.
     int jump_velocity = INIT_JUMP_VY; 
     const int hud_center_col = TILE_COLS / 2; 
     const int hud_offset = 12; 
@@ -368,7 +364,7 @@ int main(void) {
     int current_min_bar_tiles, current_max_bar_tiles, current_bar_count_per_wave, current_bar_speed_base;
     int current_bar_inter_spacing_px, current_y_pos_A, current_y_pos_B;
     int current_wave_switch_trigger_offset_px, current_bar_initial_x_stagger_group_B;
-    int current_jump_initiation_delay; // For level-dependent jump delay
+    int current_jump_initiation_delay; 
 
     Chicken chicken; initChicken(&chicken); 
     bool has_landed_this_jump = false; 
@@ -377,9 +373,14 @@ int main(void) {
     int watching_bar_idx_A = -1; int watching_bar_idx_B = -1; 
 
     // --- Main Game Loop ---
-    while (lives > 0) {
+    while (lives > 0) { // Loop continues as long as player has lives
+        // MODIFICATION: Game level calculation moved here to update based on current score
+        int old_game_level = game_level;
         game_level = 1 + (score / SCORE_PER_LEVEL);
         if (game_level > MAX_GAME_LEVEL) game_level = MAX_GAME_LEVEL;
+        // Optional: Play a sound or show a message if level changes
+        // if (game_level != old_game_level) { play_sfx(LEVEL_UP_SOUND_IDX); }
+
 
         // Set parameters based on current game_level
         switch (game_level) {
@@ -427,7 +428,7 @@ int main(void) {
         }
         current_wave_switch_trigger_offset_px = WAVE_SWITCH_TRIGGER_OFFSET_PX;
         current_bar_initial_x_stagger_group_B = BAR_INITIAL_X_STAGGER_GROUP_B;
-        int actual_bar_speed = current_bar_speed_base + (game_level -1);
+        int actual_bar_speed = current_bar_speed_base + (game_level -1); // Speed still slightly increases with actual level
 
         // ───── 1. INPUT PROCESSING ─────
         if (controller_state.b && !chicken.jumping) {
@@ -517,17 +518,14 @@ int main(void) {
 
         // Coin Collection Timer Update
         if (chicken.collecting_coin_idx != -1 && !chicken.jumping) {
-            chicken.on_bar_collect_timer_us += 16666; // Add approx 1 frame time (assuming ~60FPS)
+            chicken.on_bar_collect_timer_us += 16666; 
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
-                if (coin_to_collect->active) { // Check if coin is still active (not already collected by another rare condition)
+                if (coin_to_collect->active) { 
                     score += COIN_POINTS;
-                    coins_collected_this_game++; // Increment collected coins count
-                    play_sfx(3); // Placeholder for coin collect sound effect index
-                    coin_to_collect->active = false; // Mark coin as inactive
-                    // The sprite's desired state will be set to inactive by draw_active_coins_buffered
-                    
-                    // Remove coin association from the parent bar
+                    coins_collected_this_game++; 
+                    play_sfx(3); 
+                    coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
                     if(coin_to_collect->bar_idx != -1 && coin_to_collect->bar_idx < BAR_ARRAY_SIZE && 
                        parent_bars[coin_to_collect->bar_idx].coin_idx == chicken.collecting_coin_idx) {
@@ -535,12 +533,10 @@ int main(void) {
                         parent_bars[coin_to_collect->bar_idx].coin_idx = -1;
                     }
                 }
-                chicken.collecting_coin_idx = -1; // Reset collection state
-                chicken.on_bar_collect_timer_us = 0;
+                chicken.collecting_coin_idx = -1; chicken.on_bar_collect_timer_us = 0;
             }
-        } else if (chicken.collecting_coin_idx != -1 && chicken.jumping) { // If chicken jumps while collecting
-             chicken.on_bar_collect_timer_us = 0; // Reset timer
-             chicken.collecting_coin_idx = -1;    // Stop collection attempt
+        } else if (chicken.collecting_coin_idx != -1 && chicken.jumping) { 
+             chicken.on_bar_collect_timer_us = 0; chicken.collecting_coin_idx = -1;    
         }
 
         // Bar Collision Detection
@@ -554,26 +550,23 @@ int main(void) {
         // Boundary and Death Checks
         if (chicken.y < WALL + 40 && chicken.jumping) { chicken.y = WALL + 40; if (chicken.vy < 0) chicken.vy = 0; }
         if (chicken.y + CHICKEN_H > WIDTH - WALL) { 
-            lives--; 
-            // Reset state for next life or game over
-            reset_game_state_full(&chicken, barsA, barsB, &score, &game_level, &lives, &coins_collected_this_game, 
-                                  &towerEnabled, &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
-                                  &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B);
-            // Keep current score for display if game over, but it will be reset if restarting.
-            // Coins collected is reset by reset_game_state_full for a new game.
-            // The actual reset for a new game happens at game_restart_point.
-            // For now, just prepare for the next life's screen state if lives > 0.
+            lives--; // MODIFICATION: Decrement lives
             
-            vga_present_frame(); // Present the cleared state
-            present_sprites();   // Ensure sprites are off
-
-            if (lives > 0) { 
+            if (lives > 0) { // If player still has lives
+                // MODIFICATION: Call the new reset function for next attempt
+                reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
+                                  &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
+                                  &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B);
+                
+                vga_present_frame(); 
+                present_sprites();   
+                
                 play_sfx(1); 
                 usleep(2000000); 
-                // After death pause, the loop continues, and game_level will be recalculated based on score.
-                // Wave parameters will be set accordingly.
-            } 
-            continue; // Skip drawing this frame if died, proceed to next life or game over
+                continue; // Skip rest of loop, start next life attempt
+            }
+            // If lives is now 0, the 'if (lives > 0)' block is skipped.
+            // The main 'while (lives > 0)' loop condition will then fail, leading to the Game Over sequence.
         }
 
         // ───── 3. DRAW TO TILE BACK BUFFER ─────
@@ -598,11 +591,11 @@ int main(void) {
         vga_present_frame();
 
         // ───── 5. UPDATE DESIRED SPRITE STATES & PRESENT SPRITES ─────
-        clearSprites_buffered(); // Set all desired sprite states to inactive first
-        write_sprite_to_kernel_buffered(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); // Chicken
-        update_sun_sprite_buffered(game_level); // Sun
-        draw_active_coins_buffered(barsA, barsB); // Coins
-        present_sprites(); // Update hardware sprites based on desired states
+        clearSprites_buffered(); 
+        write_sprite_to_kernel_buffered(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); 
+        update_sun_sprite_buffered(game_level); 
+        draw_active_coins_buffered(barsA, barsB); 
+        present_sprites(); 
 
         usleep(16666); 
     }
@@ -611,44 +604,47 @@ int main(void) {
     cleartiles(); fill_sky_and_grass(); 
     clearSprites_buffered(); 
     
-    unsigned char game_over_text[] = "game over";
-    unsigned char final_score_text[] = "score"; 
-    unsigned char coins_collected_text[] = "coins collected"; // More descriptive
-    unsigned char restart_prompt_text[] = "press start to restart";
+    unsigned char game_over_text_str[] = "game over"; // Changed variable name
+    unsigned char final_score_text_str[] = "score"; 
+    unsigned char coins_collected_text_str[] = "coins collected"; 
+    unsigned char restart_prompt_text_str[] = "press start to restart";
 
-    int text_row = 10; // Starting row for game over text
-    write_text(game_over_text, sizeof(game_over_text) - 1, text_row, (TILE_COLS - (sizeof(game_over_text) - 1)) / 2);
+    int text_row = 10; 
+    write_text(game_over_text_str, sizeof(game_over_text_str) - 1, text_row, (TILE_COLS - (sizeof(game_over_text_str) - 1)) / 2);
     
     text_row += 2;
-    write_text(final_score_text, sizeof(final_score_text)-1, text_row, (TILE_COLS - (sizeof(final_score_text)-1 + 1 + MAX_SCORE_DISPLAY_DIGITS)) / 2);
-    write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, text_row, (TILE_COLS - (sizeof(final_score_text)-1 + 1 + MAX_SCORE_DISPLAY_DIGITS)) / 2 + sizeof(final_score_text));
+    write_text(final_score_text_str, sizeof(final_score_text_str)-1, text_row, (TILE_COLS - (sizeof(final_score_text_str)-1 + 1 + MAX_SCORE_DISPLAY_DIGITS)) / 2);
+    write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, text_row, (TILE_COLS - (sizeof(final_score_text_str)-1 + 1 + MAX_SCORE_DISPLAY_DIGITS)) / 2 + sizeof(final_score_text_str));
 
     text_row += 2;
-    write_text(coins_collected_text, sizeof(coins_collected_text)-1, text_row, (TILE_COLS - (sizeof(coins_collected_text)-1 + 1 + MAX_COINS_DISPLAY_DIGITS)) / 2);
-    write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, text_row, (TILE_COLS - (sizeof(coins_collected_text)-1 + 1 + MAX_COINS_DISPLAY_DIGITS)) / 2 + sizeof(coins_collected_text));
+    write_text(coins_collected_text_str, sizeof(coins_collected_text_str)-1, text_row, (TILE_COLS - (sizeof(coins_collected_text_str)-1 + 1 + MAX_COINS_DISPLAY_DIGITS)) / 2);
+    write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, text_row, (TILE_COLS - (sizeof(coins_collected_text_str)-1 + 1 + MAX_COINS_DISPLAY_DIGITS)) / 2 + sizeof(coins_collected_text_str));
     
     text_row += 3;
-    write_text(restart_prompt_text, sizeof(restart_prompt_text)-1, text_row, (TILE_COLS - (sizeof(restart_prompt_text)-1)) / 2);
+    write_text(restart_prompt_text_str, sizeof(restart_prompt_text_str)-1, text_row, (TILE_COLS - (sizeof(restart_prompt_text_str)-1)) / 2);
 
     vga_present_frame(); 
-    present_sprites(); // Ensure all sprites are off
+    present_sprites(); 
     play_sfx(2); 
     
     // Wait for START button to restart
     while(1) {
         if (controller_state.start) {
-            // Reset all necessary game state variables before jumping
-            reset_game_state_full(&chicken, barsA, barsB, &score, &game_level, &lives, &coins_collected_this_game, 
-                                  &towerEnabled, &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
+            // MODIFICATION: Explicitly reset game-wide progress for a new game
+            score = 0;
+            game_level = 1;
+            lives = INITIAL_LIVES; // This is where lives are reset for a new game
+            coins_collected_this_game = 0;
+
+            // MODIFICATION: Call the reset function for common elements
+            reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
+                                  &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
                                   &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B);
             goto game_restart_point; // Jump to the beginning of the game setup
         }
         usleep(50000); // Check controller state every 50ms
     }
 
-    // This part will effectively not be reached if restart happens via goto.
-    // For a non-goto based restart, the main while(lives>0) loop would be re-entered after state reset.
     close(vga_fd); close(audio_fd);
-    // Consider joining controller_thread here for a very clean exit, though often omitted.
     return 0;
 }
