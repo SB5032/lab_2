@@ -321,7 +321,7 @@ int main(void) {
         perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
     
-    game_restart_point: // Label for restarting the game from game over
+    game_restart_point: ; // Label for restarting the game from game over
 
     // MODIFICATION: These are now explicitly set for a full game restart
     int score = 0;
