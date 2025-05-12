@@ -11,6 +11,7 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
+// Added debug printf for coin collection.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,7 @@
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
 #define WIDTH             480   // VGA height (pixels)
-//#define TILE_SIZE          16   // background tile size (pixels)
+#define TILE_SIZE          16   // background tile size (pixels)
 #define WALL               16   // top/bottom margin (pixels)
 #define GRAVITY            +1
 
@@ -42,7 +43,7 @@
 // MIF indices
 #define CHICKEN_STAND      8
 #define CHICKEN_JUMP       9  
-#define TOWER_TILE_IDX     40 
+#define TOWER_TILE_IDX     42
 #define SUN_TILE           20
 #define COIN_SPRITE_IDX    22 
 // SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
@@ -56,7 +57,7 @@
 #define INIT_JUMP_VY     -20
 #define BASE_JUMP_INITIATION_DELAY   2000
 #define LONG_JUMP_INITIATION_DELAY   4000
-#define SCORE_PER_LEVEL    10
+#define SCORE_PER_LEVEL    5
 #define MAX_GAME_LEVEL     5
 #define MAX_SCORE_DISPLAY_DIGITS 3
 #define MAX_COINS_DISPLAY_DIGITS 2
@@ -84,7 +85,7 @@
 #define MAX_COINS_ON_SCREEN 5
 #define COIN_POINTS          10 
 #define COIN_SPAWN_LEVEL     3
-#define COIN_SPAWN_CHANCE    80
+#define COIN_SPAWN_CHANCE    100
 #define COIN_COLLECT_DELAY_US (500000)
 #define FIRST_COIN_SPRITE_REGISTER 2
 
@@ -365,7 +366,6 @@ int main(void) {
         current_bar_initial_x_stagger_group_B = BAR_INITIAL_X_STAGGER_GROUP_B;
         int actual_bar_speed = current_bar_speed_base; 
 
-        // MODIFICATION: Call update_grass_scroll with the current bar speed
         update_grass_scroll(actual_bar_speed);
 
         if (controller_state.b && !chicken.jumping) {
@@ -480,8 +480,10 @@ int main(void) {
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
                 if (coin_to_collect->active) { 
-                    score += (COIN_POINTS - 1); 
-                    coins_collected_this_game++; play_sfx(3); 
+                    score += (COIN_POINTS - 1); // MODIFICATION: Add (COIN_POINTS - 1) as 1 point is already given for landing
+                    coins_collected_this_game++; 
+                    printf("DEBUG: Coin collected! Total coins_collected_this_game = %d\n", coins_collected_this_game); // DEBUG
+                    play_sfx(3); 
                     coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
                     if(coin_to_collect->bar_idx != -1 && coin_to_collect->bar_idx < BAR_ARRAY_SIZE && parent_bars[coin_to_collect->bar_idx].coin_idx == chicken.collecting_coin_idx) {
@@ -537,7 +539,11 @@ int main(void) {
         usleep(16666); 
     }
 
-    cleartiles(); fill_sky_and_grass(); clearSprites_buffered(); 
+    // --- Game Over Sequence ---
+    printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); // DEBUG
+    cleartiles(); fill_sky_and_grass(); 
+    clearSprites_buffered(); 
+    
     unsigned char game_over_text_str[] = "game over"; 
     unsigned char final_score_text_str[] = "score "; 
     unsigned char coins_collected_text_str[] = "coins collected "; 
