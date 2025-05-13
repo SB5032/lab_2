@@ -340,10 +340,12 @@ int main(void) {
     cleartiles(); clearSprites_buffered(); 
     if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
     //vga_present_frame(); present_sprites();   
-    write_text("scream", 6, 13, 13); write_text("jump", 4, 13, 20);
-    write_text("press", 5, 19, 8); write_text("x", 1, 19, 14); 
-    write_text("key", 3, 19, 20); write_text("to", 2, 19, 26); 
-    write_text("start", 5, 19, 29);
+    write_text("scream", 6, 13, 16); write_text("jump", 4, 13, 22);
+    write_text("press", 5, 19, 9); write_text("x", 1, 19, 15); 
+    write_text("key", 3, 19, 17); write_text("to", 2, 19, 21); 
+    write_text("start", 5, 19, 24);
+
+
     vga_present_frame(); present_sprites();
 	
     while (!controller_state.x) { usleep(10000); }
