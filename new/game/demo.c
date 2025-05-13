@@ -118,12 +118,11 @@ void update_sun_sprite_buffered(int current_level_display);
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
-void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag);
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg); // Added game_level for background
 void fill_nightsky_and_grass(void); // Assuming user has this function defined elsewhere or will add it
 
 
 // --- Function Implementations (excluding main, which is shown below) ---
-// (All other functions like draw_all_active_bars_to_back_buffer, move_all_active_bars, etc., remain the same as the last correct version)
 void draw_all_active_bars_to_back_buffer(MovingBar bars_a[], MovingBar bars_b[], int array_size) {
     MovingBar* current_bar_group;
     for (int group = 0; group < 2; group++) {
@@ -231,7 +230,7 @@ void *controller_input_thread(void *arg) {
     printf("DEBUG: Controller thread exiting...\n");
     libusb_release_interface(controller_handle, 0); 
     libusb_close(controller_handle);
-    // libusb_exit(NULL); // Call this only once at the very end of the program, e.g., after pthread_join in main.
+    // libusb_exit(NULL); // Call this only once at the very end of the program
     pthread_exit(NULL);
 }
 
@@ -293,7 +292,7 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
-void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag) {
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg) {
     initChicken(c); 
     *tEnabled = true;
     resetBarArray(bA, BAR_ARRAY_SIZE); resetBarArray(bB, BAR_ARRAY_SIZE);
@@ -305,9 +304,7 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
     cleartiles(); 
-    // The actual fill_sky_and_grass or fill_nightsky_and_grass will be called in the main loop
-    // based on the current game_level, which is not reset by this function.
-    if (game_level >= 3) { // game_level is global or accessible here
+    if (game_level_for_bg >= 3) { 
         fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
@@ -315,18 +312,23 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     clearSprites_buffered(); 
 }
 
-// Placeholder for user's function if not in vga_interface.h or this file
 void fill_nightsky_and_grass(void) {
-    // This function should be implemented by the user if they want a different
-    // background for levels 3+. For now, it calls the standard one.
-    // Example: Draw night sky tiles then the same scrolling grass.
-    // fill_sky_with_night_tiles(); // Hypothetical function
-    // fill_grass_scrolling(); // Hypothetical function
-    fill_sky_and_grass(); // Current fallback
+    fill_sky_and_grass(); 
 }
 
 
 int main(void) {
+    // MODIFICATION: Moved static declarations to the top of main, before the label.
+    static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
+    static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
+    static bool first_random_wave_this_session = true;
+
+    // Variables that need to be reset for each new game instance
+    int score; 
+    int game_level; // This will be used for game logic and display
+    int lives;
+
+
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open failed"); return -1; }
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     init_vga_interface(); 
@@ -336,29 +338,21 @@ int main(void) {
         perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
     
-    // MODIFICATION: Moved static declarations to the top of main, before the label.
-    // These will be initialized once when main starts.
-    // Their values will persist across goto jumps to game_restart_point.
-    static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
-    static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
-    static bool first_random_wave_this_session = true;
-
     game_restart_point: ; 
-    // Variables that need to be reset for each new game instance
-    int score = 0; 
-    int current_game_level = 1; // Use this for game logic, distinct from global game_level for display
-    lives = INITIAL_LIVES; // lives is global, reset it here
+    // MODIFICATION: Initialize/Reset game state variables here
+    score = 0; 
+    game_level = 1; 
+    lives = INITIAL_LIVES; 
     coins_collected_this_game = 0; 
     
     init_all_coins(); 
-    // Reset these for a new game, ensuring predictability for L3+ start
     last_actual_y_A = LEVEL1_2_BAR_Y_A; 
     last_actual_y_B = LEVEL1_2_BAR_Y_B;
     first_random_wave_this_session = true;
 
 
     cleartiles(); clearSprites_buffered(); 
-    if (current_game_level >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
+    if (game_level >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
     vga_present_frame(); present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
@@ -371,7 +365,7 @@ int main(void) {
     while (controller_state.x) { usleep(10000); } 
 
     cleartiles(); clearSprites_buffered(); 
-    if (current_game_level >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
+    if (game_level >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
     
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
@@ -391,11 +385,11 @@ int main(void) {
     int watching_bar_idx_A = -1; int watching_bar_idx_B = -1; 
 
     while (lives > 0) {
-        int old_game_level = current_game_level; // Use local current_game_level for logic
-        current_game_level = 1 + (score / SCORE_PER_LEVEL);
-        if (current_game_level > MAX_GAME_LEVEL) current_game_level = MAX_GAME_LEVEL;
+        int old_game_level = game_level; 
+        game_level = 1 + (score / SCORE_PER_LEVEL);
+        if (game_level > MAX_GAME_LEVEL) game_level = MAX_GAME_LEVEL;
 
-        switch (current_game_level) { // Use local current_game_level
+        switch (game_level) { 
             case 1: 
                 current_min_bar_tiles = 6; current_max_bar_tiles = 7; 
                 current_bar_count_per_wave = 4;
@@ -457,7 +451,7 @@ int main(void) {
         
         if (group_A_is_active_spawner && needs_to_spawn_wave_A) {
             int determined_y_A;
-            if (current_game_level >= 3) { 
+            if (game_level >= 3) { 
                 if (first_random_wave_this_session) { 
                     determined_y_A = LEVEL1_2_BAR_Y_A; 
                     first_random_wave_this_session = false; 
@@ -483,7 +477,7 @@ int main(void) {
                     barsA[slot].y_px = determined_y_A; 
                     barsA[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
                     barsA[slot].has_coin = false; barsA[slot].coin_idx = -1;
-                    if (current_game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
+                    if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
                         for (int c_idx = 0; c_idx < MAX_COINS_ON_SCREEN; c_idx++) {
                             if (!active_coins[c_idx].active) {
                                 active_coins[c_idx].active = true; active_coins[c_idx].bar_idx = slot;
@@ -501,7 +495,7 @@ int main(void) {
         } 
         else if (!group_A_is_active_spawner && needs_to_spawn_wave_B) {
             int determined_y_B;
-            if (current_game_level >= 3) { 
+            if (game_level >= 3) { 
                 determined_y_B = last_actual_y_A + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
             } else { 
                 determined_y_B = spawn_y_for_B_fixed; 
@@ -522,7 +516,7 @@ int main(void) {
                     barsB[slot].y_px = determined_y_B; 
                     barsB[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
                     barsB[slot].has_coin = false; barsB[slot].coin_idx = -1;
-                    if (current_game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
+                    if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
                         for (int c_idx = 0; c_idx < MAX_COINS_ON_SCREEN; c_idx++) {
                             if (!active_coins[c_idx].active) {
                                 active_coins[c_idx].active = true; active_coins[c_idx].bar_idx = slot;
@@ -583,14 +577,15 @@ int main(void) {
                 reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
                                   &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
                                   &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B,
-                                  &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session); 
+                                  &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session,
+                                  game_level); // Pass current game_level for background consistency
                 vga_present_frame(); present_sprites();   
                 play_sfx(1); usleep(2000000); 
                 continue; 
             }
         }
 
-        if (current_game_level >= 3) { // Use current_game_level for background
+        if (game_level >= 3) { 
             fill_nightsky_and_grass();
         } else {
             fill_sky_and_grass();
@@ -601,7 +596,7 @@ int main(void) {
         write_text((unsigned char *)"score", 5, 1, hud_center_col - hud_offset + 12); 
         write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 1, hud_center_col - hud_offset + 18); 
         write_text((unsigned char *)"level", 5, 1, hud_center_col - hud_offset + 24); 
-        write_number(current_game_level, 1, hud_center_col - hud_offset + 30); // Display current_game_level
+        write_number(game_level, 1, hud_center_col - hud_offset + 30); 
         if (towerEnabled) {
             for (int r_tower = TOWER_TOP_VISIBLE_ROW; r_tower < TOWER_TOP_VISIBLE_ROW + 9; ++r_tower) { 
                  if (r_tower >= TILE_ROWS ) break; 
@@ -611,7 +606,7 @@ int main(void) {
         vga_present_frame();
         clearSprites_buffered(); 
         write_sprite_to_kernel_buffered(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); 
-        update_sun_sprite_buffered(current_game_level); // Use current_game_level for sun
+        update_sun_sprite_buffered(game_level); 
         draw_active_coins_buffered(barsA, barsB); 
         present_sprites(); 
         usleep(16666); 
@@ -619,7 +614,7 @@ int main(void) {
 
     // --- Game Over Sequence ---
     cleartiles(); 
-    if (game_level >= 3) { // Use the game_level at the point of game over for background
+    if (game_level >= 3) { 
         fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
