@@ -318,7 +318,7 @@ int main(void) {
     cleartiles(); 
     clearSprites_buffered(); 
     fill_sky_and_grass(); 
-    // vga_present_frame(); 
+    vga_present_frame(); 
     // present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
