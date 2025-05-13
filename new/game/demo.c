@@ -11,8 +11,7 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// Corrected USB handling in controller_input_thread.
-// Ensured correct handling of static variables with goto.
+// Corrected USB handling in controller_input_thread to rely on usbcontroller.c for init/claim.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +23,8 @@
 #include <string.h> 
 #include <math.h> // For ceil and floor
 
-#include "usbcontroller.h" 
+#include "usbcontroller.h" // Assumed to declare opencontroller() and usb_to_output()
+                           // and GAMEPAD_READ_LENGTH. Requires libusb-1.0 development files.
 #include "vga_interface.h" 
 #include "audio_interface.h"
 
@@ -96,9 +96,8 @@ int audio_fd;
 struct controller_output_packet controller_state; 
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
-bool restart_game_flag = true; 
-// MODIFICATION: game_level is declared here, local to main, and reset at game_restart_point
-// int game_level = 1; // This was previously global, now local to main and reset at game_restart_point
+bool restart_game_flag = true; // Used to signal controller thread to exit
+int game_level = 1; // Global for access in reset_for_level_attempt background logic
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
@@ -118,11 +117,12 @@ void update_sun_sprite_buffered(int current_level_display);
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
-void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg); // Added game_level for background
-void fill_nightsky_and_grass(void); // Assuming user has this function defined elsewhere or will add it
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag);
+void fill_nightsky_and_grass(void); // User function
 
 
-// --- Function Implementations (excluding main, which is shown below) ---
+// --- Function Implementations ---
+
 void draw_all_active_bars_to_back_buffer(MovingBar bars_a[], MovingBar bars_b[], int array_size) {
     MovingBar* current_bar_group;
     for (int group = 0; group < 2; group++) {
@@ -191,46 +191,62 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
     return false; 
 }
 
+// MODIFICATION: Simplified controller thread to rely on opencontroller() for setup
 void *controller_input_thread(void *arg) {
     uint8_t endpoint_address; 
     struct libusb_device_handle *controller_handle = NULL; 
 
+    // opencontroller() is now responsible for libusb_init(), finding, opening, 
+    // detaching kernel driver, and claiming the interface.
     controller_handle = opencontroller(&endpoint_address); 
     if (!controller_handle) {
-        fprintf(stderr, "Failed to open and claim USB controller device in thread.\n");
+        // opencontroller() itself prints errors and exits if it fails to init libusb or find device.
+        // If it returns NULL here, it means it failed to open/claim.
+        fprintf(stderr, "Controller thread: opencontroller() failed to return a valid handle.\n");
         pthread_exit(NULL);
     }
+    // If opencontroller doesn't print success, this can be useful:
+    // printf("DEBUG: USB Controller opened and interface claimed by opencontroller(). Endpoint: 0x%02X\n", endpoint_address);
 
     unsigned char buffer[GAMEPAD_READ_LENGTH]; 
     int actual_length_transferred;
 
-    while (restart_game_flag) { 
+    while (restart_game_flag) { // Check flag to allow thread to exit cleanly
         int transfer_status = libusb_interrupt_transfer(
             controller_handle,
             endpoint_address,
             buffer,
             GAMEPAD_READ_LENGTH,
             &actual_length_transferred,
-            1000 
+            1000 // Timeout in ms (e.g., 1 second) to allow checking restart_game_flag
         );
 
         if (transfer_status == LIBUSB_SUCCESS && actual_length_transferred == GAMEPAD_READ_LENGTH) {
             usb_to_output(&controller_state, buffer); 
         } else if (transfer_status == LIBUSB_ERROR_TIMEOUT) {
+            // Timeout is okay, just means no data, loop continues to check restart_game_flag
             continue;
         } else if (transfer_status == LIBUSB_ERROR_INTERRUPTED) {
+             // Transfer was cancelled, likely for shutdown
             break;
         }
         else {
-            fprintf(stderr, "Controller read error: %s\n", libusb_error_name(transfer_status));
-            usleep(100000); 
+            fprintf(stderr, "Controller read error in thread: %s\n", libusb_error_name(transfer_status));
+            // Consider breaking the loop or attempting to re-initialize on persistent errors,
+            // though opencontroller's exit(1) might prevent this stage on some errors.
+            usleep(100000); // Wait a bit before retrying
         }
     }
 
-    printf("DEBUG: Controller thread exiting...\n");
+    printf("DEBUG: Controller thread cleaning up and exiting...\n");
+    // Release the interface (assuming interface 0 was claimed by opencontroller)
+    // It's good practice for opencontroller to also return which interface it claimed if not always 0.
     libusb_release_interface(controller_handle, 0); 
     libusb_close(controller_handle);
-    // libusb_exit(NULL); // Call this only once at the very end of the program
+    // libusb_exit(NULL) is called in opencontroller() if init fails.
+    // If init succeeds in opencontroller(), a matching libusb_exit() should ideally be called
+    // once when the entire application is sure it's done with libusb.
+    // For now, assuming opencontroller's init is the main one for the app's lifecycle.
     pthread_exit(NULL);
 }
 
@@ -292,7 +308,7 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
-void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg) {
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag) {
     initChicken(c); 
     *tEnabled = true;
     resetBarArray(bA, BAR_ARRAY_SIZE); resetBarArray(bB, BAR_ARRAY_SIZE);
@@ -304,7 +320,7 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
     cleartiles(); 
-    if (game_level_for_bg >= 3) { 
+    if (game_level >= 3) { // game_level is global
         fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
@@ -312,9 +328,15 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     clearSprites_buffered(); 
 }
 
-// void fill_nightsky_and_grass(void) {
-//     fill_sky_and_grass(); 
-// }
+// Placeholder for user's function if not in vga_interface.h or this file
+void fill_nightsky_and_grass(void) {
+    // This function should be implemented by the user if they want a different
+    // background for levels 3+. For now, it calls the standard one.
+    // Example: Draw night sky tiles then the same scrolling grass.
+    // fill_sky_with_night_tiles(); // Hypothetical function
+    // fill_grass_scrolling(); // Hypothetical function
+    fill_sky_and_grass(); // Current fallback
+}
 
 
 int main(void) {
@@ -325,7 +347,7 @@ int main(void) {
 
     // Variables that need to be reset for each new game instance
     int score; 
-    int game_level; // This will be used for game logic and display
+    // int game_level; // game_level is now global for reset_for_level_attempt
     int lives;
 
 
@@ -578,7 +600,7 @@ int main(void) {
                                   &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
                                   &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B,
                                   &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session,
-                                  game_level); // Pass current game_level for background consistency
+                                  game_level); 
                 vga_present_frame(); present_sprites();   
                 play_sfx(1); usleep(2000000); 
                 continue; 
