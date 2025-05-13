@@ -75,8 +75,8 @@
 // Y-position clamping for bar generation
 //#define EFFECTIVE_BAR_MIN_Y_POS  40  // Bar top cannot be less than 40px from screen top
 //#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 8 - (BAR_HEIGHT_ROWS * TILE_SIZE)) // Bar top so bar bottom is 8px from screen bottom
-#define EFFECTIVE_BAR_MIN_Y_POS  WALL      // WALL == 8
-#define EFFECTIVE_BAR_MAX_Y_POS  360
+#define EFFECTIVE_BAR_MIN_Y_POS  180      // WALL == 8
+#define EFFECTIVE_BAR_MAX_Y_POS  400
 
 // Hardcoded Y positions for Levels 1 & 2, and for reset after death
 #define LEVEL1_2_BAR_Y_A 240
@@ -450,6 +450,7 @@ int main(void) {
             // Apply final clamping
             if (determined_y_A < EFFECTIVE_BAR_MIN_Y_POS) determined_y_A = EFFECTIVE_BAR_MIN_Y_POS;
             if (determined_y_A > EFFECTIVE_BAR_MAX_Y_POS) determined_y_A = EFFECTIVE_BAR_MAX_Y_POS;
+		determined_y_A = (determined_y_A / TILE_SIZE) * TILE_SIZE;
             last_actual_y_A = determined_y_A; 
 
             int spawned_count = 0, last_idx = -1;
