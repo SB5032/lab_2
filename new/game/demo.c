@@ -315,12 +315,17 @@ int main(void) {
     }
 
 
-    cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); vga_present_frame(); present_sprites();   
+    cleartiles(); 
+    clearSprites_buffered(); 
+    fill_sky_and_grass(); 
+    // vga_present_frame(); 
+    // present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); 
+    present_sprites();  
 
 	game_restart_point: ;
 	// pthread_t controller_thread;
