@@ -47,6 +47,7 @@
 #define CHICKEN_JUMP       9  
 #define TOWER_TILE_IDX     40 // User updated
 #define SUN_TILE           20
+#define MOON_TILE          21
 #define COIN_SPRITE_IDX    22 
 // SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
 
@@ -234,7 +235,7 @@ void update_sun_sprite_buffered(int current_level_display) {
     double fraction = (current_level_display > 1) ? (double)(current_level_display - 1) / (max_sun_level - 1) : 0.0;
     if (current_level_display >= max_sun_level) fraction = 1.0; 
     int sun_x_pos = start_x_sun + (int)((end_x_sun - start_x_sun) * fraction + 0.5);
-    write_sprite_to_kernel_buffered(1, base_y_sun, sun_x_pos, SUN_TILE, 1); 
+    write_sprite_to_kernel_buffered(1, base_y_sun, sun_x_pos, (game_level_main >=4 ? MOON_TILE : SUN_TILE), 1); 
 }
 
 void resetBarArray(MovingBar bars[], int array_size) {
@@ -353,7 +354,7 @@ int main(void) {
     while (controller_state.x) { usleep(10000); } 
 
     cleartiles(); clearSprites_buffered(); 
-    if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
+    if (game_level_main >= 4) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
     
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
