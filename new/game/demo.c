@@ -327,6 +327,7 @@ int main(void) {
     game_level_main = 1; 
     lives = INITIAL_LIVES; 
     coins_collected_this_game = 0; 
+	int game_level;
     
     init_all_coins(); 
     last_actual_y_A = LEVEL1_2_BAR_Y_A; 
