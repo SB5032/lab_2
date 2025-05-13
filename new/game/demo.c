@@ -27,7 +27,7 @@
 
 #include "usbcontroller.h"
 #include "vga_interface.h" 
-#include "audio_interface.h"
+//#include "audio_interface.h"
 
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
@@ -59,7 +59,7 @@
 #define INIT_JUMP_VY     -20
 #define BASE_JUMP_INITIATION_DELAY   2000
 #define LONG_JUMP_INITIATION_DELAY   4000
-#define SCORE_PER_LEVEL    5
+#define SCORE_PER_LEVEL    10
 #define MAX_GAME_LEVEL     5
 #define MAX_SCORE_DISPLAY_DIGITS 3
 #define MAX_COINS_DISPLAY_DIGITS 2
@@ -87,7 +87,7 @@
 
 // Coin properties
 #define MAX_COINS_ON_SCREEN 5
-#define COIN_POINTS          10 
+#define COIN_POINTS          2 
 #define COIN_SPAWN_LEVEL     3
 #define COIN_SPAWN_CHANCE    100
 #define COIN_COLLECT_DELAY_US (500)
@@ -95,7 +95,7 @@
 
 // Global variables
 int vga_fd; 
-int audio_fd; 
+//int audio_fd; 
 struct controller_output_packet controller_state; 
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
@@ -316,12 +316,12 @@ int main(void) {
 
 
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open failed"); return -1; }
-    if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
+   // if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     init_vga_interface(); 
     pthread_t controller_thread_id;
     restart_game_flag = true; 
     if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
-        perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
+        perror("Controller thread create failed"); close(vga_fd);  return -1;
     }
     
     game_restart_point: ; 
@@ -340,10 +340,10 @@ int main(void) {
     cleartiles(); clearSprites_buffered(); 
     if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
     //vga_present_frame(); present_sprites();   
-    write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
-    write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
-    write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
-    write_text((unsigned char *)"start", 5, 19, 29);
+    write_text("scream", 6, 13, 13); write_text("jump", 4, 13, 20);
+    write_text("press", 5, 19, 8); write_text("x", 1, 19, 14); 
+    write_text("key", 3, 19, 20); write_text("to", 2, 19, 26); 
+    write_text("start", 5, 19, 29);
     vga_present_frame(); present_sprites();
 	
     while (!controller_state.x) { usleep(10000); }
@@ -540,7 +540,7 @@ int main(void) {
                 if (coin_to_collect->active) { 
                     score += (COIN_POINTS - 1); 
                     coins_collected_this_game++; 
-                    play_sfx(3); 
+                    //play_sfx(3); 
                     coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
                     if(coin_to_collect->bar_idx != -1 && coin_to_collect->bar_idx < BAR_ARRAY_SIZE && parent_bars[coin_to_collect->bar_idx].coin_idx == chicken.collecting_coin_idx) {
@@ -609,12 +609,12 @@ int main(void) {
         fill_sky_and_grass();
     }
     clearSprites_buffered(); 
-    write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
-    write_text((unsigned char *)"score", 5, 15, 13); write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 15, 19);
-	write_text((unsigned char *)"coins", 5, 17, 8); write_text((unsigned char *)"collected", 9, 17, 14); write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, 17, 24);
-	write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
-    write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
-    write_text((unsigned char *)"restart", 7, 19, 29); 
+    write_text("game", 4, 13, 16); write_text("over", 4, 13, 21);
+    write_text("score", 5, 15, 16); write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 15, 22);
+	write_text("coins", 5, 17, 11); write_text("collected", 9, 17, 17); write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, 17, 27);
+	write_text("press", 5, 19, 9); write_text("x", 1, 19, 15); 
+    write_text("key", 3, 19, 17); write_text("to", 2, 19, 21); 
+    write_text("restart", 7, 19, 24); 
     vga_present_frame(); present_sprites();
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
@@ -631,6 +631,6 @@ int main(void) {
     // restart_game_flag = false; // Signal thread to exit
     // pthread_join(controller_thread_id, NULL); // Wait for thread to finish
     // libusb_exit(NULL); // Call this once when the application is completely done with libusb
-    close(vga_fd); close(audio_fd);
+    close(vga_fd); //close(audio_fd);
     return 0;
 }
