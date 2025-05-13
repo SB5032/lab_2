@@ -73,8 +73,10 @@
 #define BAR_INITIAL_X_STAGGER_GROUP_B 96
 
 // Y-position clamping for bar generation
-#define EFFECTIVE_BAR_MIN_Y_POS  40  // Bar top cannot be less than 40px from screen top
-#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 8 - (BAR_HEIGHT_ROWS * TILE_SIZE)) // Bar top so bar bottom is 8px from screen bottom
+//#define EFFECTIVE_BAR_MIN_Y_POS  40  // Bar top cannot be less than 40px from screen top
+//#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 8 - (BAR_HEIGHT_ROWS * TILE_SIZE)) // Bar top so bar bottom is 8px from screen bottom
+#define EFFECTIVE_BAR_MIN_Y_POS  WALL      // WALL == 8
+#define EFFECTIVE_BAR_MAX_Y_POS  360
 
 // Hardcoded Y positions for Levels 1 & 2, and for reset after death
 #define LEVEL1_2_BAR_Y_A 240
