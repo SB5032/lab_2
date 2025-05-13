@@ -96,6 +96,7 @@ struct controller_output_packet controller_state;
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
 bool restart = true;
+int game_level = 1;
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
@@ -347,7 +348,7 @@ int main(void) {
 	}
 	// while (controller_state.x) { usleep(10000); printf("test");}
 
-	int score = 0; int game_level = 1; int lives = INITIAL_LIVES;
+	int score = 0; int lives = INITIAL_LIVES;
     coins_collected_this_game = 0; 
     init_all_coins(); 
     static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
