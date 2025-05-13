@@ -102,6 +102,7 @@ bool towerEnabled = true;
 int coins_collected_this_game = 0;
 bool restart_game_flag = true; 
 int game_level_main_var; // Renamed to avoid conflict with any potential global 'game_level'
+int game_level_main; 
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
@@ -312,7 +313,7 @@ int main(void) {
     static bool first_random_wave_this_session = true;
 
     int score; 
-    int game_level_main; 
+  //  int game_level_main; 
     int lives;
 
 
