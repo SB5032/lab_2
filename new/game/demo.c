@@ -104,6 +104,7 @@ int coins_collected_this_game = 0;
 bool restart_game_flag = true; 
 int game_level_main_var; // Renamed to avoid conflict with any potential global 'game_level'
 int game_level_main; 
+bool vga_initialized = false; 
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
