@@ -678,8 +678,8 @@ int main(void) {
             }
         }
 
-        current_sky_mode_main = get_sky_mode(game_level_main);
-        fill_dynamic_sky_and_grass(current_sky_mode_main);
+        // current_sky_mode_main = get_sky_mode(game_level_main);
+        // fill_dynamic_sky_and_grass(current_sky_mode_main);
         
         draw_all_active_bars_to_back_buffer(barsA, barsB, BAR_ARRAY_SIZE);
         write_text((unsigned char *)"lives", 5, 1, hud_center_col - hud_offset); 
