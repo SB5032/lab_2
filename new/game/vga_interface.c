@@ -275,9 +275,9 @@ void fill_nightsky_and_grass(void) {
     // Draw sky tiles to the back buffer.
     for (r = 0; r < GRASS_ROW_START; ++r) { 
         for (c = 0; c < TILE_COLS; ++c) {
-           int rand_choice = rand() % 2;
-            sky_tile_to_use = (rand_choice == 0) ? NIGHTSKY_TILE_IDX : STAR_TILE_IDX;
-            write_tile_to_kernel(r, c, sky_tile_to_use);
+           //int rand_choice = rand() % 2;
+            //sky_tile_to_use = (rand_choice == 0) ? NIGHTSKY_TILE_IDX : STAR_TILE_IDX;
+            write_tile_to_kernel(r, c, NIGHTSKY_TILE_IDX); //sky_tile_to_use);
         }
     }
 
