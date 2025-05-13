@@ -1,4 +1,3 @@
-//LAST WORKING REVERT - 2.3 OF A
 // screamjump_dynamic_start.c
 // Uses software double buffering for tiles and sprite state buffering.
 // Implements level-based difficulty, enhanced game over screen with restart.
@@ -12,7 +11,9 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// Further enhanced debug printf for coin collection.
+// Corrected USB handling in controller_input_thread.
+// Ensured correct handling of static variables with goto.
+// Finalized Y-clamping as per user request (40px top, bar bottom 8px from screen bottom).
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,8 +32,8 @@
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
 #define WIDTH             480   // VGA height (pixels)
-#define TILE_SIZE          16   // background tile size (pixels)
-#define WALL               8   // top/bottom margin (pixels)
+// TILE_SIZE is now defined in vga_interface.h
+#define WALL               8   // User updated: top/bottom margin (pixels)
 #define GRAVITY            +1
 
 // Sprite dimensions
@@ -42,9 +43,9 @@
 #define COIN_SPRITE_H     32 
 
 // MIF indices
-#define CHICKEN_STAND      8 
+#define CHICKEN_STAND      8
 #define CHICKEN_JUMP       9  
-#define TOWER_TILE_IDX     40
+#define TOWER_TILE_IDX     40 // User updated
 #define SUN_TILE           20
 #define COIN_SPRITE_IDX    22 
 // SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
@@ -71,9 +72,9 @@
 #define BAR_INACTIVE_X  -1000
 #define BAR_INITIAL_X_STAGGER_GROUP_B 96
 
-// Y-position clamping
-#define EFFECTIVE_BAR_MIN_Y_POS  40 
-#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 16 - (BAR_HEIGHT_ROWS * TILE_SIZE)) 
+// Y-position clamping for bar generation
+#define EFFECTIVE_BAR_MIN_Y_POS  40  // Bar top cannot be less than 40px from screen top
+#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 8 - (BAR_HEIGHT_ROWS * TILE_SIZE)) // Bar top so bar bottom is 8px from screen bottom
 
 // Hardcoded Y positions for Levels 1 & 2, and for reset after death
 #define LEVEL1_2_BAR_Y_A 240
@@ -96,8 +97,8 @@ int audio_fd;
 struct controller_output_packet controller_state; 
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
-bool restart = true;
-int game_level = 1;
+bool restart_game_flag = true; 
+int game_level_main_var; // Renamed to avoid conflict with any potential global 'game_level'
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
@@ -117,7 +118,8 @@ void update_sun_sprite_buffered(int current_level_display);
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
-void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag);
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg_calc);
+void fill_nightsky_and_grass(void); 
 
 
 // --- Function Implementations ---
@@ -182,50 +184,39 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
                 *has_landed_this_jump = true; 
             }
             if (bars[b].has_coin && bars[b].coin_idx != -1 && active_coins[bars[b].coin_idx].active) {
-                printf("DEBUG: Chicken landed on bar with COIN. Coin index: %d, Coin active: true\n", bars[b].coin_idx); // NEW DEBUG
                 chicken->collecting_coin_idx = bars[b].coin_idx; chicken->on_bar_collect_timer_us = 0; 
-            } else {
-                if (bars[b].has_coin && bars[b].coin_idx != -1) {
-                     printf("DEBUG: Chicken landed on bar that HAD coin %d, but coin.active is now false.\n", bars[b].coin_idx); // NEW DEBUG
-                }
-                chicken->collecting_coin_idx = -1; 
-            }
+            } else { chicken->collecting_coin_idx = -1; }
             return true; 
         }
     }
     return false; 
 }
 
-void *controller_input_thread(void *arg)
-{
-    uint8_t endpoint_address;
-    struct libusb_device_handle *controller = opencontroller(&endpoint_address);
-    if (controller == NULL)
-    {
-        fprintf(stderr, "Failed to open USB controller device.\n");
-        pthread_exit(NULL);
+void *controller_input_thread(void *arg) {
+    uint8_t endpoint_address; 
+    struct libusb_device_handle *controller_handle = NULL; 
+    controller_handle = opencontroller(&endpoint_address); 
+    if (!controller_handle) {
+        fprintf(stderr, "Controller thread: opencontroller() failed to return a valid handle.\n");
+        pthread_exit(NULL); 
     }
-
-    while (1)
-    {
-        unsigned char output_buffer[GAMEPAD_READ_LENGTH];
-        int bytes_transferred;
-
-        int result = libusb_interrupt_transfer(controller, endpoint_address, output_buffer, GAMEPAD_READ_LENGTH, &bytes_transferred, 0);
-
-        if (result == 0)
-        {
-
-            usb_to_output(&controller_state, output_buffer);
-        }
-        if (restart == false)
-        {
-            break;
+    unsigned char buffer[GAMEPAD_READ_LENGTH]; 
+    int actual_length_transferred;
+    while (restart_game_flag) { 
+        int transfer_status = libusb_interrupt_transfer( controller_handle, endpoint_address, buffer, GAMEPAD_READ_LENGTH, &actual_length_transferred, 1000 );
+        if (transfer_status == LIBUSB_SUCCESS && actual_length_transferred == GAMEPAD_READ_LENGTH) {
+            usb_to_output(&controller_state, buffer); 
+        } else if (transfer_status == LIBUSB_ERROR_TIMEOUT) { continue;
+        } else if (transfer_status == LIBUSB_ERROR_INTERRUPTED) { break;
+        } else {
+            fprintf(stderr, "Controller read error in thread: %s\n", libusb_error_name(transfer_status));
+            if (transfer_status == LIBUSB_ERROR_NO_DEVICE) { fprintf(stderr, "Controller thread: Device disconnected.\n"); break; }
+            usleep(100000); 
         }
     }
-
-    libusb_close(controller);
-    libusb_exit(NULL);
+    printf("DEBUG: Controller thread cleaning up and exiting...\n");
+    libusb_release_interface(controller_handle, 0); 
+    libusb_close(controller_handle);
     pthread_exit(NULL);
 }
 
@@ -287,7 +278,7 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
-void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag) {
+void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg_calc) {
     initChicken(c); 
     *tEnabled = true;
     resetBarArray(bA, BAR_ARRAY_SIZE); resetBarArray(bB, BAR_ARRAY_SIZE);
@@ -299,7 +290,7 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
     cleartiles(); 
-    if (game_level >= 3) {
+    if (game_level_for_bg_calc >= 3) { 
         fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
@@ -307,62 +298,58 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     clearSprites_buffered(); 
 }
 
+void fill_nightsky_and_grass(void) {
+    fill_sky_and_grass(); 
+}
+
+
 int main(void) {
+    static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
+    static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
+    static bool first_random_wave_this_session = true;
+
+    int score; 
+    int game_level_main; 
+    int lives;
+
+
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open failed"); return -1; }
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     init_vga_interface(); 
     pthread_t controller_thread_id;
+    restart_game_flag = true; 
     if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
         perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
-	// pthread_t controller_thread;
-    // if (pthread_create(&controller_thread, NULL, controller_input_thread, NULL) != 0)
-    // {
-    //     fprintf(stderr, "Failed to create controller input thread.\n");
-    //     return 1;
-    // }
+    
+    game_restart_point: ; 
+    score = 0; 
+    game_level_main = 1; 
+    lives = INITIAL_LIVES; 
+    coins_collected_this_game = 0; 
+    
+    init_all_coins(); 
+    last_actual_y_A = LEVEL1_2_BAR_Y_A; 
+    last_actual_y_B = LEVEL1_2_BAR_Y_B;
+    first_random_wave_this_session = true;
 
 
     cleartiles(); clearSprites_buffered(); 
-    if (game_level >= 3) {
-        fill_nightsky_and_grass();
-    } else {
-        fill_sky_and_grass();
-    } 
+    if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
+    vga_present_frame(); present_sprites();   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); 
-	present_sprites(); 
+	
+    while (!controller_state.x) { usleep(10000); }
+    usleep(200000); 
+    while (controller_state.x) { usleep(10000); } 
 
-	game_restart_point: ;
-	// pthread_t controller_thread;
-    // if (pthread_create(&controller_thread, NULL, controller_input_thread, NULL) != 0)
-    // {
-    //     fprintf(stderr, "Failed to create controller input thread.\n");
-    //     return 1;
-    // }
-	// while (controller_state.x) { usleep(10000); printf("test");}
-	while (!(controller_state.x)) {
-		usleep(10000); 
-	}
-	// while (controller_state.x) { usleep(10000); printf("test");}
-
-	int score = 0; int lives = INITIAL_LIVES;
-    coins_collected_this_game = 0; 
-    init_all_coins(); 
-    static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
-    static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
-    static bool first_random_wave_this_session = true;
-
-    cleartiles(); clearSprites_buffered(); //fill_sky_and_grass(); 
-    if (game_level >= 3) {
-        fill_nightsky_and_grass();
-    } else {
-        fill_sky_and_grass();
-    }
-
+    cleartiles(); clearSprites_buffered(); 
+    if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
+    
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
     const int hud_center_col = TILE_COLS / 2; const int hud_offset = 12; 
@@ -370,7 +357,7 @@ int main(void) {
     resetBarArray(barsA, BAR_ARRAY_SIZE); resetBarArray(barsB, BAR_ARRAY_SIZE);
     int current_min_bar_tiles, current_max_bar_tiles, current_bar_count_per_wave, current_bar_speed_base;
     int current_bar_inter_spacing_px;
-    int spawn_y_for_A_fixed, spawn_y_for_B_fixed; 
+    int spawn_y_for_A_level_fixed, spawn_y_for_B_level_fixed; 
     int current_wave_switch_trigger_offset_px, current_bar_initial_x_stagger_group_B;
     int current_jump_initiation_delay;
 
@@ -381,46 +368,45 @@ int main(void) {
     int watching_bar_idx_A = -1; int watching_bar_idx_B = -1; 
 
     while (lives > 0) {
-        int old_game_level = game_level;
-        game_level = 1 + (score / SCORE_PER_LEVEL);
-        if (game_level > MAX_GAME_LEVEL) game_level = MAX_GAME_LEVEL;
+        int old_game_level = game_level_main; 
+        game_level_main = 1 + (score / SCORE_PER_LEVEL);
+        if (game_level_main > MAX_GAME_LEVEL) game_level_main = MAX_GAME_LEVEL;
 
-        switch (game_level) {
+        switch (game_level_main) { 
             case 1: 
-                current_min_bar_tiles = 6; current_max_bar_tiles = 7; 
+                current_min_bar_tiles = 7; current_max_bar_tiles = 8; // Increased
                 current_bar_count_per_wave = 4;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 170; 
-                spawn_y_for_A_fixed = LEVEL1_2_BAR_Y_A; 
-                spawn_y_for_B_fixed = LEVEL1_2_BAR_Y_B; 
+                spawn_y_for_A_level_fixed = LEVEL1_2_BAR_Y_A; 
+                spawn_y_for_B_level_fixed = LEVEL1_2_BAR_Y_B; 
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 2: 
-                current_min_bar_tiles = 5; current_max_bar_tiles = 7; 
+                current_min_bar_tiles = 6; current_max_bar_tiles = 8; // Increased
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 180; 
-                spawn_y_for_A_fixed = LEVEL1_2_BAR_Y_A; 
-                spawn_y_for_B_fixed = LEVEL1_2_BAR_Y_B; 
+                spawn_y_for_A_level_fixed = LEVEL1_2_BAR_Y_A; 
+                spawn_y_for_B_level_fixed = LEVEL1_2_BAR_Y_B; 
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 3: 
-                fill_nightsky_and_grass();
-                current_min_bar_tiles = 5; current_max_bar_tiles = 7; 
+                current_min_bar_tiles = 6; current_max_bar_tiles = 8; // Increased
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
                 current_bar_inter_spacing_px = 160; 
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 4: 
-                current_min_bar_tiles = 4; current_max_bar_tiles = 6; 
+                current_min_bar_tiles = 5; current_max_bar_tiles = 7; // Increased
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 4; 
                 current_bar_inter_spacing_px = 190; 
                 current_jump_initiation_delay = BASE_JUMP_INITIATION_DELAY;
                 break;
             case 5: default: 
-                current_min_bar_tiles = 4; current_max_bar_tiles = 5; 
+                current_min_bar_tiles = 5; current_max_bar_tiles = 6; // Increased
                 current_bar_count_per_wave = 2;
                 current_bar_speed_base = 4; 
                 current_bar_inter_spacing_px = 190; 
@@ -448,7 +434,7 @@ int main(void) {
         
         if (group_A_is_active_spawner && needs_to_spawn_wave_A) {
             int determined_y_A;
-            if (game_level >= 3) { 
+            if (game_level_main >= 3) { 
                 if (first_random_wave_this_session) { 
                     determined_y_A = LEVEL1_2_BAR_Y_A; 
                     first_random_wave_this_session = false; 
@@ -456,8 +442,9 @@ int main(void) {
                     determined_y_A = last_actual_y_B + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
                 }
             } else { 
-                determined_y_A = spawn_y_for_A_fixed; 
+                determined_y_A = spawn_y_for_A_level_fixed; 
             }
+            // Apply final clamping
             if (determined_y_A < EFFECTIVE_BAR_MIN_Y_POS) determined_y_A = EFFECTIVE_BAR_MIN_Y_POS;
             if (determined_y_A > EFFECTIVE_BAR_MAX_Y_POS) determined_y_A = EFFECTIVE_BAR_MAX_Y_POS;
             last_actual_y_A = determined_y_A; 
@@ -474,7 +461,7 @@ int main(void) {
                     barsA[slot].y_px = determined_y_A; 
                     barsA[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
                     barsA[slot].has_coin = false; barsA[slot].coin_idx = -1;
-                    if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
+                    if (game_level_main >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
                         for (int c_idx = 0; c_idx < MAX_COINS_ON_SCREEN; c_idx++) {
                             if (!active_coins[c_idx].active) {
                                 active_coins[c_idx].active = true; active_coins[c_idx].bar_idx = slot;
@@ -492,11 +479,12 @@ int main(void) {
         } 
         else if (!group_A_is_active_spawner && needs_to_spawn_wave_B) {
             int determined_y_B;
-            if (game_level >= 3) { 
+            if (game_level_main >= 3) { 
                 determined_y_B = last_actual_y_A + (rand() % (2 * BAR_Y_RELATIVE_OFFSET + 1)) - BAR_Y_RELATIVE_OFFSET;
             } else { 
-                determined_y_B = spawn_y_for_B_fixed; 
+                determined_y_B = spawn_y_for_B_level_fixed; 
             }
+            // Apply final clamping
             if (determined_y_B < EFFECTIVE_BAR_MIN_Y_POS) determined_y_B = EFFECTIVE_BAR_MIN_Y_POS;
             if (determined_y_B > EFFECTIVE_BAR_MAX_Y_POS) determined_y_B = EFFECTIVE_BAR_MAX_Y_POS;
             last_actual_y_B = determined_y_B; 
@@ -513,7 +501,7 @@ int main(void) {
                     barsB[slot].y_px = determined_y_B; 
                     barsB[slot].length = rand() % (current_max_bar_tiles - current_min_bar_tiles + 1) + current_min_bar_tiles;
                     barsB[slot].has_coin = false; barsB[slot].coin_idx = -1;
-                    if (game_level >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
+                    if (game_level_main >= COIN_SPAWN_LEVEL && (rand() % 100) < COIN_SPAWN_CHANCE) {
                         for (int c_idx = 0; c_idx < MAX_COINS_ON_SCREEN; c_idx++) {
                             if (!active_coins[c_idx].active) {
                                 active_coins[c_idx].active = true; active_coins[c_idx].bar_idx = slot;
@@ -541,18 +529,13 @@ int main(void) {
             }
         }
 
-        // MODIFICATION: Enhanced Coin Collection Debugging
         if (chicken.collecting_coin_idx != -1 && !chicken.jumping) {
             chicken.on_bar_collect_timer_us += 16666; 
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
-                printf("DEBUG: Coin collection timer met for coin_idx: %d. Chicken not jumping.\n", chicken.collecting_coin_idx);
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
-                printf("DEBUG: Coin to collect status: active = %s (bar_idx %d, group %d)\n",
-                       coin_to_collect->active ? "true" : "false", coin_to_collect->bar_idx, coin_to_collect->bar_group_id);
                 if (coin_to_collect->active) { 
                     score += (COIN_POINTS - 1); 
                     coins_collected_this_game++; 
-                    printf("DEBUG: Coin collected! Total coins_collected_this_game = %d\n", coins_collected_this_game); 
                     play_sfx(3); 
                     coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
@@ -560,8 +543,6 @@ int main(void) {
                         parent_bars[coin_to_collect->bar_idx].has_coin = false;
                         parent_bars[coin_to_collect->bar_idx].coin_idx = -1;
                     }
-                } else {
-                     printf("DEBUG: Coin collection FAILED for coin_idx %d because coin_to_collect->active was false.\n", chicken.collecting_coin_idx);
                 }
                 chicken.collecting_coin_idx = -1; chicken.on_bar_collect_timer_us = 0;
             }
@@ -581,14 +562,15 @@ int main(void) {
                 reset_for_level_attempt(&chicken, barsA, barsB, &towerEnabled,
                                   &group_A_is_active_spawner, &needs_to_spawn_wave_A, &needs_to_spawn_wave_B,
                                   &watching_bar_idx_A, &watching_bar_idx_B, &next_bar_slot_A, &next_bar_slot_B,
-                                  &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session); 
+                                  &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session,
+                                  game_level_main); 
                 vga_present_frame(); present_sprites();   
                 play_sfx(1); usleep(2000000); 
                 continue; 
             }
         }
 
-        if (game_level >= 3) {
+        if (game_level_main >= 3) { 
             fill_nightsky_and_grass();
         } else {
             fill_sky_and_grass();
@@ -599,7 +581,7 @@ int main(void) {
         write_text((unsigned char *)"score", 5, 1, hud_center_col - hud_offset + 12); 
         write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 1, hud_center_col - hud_offset + 18); 
         write_text((unsigned char *)"level", 5, 1, hud_center_col - hud_offset + 24); 
-        write_number(game_level, 1, hud_center_col - hud_offset + 30);
+        write_number(game_level_main, 1, hud_center_col - hud_offset + 30); 
         if (towerEnabled) {
             for (int r_tower = TOWER_TOP_VISIBLE_ROW; r_tower < TOWER_TOP_VISIBLE_ROW + 9; ++r_tower) { 
                  if (r_tower >= TILE_ROWS ) break; 
@@ -609,16 +591,15 @@ int main(void) {
         vga_present_frame();
         clearSprites_buffered(); 
         write_sprite_to_kernel_buffered(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); 
-        update_sun_sprite_buffered(game_level); 
+        update_sun_sprite_buffered(game_level_main); 
         draw_active_coins_buffered(barsA, barsB); 
         present_sprites(); 
         usleep(16666); 
     }
 
     // --- Game Over Sequence ---
-    printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
     cleartiles(); 
-    if (game_level >= 3) {
+    if (game_level >= 3) { // Use game_level from when game ended for background
         fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
@@ -629,13 +610,23 @@ int main(void) {
 	write_text((unsigned char *)"coins", 5, 17, 8); write_text((unsigned char *)"collected", 9, 17, 14); write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, 17, 24);
 	write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
-    write_text((unsigned char *)"start", 5, 19, 29);
+    write_text((unsigned char *)"restart", 7, 19, 29); 
     vga_present_frame(); present_sprites();
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
-	// pthread_join(controller_thread, NULL); //close(vga_fd); close(audio_fd);
-	goto game_restart_point; 
-
-   
+	
+    while(1) {
+        if (controller_state.x) { 
+            // Values are reset at game_restart_point label
+            goto game_restart_point; 
+        }
+        usleep(50000); 
+    }
+    // This part is effectively unreachable due to the infinite loop and goto.
+    // For a very clean exit, the controller thread would need a way to be signaled to terminate.
+    // restart_game_flag = false; // Signal thread to exit
+    // pthread_join(controller_thread_id, NULL); // Wait for thread to finish
+    // libusb_exit(NULL); // Call this once when the application is completely done with libusb
+    close(vga_fd); close(audio_fd);
     return 0;
 }
