@@ -341,7 +341,7 @@ int main(void) {
 
     cleartiles(); clearSprites_buffered(); 
     if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
-    vga_present_frame(); present_sprites();   
+   // vga_present_frame(); present_sprites();   
     write_text("scream", 6, 13, 16); write_text("jump", 4, 13, 22);
     write_text("press", 5, 16, 12); write_text("x", 1, 16, 18); 
     write_text("key", 3, 16, 20); write_text("to", 2, 16, 24); 
