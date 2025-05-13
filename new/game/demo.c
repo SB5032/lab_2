@@ -41,7 +41,7 @@
 #define COIN_SPRITE_H     32 
 
 // MIF indices
-#define CHICKEN_STAND      24 //8
+#define CHICKEN_STAND      8 
 #define CHICKEN_JUMP       9  
 #define TOWER_TILE_IDX     40
 #define SUN_TILE           20
