@@ -1,4 +1,6 @@
 // screamjump_dynamic_start.c
+// MODIFICATION: Switched to Linux event device input (/dev/input/eventX) instead of libusb.
+// Removed pthreads for controller input.
 // Uses software double buffering for tiles and sprite state buffering.
 // Implements level-based difficulty, enhanced game over screen with restart.
 // Includes level-dependent jump initiation delay.
@@ -11,26 +13,29 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// TILE_SIZE is now included via vga_interface.h
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <pthread.h>
+// #include <pthread.h> // MODIFICATION: Removed pthread
 #include <time.h>
 #include <fcntl.h>
 #include <string.h> 
 #include <math.h> // For ceil and floor
 
-#include "usbcontroller.h" 
-#include "vga_interface.h" // Now includes TILE_SIZE and update_grass_scroll
+// MODIFICATION: Added for new input method
+#include <linux/input.h>
+#include <linux/input-event-codes.h> // For BTN_ defines
+
+// #include "usbcontroller.h" // MODIFICATION: Removed usbcontroller.h
+#include "vga_interface.h" 
 #include "audio_interface.h"
 
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
 #define WIDTH             480   // VGA height (pixels)
-// TILE_SIZE is defined in vga_interface.h
+// TILE_SIZE is now defined in vga_interface.h
 #define WALL               8   // User updated: top/bottom margin (pixels)
 #define GRAVITY            +1
 
@@ -44,10 +49,9 @@
 #define CHICKEN_STAND      8 
 #define CHICKEN_JUMP       9  
 #define TOWER_TILE_IDX     40 // User updated
-#define SUN_TILE           20
-#define MOON_TILE           21
+#define SUN_TILE           20 // For day/evening
+#define MOON_TILE          21 // For night
 #define COIN_SPRITE_IDX    22 
-
 // SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
 
 // Tower properties
@@ -89,16 +93,30 @@
 #define COIN_SPAWN_LEVEL     3
 #define COIN_SPAWN_CHANCE    100
 #define COIN_COLLECT_DELAY_US (500) 
-#define FIRST_COIN_SPRITE_REGISTER 2
+#define FIRST_COIN_SPRITE_REGISTER 2 // Sprites 0 (chicken) and 1 (sun/moon) are used.
 
 // Global variables
 int vga_fd; 
 int audio_fd; 
+// MODIFICATION: controller_state struct definition
+struct controller_output_packet {
+    short updown;    // D-PAD: 0 neutral, 1 up, -1 down
+    short leftright; // D-PAD: 0 neutral, 1 left, -1 right
+    uint8_t select;  
+    uint8_t start;
+    uint8_t left_rib;  // L1/LB
+    uint8_t right_rib; // R1/RB
+    uint8_t x;         // X/Square
+    uint8_t y;         // Y/Triangle
+    uint8_t a;         // A/Cross
+    uint8_t b;         // B/Circle
+};
 struct controller_output_packet controller_state; 
+
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
-bool restart_game_flag = true; 
- int game_level; // Will be a local variable in main
+// bool restart_game_flag = true; // MODIFICATION: No longer needed for thread
+int game_level_main_logic; // Renamed to avoid conflict with any global 'game_level' from vga_interface if it existed
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
@@ -107,23 +125,112 @@ typedef struct { int bar_idx; int bar_group_id; bool active; int sprite_register
 
 Coin active_coins[MAX_COINS_ON_SCREEN];
 
-// --- Function Prototypes ---
+// MODIFICATION: SkyMode enum as per user's code
+typedef enum {
+    SKY_DAY,
+    SKY_EVENING,
+    SKY_NIGHT
+} SkyMode;
+
+
+// --- Function Prototypes for Game Logic ---
 void draw_all_active_bars_to_back_buffer(MovingBar bars_a[], MovingBar bars_b[], int array_size);
 void move_all_active_bars(MovingBar bars_a[], MovingBar bars_b[], int array_size, int speed);
 bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int prevY_chicken, Chicken *chicken, int *score, bool *has_landed_this_jump);
-void *controller_input_thread(void *arg);
 void initChicken(Chicken *c);
 void moveChicken(Chicken *c);
-void update_sky_sprite_buffered(int current_level_display, SkyMode mode);
+void update_sky_sprite_buffered(int current_level_display, SkyMode mode); // MODIFIED: Takes SkyMode
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg);
-// void fill_nightsky_and_grass(void); 
-void fill_dynamic_sky_and_grass(SkyMode mode);
-SkyMode get_sky_mode(int level);
+void fill_dynamic_sky_and_grass(SkyMode mode); // User function
+SkyMode get_sky_mode(int level); // User function
 
-// --- Function Implementations ---
+// --- NEW Controller Input Functions (Linux Event Device) ---
+int open_game_controller() {
+    struct input_id id;
+    char path[64], name[256];
+    int fd = -1;
+    const char *gamepad_names[] = {"Gamepad", "Controller", "Joystick"}; // Common names
+    int num_gamepad_names = sizeof(gamepad_names) / sizeof(gamepad_names[0]);
+
+    for (int i = 0; i < 32; ++i) { 
+        snprintf(path, sizeof(path), "/dev/input/event%d", i);
+        fd = open(path, O_RDONLY | O_NONBLOCK); 
+        if (fd < 0) {
+            continue;
+        }
+
+        if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) < 0) { name[0] = '\0'; }
+        if (ioctl(fd, EVIOCGID, &id) < 0) { memset(&id, 0, sizeof(id)); }
+
+        bool found_by_name = false;
+        for(int j=0; j < num_gamepad_names; ++j) {
+            if (strstr(name, gamepad_names[j]) != NULL) {
+                found_by_name = true;
+                break;
+            }
+        }
+        // Add your specific controller's VID/PID here if known, e.g. (id.vendor == 0x0079 && id.product == 0x0011)
+        if (found_by_name || (id.vendor == 0x0079 && id.product == 0x0011) ) { 
+            printf("INFO: Using controller: %s (%s), VID:0x%04x, PID:0x%04x\n", name, path, id.vendor, id.product);
+            return fd; 
+        }
+        close(fd); 
+        fd = -1;
+    }
+    fprintf(stderr, "Error: No suitable game controller found in /dev/input/event*\n");
+    return -1; 
+}
+
+void poll_game_controller_input(int controller_fd, struct controller_output_packet *state) {
+    if (controller_fd < 0) return;
+
+    struct input_event ev;
+    // Reset momentary presses (like D-pad if it's not sending release events for ABS_HAT)
+    // If your D-pad sends 0 on release for ABS_HAT, this might not be strictly needed for updown/leftright
+    // but good for buttons if you only care about the press down event.
+    // However, for continuous state, we only update on new events.
+    // For buttons, we set to 0 if the event is a release (ev.value == 0)
+    
+    while (read(controller_fd, &ev, sizeof(ev)) == sizeof(ev)) {
+        if (ev.type == EV_KEY) { 
+            // printf("DEBUG: EV_KEY: code=%d, value=%d\n", ev.code, ev.value);
+            switch (ev.code) {
+                case BTN_SOUTH: state->a = ev.value ? 1 : 0; break; // Typically A or Cross
+                case BTN_EAST:  state->b = ev.value ? 1 : 0; break; // Typically B or Circle
+                case BTN_WEST:  state->x = ev.value ? 1 : 0; break; // Typically X or Square
+                case BTN_NORTH: state->y = ev.value ? 1 : 0; break; // Typically Y or Triangle
+                case BTN_START: state->start = ev.value ? 1 : 0; break;
+                case BTN_SELECT:state->select = ev.value ? 1 : 0; break;
+                case BTN_TL:    state->left_rib = ev.value ? 1 : 0; break; // Left Bumper
+                case BTN_TR:    state->right_rib = ev.value ? 1 : 0; break; // Right Bumper
+                // Some D-pads might send KEY events instead of ABS_HAT
+                case KEY_UP:    state->updown = (ev.value ? 1 : (state->updown == 1 ? 0 : state->updown)); break;
+                case KEY_DOWN:  state->updown = (ev.value ? -1 : (state->updown == -1 ? 0 : state->updown)); break;
+                case KEY_LEFT:  state->leftright = (ev.value ? 1 : (state->leftright == 1 ? 0 : state->leftright)); break;
+                case KEY_RIGHT: state->leftright = (ev.value ? -1 : (state->leftright == -1 ? 0 : state->leftright)); break;
+            }
+        } else if (ev.type == EV_ABS) { 
+            // printf("DEBUG: EV_ABS: code=%d, value=%d\n", ev.code, ev.value);
+            if (ev.code == ABS_HAT0X) { // D-Pad X-axis
+                if (ev.value < 0) state->leftright = 1;  // Left
+                else if (ev.value > 0) state->leftright = -1; // Right
+                else state->leftright = 0;                    // Neutral
+            } else if (ev.code == ABS_HAT0Y) { // D-Pad Y-axis
+                if (ev.value < 0) state->updown = 1;  // Up
+                else if (ev.value > 0) state->updown = -1; // Down
+                else state->updown = 0;                    // Neutral
+            }
+        }
+    }
+}
+
+
+// --- Function Implementations for Game Logic (Draw, Move, Collision, etc.) ---
+// (These functions remain largely the same as the previous version, 
+//  ensure they are present in your file)
 
 void draw_all_active_bars_to_back_buffer(MovingBar bars_a[], MovingBar bars_b[], int array_size) {
     MovingBar* current_bar_group;
@@ -193,68 +300,20 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
     return false; 
 }
 
-void *controller_input_thread(void *arg) {
-    uint8_t endpoint_address; 
-    struct libusb_device_handle *controller_handle = NULL; 
-
-    controller_handle = opencontroller(&endpoint_address); 
-    if (!controller_handle) {
-        fprintf(stderr, "Controller thread: opencontroller() failed to return a valid handle.\n");
-        pthread_exit(NULL);
-    }
-
-    unsigned char buffer[GAMEPAD_READ_LENGTH]; 
-    int actual_length_transferred;
-
-    while (restart_game_flag) { 
-        int transfer_status = libusb_interrupt_transfer(
-            controller_handle,
-            endpoint_address,
-            buffer,
-            GAMEPAD_READ_LENGTH,
-            &actual_length_transferred,
-            1000 
-        );
-
-        if (transfer_status == LIBUSB_SUCCESS && actual_length_transferred == GAMEPAD_READ_LENGTH) {
-            usb_to_output(&controller_state, buffer); 
-        } else if (transfer_status == LIBUSB_ERROR_TIMEOUT) {
-            continue;
-        } else if (transfer_status == LIBUSB_ERROR_INTERRUPTED) {
-            break;
-        }
-        else {
-            fprintf(stderr, "Controller read error in thread: %s\n", libusb_error_name(transfer_status));
-            if (transfer_status == LIBUSB_ERROR_NO_DEVICE) {
-                fprintf(stderr, "Controller thread: Device disconnected.\n");
-                break; 
-            }
-            usleep(100000); 
-        }
-    }
-
-    printf("DEBUG: Controller thread cleaning up and exiting...\n");
-    libusb_release_interface(controller_handle, 0); 
-    libusb_close(controller_handle);
-    pthread_exit(NULL);
-}
-
 void initChicken(Chicken *c) { 
     c->x = 32; c->y = CHICKEN_ON_TOWER_Y; c->vy = 0; c->jumping = false; 
     c->collecting_coin_idx = -1; c->on_bar_collect_timer_us = 0;
 }
 void moveChicken(Chicken *c) { if (!c->jumping && towerEnabled) return; c->y += c->vy; c->vy += GRAVITY; }
 
-void update_sky_sprite_buffered(int current_level, SkyMode mode) {
-    const int start_x = 32, end_x = 608, y = 64;
-    double fraction = (current_level > 1) ? 
-        (double)(current_level - 1) / (MAX_GAME_LEVEL - 1) : 0.0;
-    if (current_level >= MAX_GAME_LEVEL) fraction = 1.0;
-
-    int x_pos = start_x + (int)((end_x - start_x) * fraction + 0.5);
-
-    unsigned char sprite_tile = (mode == SKY_NIGHT) ? MOON_TILE : SUN_TILE;
-    write_sprite_to_kernel_buffered(1, y, x_pos, sprite_tile, 1);
+void update_sky_sprite_buffered(int current_level_display, SkyMode mode) { 
+    const int max_sun_level = MAX_GAME_LEVEL; 
+    const int start_x_sun = 32; const int end_x_sun = 608; const int base_y_sun = 64;      
+    double fraction = (current_level_display > 1) ? (double)(current_level_display - 1) / (max_sun_level - 1) : 0.0;
+    if (current_level_display >= max_sun_level) fraction = 1.0; 
+    int x_pos = start_x_sun + (int)((end_x_sun - start_x_sun) * fraction + 0.5);
+    unsigned char sprite_tile_idx = (mode == SKY_NIGHT) ? MOON_TILE : SUN_TILE;
+    write_sprite_to_kernel_buffered(1, base_y_sun, x_pos, sprite_tile_idx, 1); // Sprite reg 1 for sun/moon
 }
 
 void resetBarArray(MovingBar bars[], int array_size) {
@@ -306,6 +365,7 @@ SkyMode get_sky_mode(int level) {
     return SKY_DAY;
 }
 
+
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg) {
     initChicken(c); 
     *tEnabled = true;
@@ -318,12 +378,17 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
     cleartiles(); 
-    SkyMode mode = get_sky_mode(game_level);
-    fill_dynamic_sky_and_grass(mode);
-    update_sky_sprite_buffered(game_level, mode);
+    SkyMode current_sky_mode = get_sky_mode(game_level_for_bg); // Use passed game_level
+    fill_dynamic_sky_and_grass(current_sky_mode);
     clearSprites_buffered(); 
 }
 
+void fill_dynamic_sky_and_grass(SkyMode mode) { // User function from their code
+    // This function should be implemented by the user based on SkyMode
+    // For now, just calling the standard one as a placeholder.
+    // User needs to define different SKY_TILE_IDX for night/evening if desired.
+    fill_sky_and_grass(); 
+}
 
 
 int main(void) {
@@ -334,15 +399,18 @@ int main(void) {
     int score; 
     int game_level_main; 
     int lives;
+    int controller_fd = -1; 
 
 
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open failed"); return -1; }
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     init_vga_interface(); 
-    pthread_t controller_thread_id;
-    restart_game_flag = true; 
-    if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
-        perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
+    
+    controller_fd = open_game_controller();
+    if (controller_fd < 0) {
+        fprintf(stderr, "Failed to open game controller. Exiting.\n");
+        close(vga_fd); close(audio_fd);
+        return -1;
     }
     
     game_restart_point: ; 
@@ -358,30 +426,35 @@ int main(void) {
 
 
     cleartiles(); clearSprites_buffered(); 
+    SkyMode current_sky_mode_main = get_sky_mode(game_level_main);
+    fill_dynamic_sky_and_grass(current_sky_mode_main);
+    update_sky_sprite_buffered(game_level_main, current_sky_mode_main);
+    vga_present_frame(); present_sprites();   
 
-    // vga_present_frame(); present_sprites();
-    SkyMode mode = get_sky_mode(game_level);
-    fill_dynamic_sky_and_grass(mode);
-    update_sky_sprite_buffered(game_level, mode);
-   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); 
-    present_sprites();
 	
-    while (!controller_state.x) { usleep(10000); }
+    memset(&controller_state, 0, sizeof(controller_state));
+    do {
+        poll_game_controller_input(controller_fd, &controller_state);
+        usleep(10000); 
+    } while (!controller_state.x);
+    
     usleep(200000); 
-    while (controller_state.x) { usleep(10000); } 
+    do { 
+        poll_game_controller_input(controller_fd, &controller_state);
+        usleep(10000);
+    } while (controller_state.x);
+
 
     cleartiles(); clearSprites_buffered(); 
-    // if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
-    SkyMode mode = get_sky_mode(game_level);
-    fill_dynamic_sky_and_grass(mode);
-    update_sky_sprite_buffered(game_level, mode);
-
-
+    current_sky_mode_main = get_sky_mode(game_level_main);
+    fill_dynamic_sky_and_grass(current_sky_mode_main);
+    update_sky_sprite_buffered(game_level_main, current_sky_mode_main);
+    
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
     const int hud_center_col = TILE_COLS / 2; const int hud_offset = 12; 
@@ -400,9 +473,13 @@ int main(void) {
     int watching_bar_idx_A = -1; int watching_bar_idx_B = -1; 
 
     while (lives > 0) {
+        poll_game_controller_input(controller_fd, &controller_state);
+
         int old_game_level = game_level_main; 
         game_level_main = 1 + (score / SCORE_PER_LEVEL);
         if (game_level_main > MAX_GAME_LEVEL) game_level_main = MAX_GAME_LEVEL;
+
+        current_sky_mode_main = get_sky_mode(game_level_main); // Update sky mode based on level
 
         switch (game_level_main) { 
             case 1: 
@@ -600,10 +677,9 @@ int main(void) {
             }
         }
 
-        SkyMode mode = get_sky_mode(game_level);
-        fill_dynamic_sky_and_grass(mode);
-        update_sky_sprite_buffered(game_level, mode);
-
+        current_sky_mode_main = get_sky_mode(game_level_main);
+        fill_dynamic_sky_and_grass(current_sky_mode_main);
+        
         draw_all_active_bars_to_back_buffer(barsA, barsB, BAR_ARRAY_SIZE);
         write_text((unsigned char *)"lives", 5, 1, hud_center_col - hud_offset); 
         write_number(lives, 1, hud_center_col - hud_offset + 6);
@@ -620,7 +696,7 @@ int main(void) {
         vga_present_frame();
         clearSprites_buffered(); 
         write_sprite_to_kernel_buffered(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); 
-        update_sky_sprite_buffered(game_level, mode); 
+        update_sky_sprite_buffered(game_level_main, current_sky_mode_main); 
         draw_active_coins_buffered(barsA, barsB); 
         present_sprites(); 
         usleep(16666); 
@@ -628,11 +704,11 @@ int main(void) {
 
     // --- Game Over Sequence ---
     cleartiles(); 
-    SkyMode mode = get_sky_mode(game_level);
-    fill_dynamic_sky_and_grass(mode);
-    update_sky_sprite_buffered(game_level, mode);
+    current_sky_mode_main = get_sky_mode(game_level_main); // Use level at game over for background
+    fill_dynamic_sky_and_grass(current_sky_mode_main);
+    update_sky_sprite_buffered(game_level_main, current_sky_mode_main); // Update sun/moon for game over screen
+    clearSprites_buffered(); // Clear all other sprites for game over
 
-    clearSprites_buffered(); 
     write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
     write_text((unsigned char *)"score", 5, 15, 13); write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 15, 19);
 	write_text((unsigned char *)"coins", 5, 17, 8); write_text((unsigned char *)"collected", 9, 17, 14); write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, 17, 24);
@@ -644,17 +720,21 @@ int main(void) {
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
 	
     while(1) {
+        poll_game_controller_input(controller_fd, &controller_state);
         if (controller_state.x) { 
-            // Values are reset at game_restart_point label
+            usleep(200000); // Debounce
+            while(controller_state.x) {
+                poll_game_controller_input(controller_fd, &controller_state);
+                usleep(10000);
+            }
             goto game_restart_point; 
         }
         usleep(50000); 
     }
     // This part is effectively unreachable due to the infinite loop and goto.
-    // For a very clean exit, the controller thread would need a way to be signaled to terminate.
-    // restart_game_flag = false; // Signal thread to exit
-    // pthread_join(controller_thread_id, NULL); // Wait for thread to finish
-    // libusb_exit(NULL); // Call this once when the application is completely done with libusb
-    close(vga_fd); close(audio_fd);
+    // For a very clean exit:
+    // if (controller_fd >= 0) close(controller_fd); // Close controller file descriptor
+    // close(vga_fd); close(audio_fd);
+    // libusb_exit(NULL); // If libusb was used and initialized in opencontroller
     return 0;
 }
