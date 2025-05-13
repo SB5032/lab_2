@@ -269,6 +269,7 @@ void fill_nightsky_and_grass(void) {
   
     int r, c;
     unsigned char sky_tile_to_use;
+    unsigned char grass_tile_to_use;
 
     // Draw sky tiles to the back buffer.
     for (r = 0; r < GRASS_ROW_START; ++r) { 
