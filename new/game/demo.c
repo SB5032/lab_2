@@ -633,6 +633,11 @@ int main(void) {
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
 	// pthread_join(controller_thread, NULL); //close(vga_fd); close(audio_fd);
+	/* Terminate the network thread */
+  pthread_cancel(controller_thread_id);
+
+  /* Wait for the network thread to finish */
+  pthread_join(controller_thread_id, NULL);
 	goto game_restart_point; 
 
    
