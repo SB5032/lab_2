@@ -299,7 +299,7 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *first_random_wave_flag = true; 
     cleartiles(); 
     if (game_level >= 3) {
-        fill_night_sky_and_grass();
+        fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
     }
@@ -324,7 +324,7 @@ int main(void) {
 
     cleartiles(); clearSprites_buffered(); 
     if (game_level >= 3) {
-        fill_night_sky_and_grass();
+        fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
     } 
@@ -357,7 +357,7 @@ int main(void) {
 
     cleartiles(); clearSprites_buffered(); //fill_sky_and_grass(); 
     if (game_level >= 3) {
-        fill_night_sky_and_grass();
+        fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
     }
@@ -588,7 +588,7 @@ int main(void) {
         }
 
         if (game_level >= 3) {
-            fill_night_sky_and_grass();
+            fill_nightsky_and_grass();
         } else {
             fill_sky_and_grass();
         }
@@ -618,7 +618,7 @@ int main(void) {
     printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
     cleartiles(); 
     if (game_level >= 3) {
-        fill_night_sky_and_grass();
+        fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
     }
