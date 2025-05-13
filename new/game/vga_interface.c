@@ -266,35 +266,19 @@ void fill_nightsky_and_grass(void) {
         init_vga_interface(); 
         if (!vga_initialized) return; 
     }
-    int r, c;
+  
     int p, q;
-    unsigned char grass_tile_to_use;
     unsigned char sky_tile_to_use;
 
     // Draw sky tiles to the back buffer.
     for (p = 0; p < GRASS_ROW_START; ++p) { 
         for (q = 0; q < TILE_COLS; ++q) {
-            // Calculate the effective column in the "world" grass pattern
-            int pattern_col = (q + grass_current_tile_shift) % TILE_COLS;
-            if (pattern_col < 0) pattern_col += TILE_COLS; // Ensure positive for modulo-based pattern
-
-            // Choose grass tile type based on the scrolled pattern column and row
-            // This creates a diagonal-like repeating pattern that scrolls.
-            int rand_choice = (pattern_col + p) % 3; // Deterministic based on scrolled position
-
-            switch (rand_choice) {
-                case 0:
-                    sky_tile_to_use = NIGHTSKY_TILE_IDX;
-                    break;
-                case 1:
-                default:
-                    sky_tile_to_use = STAR_TILE_IDX;
-                    break;
-            }
-            write_tile_to_kernel(p, q, sky_tile_to_use);  
+           int rand_choice = rand() % 2;
+            sky_tile_to_use = (rand_choice == 0) ? NIGHTSKY_TILE_IDX : STAR_TILE_IDX;
+            write_tile_to_kernel(p, q, sky_tile_to_use);
         }
     }
-    
+
     // Draw grass tiles randomly to the back buffer, considering the scroll.
     for (r = GRASS_ROW_START; r < TILE_ROWS; ++r) { 
         for (c = 0; c < TILE_COLS; ++c) {

@@ -296,7 +296,13 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_A = LEVEL1_2_BAR_Y_A; 
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
-    cleartiles(); fill_sky_and_grass(); clearSprites_buffered(); 
+    cleartiles(); 
+    if (game_level >= 3) {
+        fill_night_sky_and_grass();
+    } else {
+        fill_sky_and_grass();
+    }
+    clearSprites_buffered(); 
 }
 
 int main(void) {
@@ -315,7 +321,12 @@ int main(void) {
     // }
 
 
-    cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); //vga_present_frame(); present_sprites();   
+    cleartiles(); clearSprites_buffered(); 
+    if (game_level >= 3) {
+        fill_night_sky_and_grass();
+    } else {
+        fill_sky_and_grass();
+    } 
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
@@ -343,7 +354,13 @@ int main(void) {
     static int last_actual_y_B = LEVEL1_2_BAR_Y_B;
     static bool first_random_wave_this_session = true;
 
-    cleartiles(); clearSprites_buffered(); fill_sky_and_grass(); 
+    cleartiles(); clearSprites_buffered(); //fill_sky_and_grass(); 
+    if (game_level >= 3) {
+        fill_night_sky_and_grass();
+    } else {
+        fill_sky_and_grass();
+    }
+
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
     const int hud_center_col = TILE_COLS / 2; const int hud_offset = 12; 
@@ -569,7 +586,11 @@ int main(void) {
             }
         }
 
-        fill_sky_and_grass(); 
+        if (game_level >= 3) {
+            fill_night_sky_and_grass();
+        } else {
+            fill_sky_and_grass();
+        }
         draw_all_active_bars_to_back_buffer(barsA, barsB, BAR_ARRAY_SIZE);
         write_text((unsigned char *)"lives", 5, 1, hud_center_col - hud_offset); 
         write_number(lives, 1, hud_center_col - hud_offset + 6);
@@ -594,7 +615,12 @@ int main(void) {
 
     // --- Game Over Sequence ---
     printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
-    cleartiles(); fill_sky_and_grass(); 
+    cleartiles(); 
+    if (game_level >= 3) {
+        fill_night_sky_and_grass();
+    } else {
+        fill_sky_and_grass();
+    }
     clearSprites_buffered(); 
     write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
     write_text((unsigned char *)"score", 5, 15, 13); write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 15, 19);
