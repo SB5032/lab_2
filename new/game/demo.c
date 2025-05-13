@@ -425,7 +425,7 @@ int main(void) {
 
         if (controller_state.b && !chicken.jumping) {
             chicken.vy = jump_velocity; chicken.jumping = true;
-            has_landed_this_jump = false; towerEnabled = false; play_sfx(0); 
+            has_landed_this_jump = false; towerEnabled = false; // play_sfx(0); 
             if(chicken.collecting_coin_idx != -1) { 
                 chicken.on_bar_collect_timer_us = 0; chicken.collecting_coin_idx = -1;
             }
@@ -569,7 +569,7 @@ int main(void) {
                                   &last_actual_y_A, &last_actual_y_B, &first_random_wave_this_session,
                                   game_level_main); 
                 vga_present_frame(); present_sprites();   
-                play_sfx(1); usleep(2000000); 
+             //   play_sfx(1); usleep(2000000); 
                 continue; 
             }
         }
