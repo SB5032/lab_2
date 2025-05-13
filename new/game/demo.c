@@ -313,9 +313,9 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     clearSprites_buffered(); 
 }
 
-void fill_nightsky_and_grass(void) {
-    fill_sky_and_grass(); 
-}
+// void fill_nightsky_and_grass(void) {
+//     fill_sky_and_grass(); 
+// }
 
 
 int main(void) {
