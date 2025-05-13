@@ -45,7 +45,9 @@
 #define CHICKEN_JUMP       9  
 #define TOWER_TILE_IDX     40 // User updated
 #define SUN_TILE           20
+#define MOON_TILE           21
 #define COIN_SPRITE_IDX    22 
+
 // SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
 
 // Tower properties
@@ -112,13 +114,14 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
 void *controller_input_thread(void *arg);
 void initChicken(Chicken *c);
 void moveChicken(Chicken *c);
-void update_sky_sprite_buffered(int current_level_display, int mode);
+void update_sky_sprite_buffered(int current_level_display, SkyMode mode);
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg);
-void fill_nightsky_and_grass(void); 
-
+// void fill_nightsky_and_grass(void); 
+void fill_dynamic_sky_and_grass(SkyMode mode);
+SkyMode get_sky_mode(int level);
 
 // --- Function Implementations ---
 
