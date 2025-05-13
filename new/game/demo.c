@@ -96,7 +96,7 @@ struct controller_output_packet controller_state;
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
 bool restart_game_flag = true; 
-// int game_level; // Will be a local variable in main
+ int game_level; // Will be a local variable in main
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
