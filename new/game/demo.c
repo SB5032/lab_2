@@ -31,6 +31,7 @@
 // #include "usbcontroller.h" // MODIFICATION: Removed usbcontroller.h
 #include "vga_interface.h" 
 #include "audio_interface.h"
+#include <stdint.h> 
 
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
@@ -126,11 +127,11 @@ typedef struct { int bar_idx; int bar_group_id; bool active; int sprite_register
 Coin active_coins[MAX_COINS_ON_SCREEN];
 
 // MODIFICATION: SkyMode enum as per user's code
-typedef enum {
-    SKY_DAY,
-    SKY_EVENING,
-    SKY_NIGHT
-} SkyMode;
+// typedef enum {
+//     SKY_DAY,
+//     SKY_EVENING,
+//     SKY_NIGHT
+// } SkyMode;
 
 
 // --- Function Prototypes for Game Logic ---
@@ -139,13 +140,13 @@ void move_all_active_bars(MovingBar bars_a[], MovingBar bars_b[], int array_size
 bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int prevY_chicken, Chicken *chicken, int *score, bool *has_landed_this_jump);
 void initChicken(Chicken *c);
 void moveChicken(Chicken *c);
-void update_sky_sprite_buffered(int current_level_display, SkyMode mode); // MODIFIED: Takes SkyMode
+// void update_sky_sprite_buffered(int current_level_display, SkyMode mode); // MODIFIED: Takes SkyMode
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg);
-void fill_dynamic_sky_and_grass(SkyMode mode); // User function
-SkyMode get_sky_mode(int level); // User function
+// void fill_dynamic_sky_and_grass(SkyMode mode); // User function
+// SkyMode get_sky_mode(int level); // User function
 
 // --- NEW Controller Input Functions (Linux Event Device) ---
 int open_game_controller() {
@@ -306,15 +307,15 @@ void initChicken(Chicken *c) {
 }
 void moveChicken(Chicken *c) { if (!c->jumping && towerEnabled) return; c->y += c->vy; c->vy += GRAVITY; }
 
-void update_sky_sprite_buffered(int current_level_display, SkyMode mode) { 
-    const int max_sun_level = MAX_GAME_LEVEL; 
-    const int start_x_sun = 32; const int end_x_sun = 608; const int base_y_sun = 64;      
-    double fraction = (current_level_display > 1) ? (double)(current_level_display - 1) / (max_sun_level - 1) : 0.0;
-    if (current_level_display >= max_sun_level) fraction = 1.0; 
-    int x_pos = start_x_sun + (int)((end_x_sun - start_x_sun) * fraction + 0.5);
-    unsigned char sprite_tile_idx = (mode == SKY_NIGHT) ? MOON_TILE : SUN_TILE;
-    write_sprite_to_kernel_buffered(1, base_y_sun, x_pos, sprite_tile_idx, 1); // Sprite reg 1 for sun/moon
-}
+// void update_sky_sprite_buffered(int current_level_display, SkyMode mode) { 
+//     const int max_sun_level = MAX_GAME_LEVEL; 
+//     const int start_x_sun = 32; const int end_x_sun = 608; const int base_y_sun = 64;      
+//     double fraction = (current_level_display > 1) ? (double)(current_level_display - 1) / (max_sun_level - 1) : 0.0;
+//     if (current_level_display >= max_sun_level) fraction = 1.0; 
+//     int x_pos = start_x_sun + (int)((end_x_sun - start_x_sun) * fraction + 0.5);
+//     unsigned char sprite_tile_idx = (mode == SKY_NIGHT) ? MOON_TILE : SUN_TILE;
+//     write_sprite_to_kernel_buffered(1, base_y_sun, x_pos, sprite_tile_idx, 1); // Sprite reg 1 for sun/moon
+// }
 
 void resetBarArray(MovingBar bars[], int array_size) {
     for (int i = 0; i < array_size; i++) { 
@@ -359,11 +360,11 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
-SkyMode get_sky_mode(int level) {
-    if (level >= 5) return SKY_NIGHT;
-    if (level >= 3) return SKY_EVENING;
-    return SKY_DAY;
-}
+// SkyMode get_sky_mode(int level) {
+//     if (level >= 5) return SKY_NIGHT;
+//     if (level >= 3) return SKY_EVENING;
+//     return SKY_DAY;
+// }
 
 
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg) {
@@ -378,17 +379,17 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
     cleartiles(); 
-    SkyMode current_sky_mode = get_sky_mode(game_level_for_bg); // Use passed game_level
-    fill_dynamic_sky_and_grass(current_sky_mode);
+    // SkyMode current_sky_mode = get_sky_mode(game_level_for_bg); // Use passed game_level
+    // fill_dynamic_sky_and_grass(current_sky_mode);
     clearSprites_buffered(); 
 }
 
-void fill_dynamic_sky_and_grass(SkyMode mode) { // User function from their code
-    // This function should be implemented by the user based on SkyMode
-    // For now, just calling the standard one as a placeholder.
-    // User needs to define different SKY_TILE_IDX for night/evening if desired.
-    fill_sky_and_grass(); 
-}
+// void fill_dynamic_sky_and_grass(SkyMode mode) { // User function from their code
+//     // This function should be implemented by the user based on SkyMode
+//     // For now, just calling the standard one as a placeholder.
+//     // User needs to define different SKY_TILE_IDX for night/evening if desired.
+//     fill_sky_and_grass(); 
+// }
 
 
 int main(void) {
@@ -426,9 +427,9 @@ int main(void) {
 
 
     cleartiles(); clearSprites_buffered(); 
-    SkyMode current_sky_mode_main = get_sky_mode(game_level_main);
-    fill_dynamic_sky_and_grass(current_sky_mode_main);
-    update_sky_sprite_buffered(game_level_main, current_sky_mode_main);
+    // SkyMode current_sky_mode_main = get_sky_mode(game_level_main);
+    // fill_dynamic_sky_and_grass(current_sky_mode_main);
+    // update_sky_sprite_buffered(game_level_main, current_sky_mode_main);
     vga_present_frame(); present_sprites();   
 
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
@@ -451,9 +452,9 @@ int main(void) {
 
 
     cleartiles(); clearSprites_buffered(); 
-    current_sky_mode_main = get_sky_mode(game_level_main);
-    fill_dynamic_sky_and_grass(current_sky_mode_main);
-    update_sky_sprite_buffered(game_level_main, current_sky_mode_main);
+    // current_sky_mode_main = get_sky_mode(game_level_main);
+    // fill_dynamic_sky_and_grass(current_sky_mode_main);
+    // update_sky_sprite_buffered(game_level_main, current_sky_mode_main);
     
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
@@ -479,7 +480,7 @@ int main(void) {
         game_level_main = 1 + (score / SCORE_PER_LEVEL);
         if (game_level_main > MAX_GAME_LEVEL) game_level_main = MAX_GAME_LEVEL;
 
-        current_sky_mode_main = get_sky_mode(game_level_main); // Update sky mode based on level
+        // current_sky_mode_main = get_sky_mode(game_level_main); // Update sky mode based on level
 
         switch (game_level_main) { 
             case 1: 
@@ -696,7 +697,7 @@ int main(void) {
         vga_present_frame();
         clearSprites_buffered(); 
         write_sprite_to_kernel_buffered(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); 
-        update_sky_sprite_buffered(game_level_main, current_sky_mode_main); 
+        // update_sky_sprite_buffered(game_level_main, current_sky_mode_main); 
         draw_active_coins_buffered(barsA, barsB); 
         present_sprites(); 
         usleep(16666); 
@@ -704,9 +705,9 @@ int main(void) {
 
     // --- Game Over Sequence ---
     cleartiles(); 
-    current_sky_mode_main = get_sky_mode(game_level_main); // Use level at game over for background
-    fill_dynamic_sky_and_grass(current_sky_mode_main);
-    update_sky_sprite_buffered(game_level_main, current_sky_mode_main); // Update sun/moon for game over screen
+    // current_sky_mode_main = get_sky_mode(game_level_main); // Use level at game over for background
+    // fill_dynamic_sky_and_grass(current_sky_mode_main);
+    // update_sky_sprite_buffered(game_level_main, current_sky_mode_main); // Update sun/moon for game over screen
     clearSprites_buffered(); // Clear all other sprites for game over
 
     write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
