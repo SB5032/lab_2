@@ -360,9 +360,9 @@ int main(void) {
     cleartiles(); clearSprites_buffered(); 
 
     // vga_present_frame(); present_sprites();
-    SkyMode mode = get_sky_mode(game_level);
-    fill_dynamic_sky_and_grass(mode);
-    update_sky_sprite_buffered(game_level, mode);
+    SkyMode sky_mode = get_sky_mode(game_level);
+    fill_dynamic_sky_and_grass(sky_mode);
+    update_sky_sprite_buffered(game_level, sky_mode);
    
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
@@ -377,9 +377,9 @@ int main(void) {
 
     cleartiles(); clearSprites_buffered(); 
     // if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
-    SkyMode mode = get_sky_mode(game_level);
-    fill_dynamic_sky_and_grass(mode);
-    update_sky_sprite_buffered(game_level, mode);
+    SkyMode sky_mode_2 = get_sky_mode(game_level);
+    fill_dynamic_sky_and_grass(sky_mode_2);
+    update_sky_sprite_buffered(game_level, sky_mode_2);
 
 
     srand(time(NULL)); 
@@ -628,9 +628,9 @@ int main(void) {
 
     // --- Game Over Sequence ---
     cleartiles(); 
-    SkyMode mode = get_sky_mode(game_level);
-    fill_dynamic_sky_and_grass(mode);
-    update_sky_sprite_buffered(game_level, mode);
+    SkyMode mode_3 = get_sky_mode(game_level);
+    fill_dynamic_sky_and_grass(mode_3);
+    update_sky_sprite_buffered(game_level, mode_3);
 
     clearSprites_buffered(); 
     write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
