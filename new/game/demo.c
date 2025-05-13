@@ -49,6 +49,7 @@
 #define SUN_TILE           20
 #define MOON_TILE          21
 #define COIN_SPRITE_IDX    22 
+#define EVE_TILE_IDX       43
 // SKY_TILE_IDX, GRASS_TILE_1_IDX, etc. are defined in vga_interface.h
 
 // Tower properties
@@ -236,9 +237,56 @@ void update_sun_sprite_buffered(int current_level_display) {
     double fraction = (current_level_display > 1) ? (double)(current_level_display - 1) / (max_sun_level - 1) : 0.0;
     if (current_level_display >= max_sun_level) fraction = 1.0; 
     int sun_x_pos = start_x_sun + (int)((end_x_sun - start_x_sun) * fraction + 0.5);
-    write_sprite_to_kernel_buffered(1, base_y_sun, sun_x_pos, (game_level_main >=3 ? MOON_TILE : SUN_TILE), 1); 
+    write_sprite_to_kernel_buffered(1, base_y_sun, sun_x_pos, (game_level_main >=4 ? MOON_TILE : SUN_TILE), 1); 
 }
 
+//Modified
+
+// MODIFICATION: Fills the sky and randomly distributes three types of grass tiles,
+// taking into account the current scroll offset.
+void fill_sky_and_grass(void) {
+    if (!vga_initialized) {
+        init_vga_interface(); 
+        if (!vga_initialized) return; 
+    }
+    int r, c;
+    unsigned char grass_tile_to_use;
+
+    // Draw sky tiles to the back buffer.
+    for (r = 0; r < GRASS_ROW_START; ++r) { 
+        for (c = 0; c < TILE_COLS; ++c) {
+            write_tile_to_kernel(r, c, game_level_main =3 ? EVE_TILE_IDX: SKY_TILE_IDX); 
+        }
+    }
+    // Draw grass tiles randomly to the back buffer, considering the scroll.
+    for (r = GRASS_ROW_START; r < TILE_ROWS; ++r) { 
+        for (c = 0; c < TILE_COLS; ++c) {
+            // Calculate the effective column in the "world" grass pattern
+            int pattern_col = (c + grass_current_tile_shift) % TILE_COLS;
+            if (pattern_col < 0) pattern_col += TILE_COLS; // Ensure positive for modulo-based pattern
+
+            // Choose grass tile type based on the scrolled pattern column and row
+            // This creates a diagonal-like repeating pattern that scrolls.
+            int rand_choice = (pattern_col + r) % 3; // Deterministic based on scrolled position
+
+            switch (rand_choice) {
+                case 0:
+                    grass_tile_to_use = GRASS_TILE_1_IDX;
+                    break;
+                case 1:
+                    grass_tile_to_use = GRASS_TILE_2_IDX;
+                    break;
+                case 2:
+                default: 
+                    grass_tile_to_use = GRASS_TILE_3_IDX;
+                    break;
+            }
+            write_tile_to_kernel(r, c, grass_tile_to_use); 
+        }
+    }
+}
+
+///Modified
 void resetBarArray(MovingBar bars[], int array_size) {
     for (int i = 0; i < array_size; i++) { 
         bars[i].x = BAR_INACTIVE_X; bars[i].length = 0; 
