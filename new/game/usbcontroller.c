@@ -1,112 +1,124 @@
-#include "usbcontroller.h"
-
+#include "usbcontroller.h" // Contains VENDOR_ID, PRODUCT_ID, GAMEPAD_CONTROL_PROTOCOL etc.
 #include <stdio.h>
 #include <stdlib.h> 
 
 // find and return a usb controller via the argument, or NULL if not found
 struct libusb_device_handle *opencontroller(uint8_t *endpoint_address) {
     //initialize libusb
-	int initReturn = libusb_init(NULL);
+	int initReturn = libusb_init(NULL); // Initialize libusb context
 
 	if(initReturn < 0) {
 		fprintf(stderr, "libusb_init failed: %s\n", libusb_error_name(initReturn));
-		// No handle to return, libusb_exit should be called if we are the one failing init.
-		// However, if another part of the program might have already inited, this is complex.
-		// For a self-contained controller function, exiting here if init fails is reasonable.
+		// Cannot proceed if libusb cannot be initialized.
 		exit(1); 
 	}
+    printf("DEBUG: libusb initialized successfully.\n");
 
     struct libusb_device_descriptor desc;
-    struct libusb_device_handle *controller = NULL;
-    libusb_device **devs;
-    ssize_t num_devs, d;
-    uint8_t i_interface, k_altsetting; // Renamed to avoid confusion with loop variables
+    struct libusb_device_handle *controller = NULL; // Handle for the opened device
+    libusb_device **devs; // Pointer to a list of devices
+    ssize_t num_devs, d_idx; // Number of devices and loop index for devices
+    uint8_t i_idx, k_idx;    // Loop indices for interfaces and altsettings
 
+    // Get a list of all USB devices
     if ( (num_devs = libusb_get_device_list(NULL, &devs)) < 0 ) {
-        fprintf(stderr, "Error: libusb_get_device_list failed\n");
-        libusb_exit(NULL); // Clean up libusb if list fails
+        fprintf(stderr, "Error: libusb_get_device_list failed: %s\n", libusb_error_name((int)num_devs));
+        libusb_exit(NULL); // Clean up libusb if device list fails
         exit(1);
     }
+    printf("DEBUG: Found %zd USB devices.\n", num_devs);
 
-    // Iterate over all devices list to find the one with the right protocol
-    for (d = 0; d < num_devs; d++) {
-        libusb_device *dev_ptr = devs[d]; // Use a different name for the device pointer
-        if ( libusb_get_device_descriptor(dev_ptr, &desc) < 0 ) {
-            fprintf(stderr, "Error: libusb_get_device_descriptor failed for a device\n");
+    // Iterate over all devices to find the gamepad
+    for (d_idx = 0; d_idx < num_devs; d_idx++) {
+        libusb_device *current_dev = devs[d_idx]; // Get a pointer to the current device
+        if ( libusb_get_device_descriptor(current_dev, &desc) < 0 ) {
+            fprintf(stderr, "Warning: libusb_get_device_descriptor failed for a device, skipping.\n");
             continue; // Skip this device
         }
+        
+        // Optional: Print VID/PID for debugging all devices
+        // printf("DEBUG: Checking Device %zd: VID=0x%04x, PID=0x%04x, Class=0x%02x\n", 
+        //        d_idx, desc.idVendor, desc.idProduct, desc.bDeviceClass);
 
-        // Check if this device might be the one based on Vendor/Product ID if known,
-        // or proceed to check interfaces.
-        // For this example, we rely on interface descriptors as in the original code.
-
-        if (desc.bDeviceClass == LIBUSB_CLASS_PER_INTERFACE || desc.bDeviceClass == 0) { // Also check for class 0
+        // Gamepads often have bDeviceClass = 0 (defined at interface level) or LIBUSB_CLASS_PER_INTERFACE
+        if (desc.bDeviceClass == 0 || desc.bDeviceClass == LIBUSB_CLASS_PER_INTERFACE) {
             struct libusb_config_descriptor *config;
-            int getConfigDescResult = libusb_get_config_descriptor(dev_ptr, 0, &config);
-            if (getConfigDescResult < 0) {
-                // fprintf(stderr, "Warning: libusb_get_config_descriptor failed for device %zd: %s\n", d, libusb_error_name(getConfigDescResult));
-                continue; // Skip this device if config descriptor fails
+            int r = libusb_get_config_descriptor(current_dev, 0, &config);
+            if (r < 0) {
+                // fprintf(stderr, "Warning: Could not get config descriptor for device %zd: %s\n", d_idx, libusb_error_name(r));
+                continue; // Skip this device
             }
 
-            for (i_interface = 0 ; i_interface < config->bNumInterfaces ; i_interface++) {
-                for ( k_altsetting = 0 ; k_altsetting < config->interface[i_interface].num_altsetting ; k_altsetting++ ) {
-                    const struct libusb_interface_descriptor *inter = 
-                    config->interface[i_interface].altsetting + k_altsetting;
+            for (i_idx = 0 ; i_idx < config->bNumInterfaces ; i_idx++) {
+                for ( k_idx = 0 ; k_idx < config->interface[i_idx].num_altsetting ; k_idx++ ) {
+                    const struct libusb_interface_descriptor *inter = &config->interface[i_idx].altsetting[k_idx];
+                    
+                    // printf("DEBUG: Dev %zd, Iface %d, Alt %d: Class=0x%02x, SubClass=0x%02x, Protocol=0x%02x, NumEndpoints=%d\n",
+                    //        d_idx, inter->bInterfaceNumber, inter->bAlternateSetting,
+                    //        inter->bInterfaceClass, inter->bInterfaceSubClass, inter->bInterfaceProtocol, inter->bNumEndpoints);
 
+                    // Check if this interface matches our criteria (HID class and specific protocol)
                     if (inter->bInterfaceClass == LIBUSB_CLASS_HID &&
                         inter->bInterfaceProtocol == GAMEPAD_CONTROL_PROTOCOL) {
                         
-                        int r;
-                        if ((r = libusb_open(dev_ptr, &controller)) != 0) {
-                            fprintf(stderr, "libusb_open failed for matching device: %s\n", libusb_error_name(r));
-                            controller = NULL; // Ensure controller is NULL if open fails
-                            continue; // Try next compatible interface/device
+                        printf("DEBUG: Found potential HID Interface %d with Protocol %d on Device %zd (VID:0x%04x, PID:0x%04x)\n",
+                               inter->bInterfaceNumber, inter->bInterfaceProtocol, d_idx, desc.idVendor, desc.idProduct);
+
+                        if (inter->bNumEndpoints == 0) {
+                            // printf("DEBUG: Interface has 0 endpoints, cannot be our gamepad data interface. Skipping.\n");
+                            continue;
                         }
 
-                        // MODIFICATION: Enable auto-detaching of kernel driver for this device handle
-                        // This should be done BEFORE claiming the interface.
+                        // Attempt to open the device
+                        if ((r = libusb_open(current_dev, &controller)) != 0) {
+                            fprintf(stderr, "Warning: libusb_open failed for matching device: %s. Trying next...\n", libusb_error_name(r));
+                            controller = NULL; 
+                            continue; // Try next compatible interface or device
+                        }
+                        printf("DEBUG: Device VID:0x%04x, PID:0x%04x opened successfully.\n", desc.idVendor, desc.idProduct);
+
+                        // Enable auto-detaching of kernel driver for the whole device
+                        // This function operates on the device handle, not a specific interface index for the handle.
                         if (libusb_set_auto_detach_kernel_driver(controller, 1) != LIBUSB_SUCCESS) {
-                             fprintf(stderr, "Warning: Could not enable auto-detach kernel driver for controller.\n");
-                             // This is not necessarily fatal, claim might still work or fail if driver is active.
+                             fprintf(stderr, "Warning: Could not enable auto-detach kernel driver. Claiming might fail if driver is active.\n");
                         }
                         
-                        // Attempt to detach kernel driver if active (auto-detach might not always work or be immediate)
-                        // This is somewhat redundant if auto-detach is enabled but can be a fallback.
-                        if (libusb_kernel_driver_active(controller, i_interface)) {
-                            // printf("Kernel driver active on interface %d. Attempting to detach...\n", i_interface);
-                            if (libusb_detach_kernel_driver(controller, i_interface) != 0) {
-                                fprintf(stderr, "Error detaching kernel driver from interface %d. Claim might fail.\n", i_interface);
+                        // Check if kernel driver is active on this specific interface and detach it
+                        if (libusb_kernel_driver_active(controller, inter->bInterfaceNumber)) {
+                            printf("DEBUG: Kernel driver active on interface %d. Attempting to detach...\n", inter->bInterfaceNumber);
+                            if (libusb_detach_kernel_driver(controller, inter->bInterfaceNumber) == 0) {
+                                printf("DEBUG: Kernel driver detached successfully from interface %d.\n", inter->bInterfaceNumber);
                             } else {
-                                // printf("Kernel driver detached successfully from interface %d.\n", i_interface);
+                                fprintf(stderr, "Warning: Error detaching kernel driver from interface %d. Claim might fail.\n", inter->bInterfaceNumber);
                             }
                         }
 
-                        // Now claim the interface
-                        if ((r = libusb_claim_interface(controller, i_interface)) != 0) {
-                            fprintf(stderr, "Claim interface %d failed: %s\n", i_interface, libusb_error_name(r));
-                            libusb_close(controller); // Close handle if claim fails
-                            controller = NULL;        // Mark as failed for this attempt
-                            continue;                 // Try next compatible interface/device
+                        // Claim the interface
+                        if ((r = libusb_claim_interface(controller, inter->bInterfaceNumber)) != 0) {
+                            fprintf(stderr, "Warning: Claim interface %d failed: %s. Trying next...\n", inter->bInterfaceNumber, libusb_error_name(r));
+                            libusb_close(controller); 
+                            controller = NULL;        
+                            continue;                 
                         }
                         
-                        *endpoint_address = inter->endpoint[0].bEndpointAddress;
-                        printf("DEBUG: USB Controller found, opened, and interface %d claimed. Endpoint: 0x%02X\n", i_interface, *endpoint_address);
-                        libusb_free_config_descriptor(config); // Free config descriptor
-                        goto found; // Successfully found and claimed
+                        *endpoint_address = inter->endpoint[0].bEndpointAddress; // Assuming first endpoint is correct Interrupt IN
+                        printf("SUCCESS: USB Controller interface %d claimed. Endpoint Address: 0x%02X\n", inter->bInterfaceNumber, *endpoint_address);
+                        
+                        libusb_free_config_descriptor(config); // Free the configuration descriptor
+                        goto found_controller; // Successfully found and claimed
                     }
                 }
             }
-            libusb_free_config_descriptor(config); // Free config descriptor if no match found in it
+            libusb_free_config_descriptor(config); // Free config descriptor if no match found within it
         }
     }
 
-found:
+found_controller:
     libusb_free_device_list(devs, 1); // Free the list of devices
 
     if (!controller) {
-        fprintf(stderr, "Error: No suitable USB game controller found or claimed.\n");
+        fprintf(stderr, "Error: No USB game controller found or claimed after checking all devices/interfaces.\n");
         libusb_exit(NULL); // Deinitialize libusb if no controller was successfully set up
-                           // This assumes this function is the sole manager of libusb_init for this path.
     }
     return controller;
 }
@@ -114,75 +126,54 @@ found:
 
 struct controller_output_packet *usb_to_output(struct controller_output_packet *packet, 
                                                 unsigned char* output_array) {
-    /* check up and down arrow */
+    // Check up and down arrow
     switch(output_array[IND_UPDOWN]) {
-        case 0x0: packet->updown = 1;
-            break;
-        case 0xff: packet->updown = -1;
-            break;
-        default: packet->updown = 0;
-            break;
+        case 0x00: packet->updown = 1; break;    // Up
+        case 0xff: packet->updown = -1; break;   // Down
+        default:   packet->updown = 0; break;    // Neutral or invalid
     }
-    /* check left and right arrow */
+    // Check left and right arrow
     switch(output_array[IND_LEFTRIGHT]) {
-        case 0x0: packet->leftright = 1;
-            break;
-        case 0xff: packet->leftright = -1;
-            break;
-        default: packet->leftright = 0;
-            break;
+        case 0x00: packet->leftright = 1; break;  // Left
+        case 0xff: packet->leftright = -1; break; // Right
+        default:   packet->leftright = 0; break;  // Neutral or invalid
     }
 
-    /* check select and start with bitshifting */
-    switch(output_array[IND_SELSTARIB] >> 4) {
-        case 0x03: packet->select = 1; packet->start = 1; // Fixed: was packet->select = packet->start = 1;
-            break;
-        case 0x02: packet->start = 1;
-            packet->select = 0;
-            break;
-        case 0x01: packet->start = 0;
-            packet->select = 1;
-            break;
-        case 0x00: packet->start = 0;
-            packet->select = 0;
-            break;
-        default: // Should not happen with 4 bits
-            packet->start = 0;
-            packet->select = 0;
-            break;
-    }
+    // Check select and start (typically in the upper nibble of IND_SELSTARIB)
+    unsigned char sel_start_byte = output_array[IND_SELSTARIB] >> 4;
+    packet->select = (sel_start_byte & 0x01) ? 1 : 0; // Assuming bit 0 for select
+    packet->start  = (sel_start_byte & 0x02) ? 1 : 0; // Assuming bit 1 for start
+                                                     // Adjust if your controller maps these differently
 
-    /* check left and right rib with bitmasking */
-    // Original code for IND_SELSTARIB & 0x0f seems correct for L/R ribs
-    // Assuming LSB is right_rib, next bit is left_rib
-    packet->right_rib = (output_array[IND_SELSTARIB] & 0x01) ? 1 : 0;
-    packet->left_rib  = (output_array[IND_SELSTARIB] & 0x02) ? 1 : 0;
+    // Check left and right rib (typically in the lower nibble of IND_SELSTARIB)
+    unsigned char rib_byte = output_array[IND_SELSTARIB] & 0x0F;
+    packet->left_rib  = (rib_byte & 0x02) ? 1 : 0; // Assuming bit 1 for Left Rib
+    packet->right_rib = (rib_byte & 0x01) ? 1 : 0; // Assuming bit 0 for Right Rib
+                                                   // Adjust if your controller maps these differently
 
+    // Check face buttons (X, Y, A, B - typically in IND_XYAB)
+    // The mapping of bits to buttons can vary significantly between controllers.
+    // The original code used the upper nibble (>> 4).
+    unsigned char xyab_byte = output_array[IND_XYAB]; // Using the whole byte first for clarity
+                                                      // Or output_array[IND_XYAB] >> 4; if only upper nibble matters
 
-    packet->x = 0; packet->y = 0; packet->a = 0; packet->b = 0; // Initialize
-
-    /* check if x, y, a, b is pressed */
-    // Assuming byte IND_XYAB:
+    // Example mapping (common but not universal):
     // Bit 0: A
     // Bit 1: B
-    // Bit 2: X
-    // Bit 3: Y
-    // (This might vary by controller, original code used >> 4 which implies upper nibble)
-    // Reverting to original interpretation based on IND_XYAB >> 4
-    unsigned char xyab_byte = output_array[IND_XYAB] >> 4; // Look at upper nibble
+    // Bit 2: X (or sometimes C/Z on older controllers)
+    // Bit 3: Y (or sometimes C/Z on older controllers)
+    // Bit 4: L1 (if not in IND_SELSTARIB)
+    // Bit 5: R1 (if not in IND_SELSTARIB)
+    // Bit 6: L2
+    // Bit 7: R2
 
-    if (xyab_byte & 0x01) { // Original code implies this bit is X
-        packet->x = 1;
-    }
-    if (xyab_byte & 0x02) { // Original code implies this bit is A
-        packet->a = 1;
-    }
-    if (xyab_byte & 0x04) { // Original code implies this bit is B
-        packet->b = 1;
-    }
-    if (xyab_byte & 0x08) { // Original code implies this bit is Y
-        packet->y = 1;
-    }
+    // Using the original code's interpretation (upper nibble for XYAB)
+    unsigned char face_buttons_upper_nibble = output_array[IND_XYAB] >> 4;
+
+    packet->x = (face_buttons_upper_nibble & 0x01) ? 1 : 0; // Original: X
+    packet->a = (face_buttons_upper_nibble & 0x02) ? 1 : 0; // Original: A
+    packet->b = (face_buttons_upper_nibble & 0x04) ? 1 : 0; // Original: B
+    packet->y = (face_buttons_upper_nibble & 0x08) ? 1 : 0; // Original: Y
 
     return packet;
 }
