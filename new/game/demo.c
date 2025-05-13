@@ -386,6 +386,7 @@ int main(void) {
                 current_jump_initiation_delay = LONG_JUMP_INITIATION_DELAY;
                 break;
             case 3: 
+                fill_nightsky_and_grass();
                 current_min_bar_tiles = 5; current_max_bar_tiles = 7; 
                 current_bar_count_per_wave = 3;
                 current_bar_speed_base = 3; 
