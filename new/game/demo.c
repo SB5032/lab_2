@@ -244,6 +244,9 @@ void update_sun_sprite_buffered(int current_level_display) {
 
 // MODIFICATION: Fills the sky and randomly distributes three types of grass tiles,
 // taking into account the current scroll offset.
+// MODIFICATION: Variables for scrolling grass effect
+int grass_pixel_scroll_accumulator = 0;
+int grass_current_tile_shift = 0; // How many full tiles the grass pattern has shifted
 void fill_sky_and_grass(void) {
     if (!vga_initialized) {
         init_vga_interface(); 
