@@ -25,7 +25,9 @@ static bool vga_initialized = false;
 static SpriteHWState desired_sprite_states[MAX_HARDWARE_SPRITES];
 static SpriteHWState actual_hw_sprites[MAX_HARDWARE_SPRITES];   
 
-
+// MODIFICATION: Variables for scrolling grass effect
+static int grass_pixel_scroll_accumulator = 0;
+static int grass_current_tile_shift = 0; // How many full tiles the grass pattern has shifted
 
 
 static void vga_hardware_write_tile(unsigned char r, unsigned char c, unsigned char n) {
@@ -210,6 +212,51 @@ void update_grass_scroll(int scroll_speed_px) {
         grass_current_tile_shift %= TILE_COLS;
         if (grass_current_tile_shift < 0) {
             grass_current_tile_shift += TILE_COLS;
+        }
+    }
+}
+
+
+// MODIFICATION: Fills the sky and randomly distributes three types of grass tiles,
+// taking into account the current scroll offset.
+void fill_sky_and_grass(void) {
+    if (!vga_initialized) {
+        init_vga_interface(); 
+        if (!vga_initialized) return; 
+    }
+    int r, c;
+    unsigned char grass_tile_to_use;
+
+    // Draw sky tiles to the back buffer.
+    for (r = 0; r < GRASS_ROW_START; ++r) { 
+        for (c = 0; c < TILE_COLS; ++c) {
+            write_tile_to_kernel(r, c, SKY_TILE_IDX); 
+        }
+    }
+    // Draw grass tiles randomly to the back buffer, considering the scroll.
+    for (r = GRASS_ROW_START; r < TILE_ROWS; ++r) { 
+        for (c = 0; c < TILE_COLS; ++c) {
+            // Calculate the effective column in the "world" grass pattern
+            int pattern_col = (c + grass_current_tile_shift) % TILE_COLS;
+            if (pattern_col < 0) pattern_col += TILE_COLS; // Ensure positive for modulo-based pattern
+
+            // Choose grass tile type based on the scrolled pattern column and row
+            // This creates a diagonal-like repeating pattern that scrolls.
+            int rand_choice = (pattern_col + r) % 3; // Deterministic based on scrolled position
+
+            switch (rand_choice) {
+                case 0:
+                    grass_tile_to_use = GRASS_TILE_1_IDX;
+                    break;
+                case 1:
+                    grass_tile_to_use = GRASS_TILE_2_IDX;
+                    break;
+                case 2:
+                default: 
+                    grass_tile_to_use = GRASS_TILE_3_IDX;
+                    break;
+            }
+            write_tile_to_kernel(r, c, grass_tile_to_use); 
         }
     }
 }
