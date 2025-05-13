@@ -11,8 +11,7 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// Corrected USB handling in controller_input_thread.
-// Ensured consistent function signatures for reset_for_level_attempt.
+// TILE_SIZE is now included via vga_interface.h
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,13 +24,13 @@
 #include <math.h> // For ceil and floor
 
 #include "usbcontroller.h" 
-#include "vga_interface.h" 
+#include "vga_interface.h" // Now includes TILE_SIZE and update_grass_scroll
 #include "audio_interface.h"
 
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
 #define WIDTH             480   // VGA height (pixels)
-// TILE_SIZE is now defined in vga_interface.h
+// TILE_SIZE is defined in vga_interface.h
 #define WALL               8   // User updated: top/bottom margin (pixels)
 #define GRAVITY            +1
 
@@ -73,7 +72,7 @@
 
 // Y-position clamping
 #define EFFECTIVE_BAR_MIN_Y_POS  40 
-#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 16 - (BAR_HEIGHT_ROWS * TILE_SIZE)) 
+#define EFFECTIVE_BAR_MAX_Y_POS  (WIDTH - 25 - (BAR_HEIGHT_ROWS * TILE_SIZE)) 
 
 // Hardcoded Y positions for Levels 1 & 2, and for reset after death
 #define LEVEL1_2_BAR_Y_A 240
@@ -87,7 +86,7 @@
 #define COIN_POINTS          10 
 #define COIN_SPAWN_LEVEL     3
 #define COIN_SPAWN_CHANCE    100
-#define COIN_COLLECT_DELAY_US (500) // User updated
+#define COIN_COLLECT_DELAY_US (500) 
 #define FIRST_COIN_SPRITE_REGISTER 2
 
 // Global variables
@@ -97,7 +96,7 @@ struct controller_output_packet controller_state;
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
 bool restart_game_flag = true; 
-int game_level = 1; // This will be a local variable in main
+// int game_level; // Will be a local variable in main
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
@@ -117,7 +116,6 @@ void update_sun_sprite_buffered(int current_level_display);
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
-// MODIFICATION: Ensure prototype matches definition and call (15 arguments)
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg);
 void fill_nightsky_and_grass(void); 
 
@@ -224,6 +222,10 @@ void *controller_input_thread(void *arg) {
         }
         else {
             fprintf(stderr, "Controller read error in thread: %s\n", libusb_error_name(transfer_status));
+            if (transfer_status == LIBUSB_ERROR_NO_DEVICE) {
+                fprintf(stderr, "Controller thread: Device disconnected.\n");
+                break; 
+            }
             usleep(100000); 
         }
     }
@@ -292,7 +294,6 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
-// MODIFICATION: Ensure definition matches prototype and call (15 arguments)
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg) {
     initChicken(c); 
     *tEnabled = true;
@@ -313,9 +314,9 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     clearSprites_buffered(); 
 }
 
-// void fill_nightsky_and_grass(void) {
-//     fill_sky_and_grass(); 
-// }
+void fill_nightsky_and_grass(void) {
+    fill_sky_and_grass(); 
+}
 
 
 int main(void) {
@@ -324,7 +325,7 @@ int main(void) {
     static bool first_random_wave_this_session = true;
 
     int score; 
-    int game_level_main; // Renamed to avoid conflict with global game_level if it existed
+    int game_level_main; 
     int lives;
 
 
@@ -339,7 +340,7 @@ int main(void) {
     
     game_restart_point: ; 
     score = 0; 
-    game_level_main = 1; // Use local game_level_main for game logic
+    game_level_main = 1; 
     lives = INITIAL_LIVES; 
     coins_collected_this_game = 0; 
     
