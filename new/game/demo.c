@@ -112,7 +112,7 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
 void *controller_input_thread(void *arg);
 void initChicken(Chicken *c);
 void moveChicken(Chicken *c);
-void update_sun_sprite_buffered(int current_level_display);
+void update_sky_sprite_buffered(int current_level_display, int mode);
 void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
@@ -242,13 +242,16 @@ void initChicken(Chicken *c) {
 }
 void moveChicken(Chicken *c) { if (!c->jumping && towerEnabled) return; c->y += c->vy; c->vy += GRAVITY; }
 
-void update_sun_sprite_buffered(int current_level_display) { 
-    const int max_sun_level = MAX_GAME_LEVEL; 
-    const int start_x_sun = 32; const int end_x_sun = 608; const int base_y_sun = 64;      
-    double fraction = (current_level_display > 1) ? (double)(current_level_display - 1) / (max_sun_level - 1) : 0.0;
-    if (current_level_display >= max_sun_level) fraction = 1.0; 
-    int sun_x_pos = start_x_sun + (int)((end_x_sun - start_x_sun) * fraction + 0.5);
-    write_sprite_to_kernel_buffered(1, base_y_sun, sun_x_pos, SUN_TILE, 1); 
+void update_sky_sprite_buffered(int current_level, SkyMode mode) {
+    const int start_x = 32, end_x = 608, y = 64;
+    double fraction = (current_level > 1) ? 
+        (double)(current_level - 1) / (MAX_GAME_LEVEL - 1) : 0.0;
+    if (current_level >= MAX_GAME_LEVEL) fraction = 1.0;
+
+    int x_pos = start_x + (int)((end_x - start_x) * fraction + 0.5);
+
+    unsigned char sprite_tile = (mode == SKY_NIGHT) ? MOON_TILE : SUN_TILE;
+    write_sprite_to_kernel_buffered(1, y, x_pos, sprite_tile, 1);
 }
 
 void resetBarArray(MovingBar bars[], int array_size) {
@@ -294,6 +297,12 @@ void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]) {
     }
 }
 
+SkyMode get_sky_mode(int level) {
+    if (level >= 5) return SKY_NIGHT;
+    if (level >= 3) return SKY_EVENING;
+    return SKY_DAY;
+}
+
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag, int game_level_for_bg) {
     initChicken(c); 
     *tEnabled = true;
@@ -306,17 +315,12 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
     cleartiles(); 
-    if (game_level_for_bg >= 3) { 
-        fill_nightsky_and_grass();
-    } else {
-        fill_sky_and_grass();
-    }
+    SkyMode mode = get_sky_mode(game_level);
+    fill_dynamic_sky_and_grass(mode);
+    update_sky_sprite_buffered(game_level, mode);
     clearSprites_buffered(); 
 }
 
-// void fill_nightsky_and_grass(void) {
-//     fill_sky_and_grass(); 
-// }
 
 
 int main(void) {
@@ -351,21 +355,30 @@ int main(void) {
 
 
     cleartiles(); clearSprites_buffered(); 
-    if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
-    vga_present_frame(); present_sprites();   
+
+    // vga_present_frame(); present_sprites();
+    SkyMode mode = get_sky_mode(game_level);
+    fill_dynamic_sky_and_grass(mode);
+    update_sky_sprite_buffered(game_level, mode);
+   
     write_text((unsigned char *)"scream", 6, 13, 13); write_text((unsigned char *)"jump", 4, 13, 20);
     write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); 
+    present_sprites();
 	
     while (!controller_state.x) { usleep(10000); }
     usleep(200000); 
     while (controller_state.x) { usleep(10000); } 
 
     cleartiles(); clearSprites_buffered(); 
-    if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
-    
+    // if (game_level_main >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
+    SkyMode mode = get_sky_mode(game_level);
+    fill_dynamic_sky_and_grass(mode);
+    update_sky_sprite_buffered(game_level, mode);
+
+
     srand(time(NULL)); 
     int jump_velocity = INIT_JUMP_VY; 
     const int hud_center_col = TILE_COLS / 2; const int hud_offset = 12; 
@@ -584,11 +597,10 @@ int main(void) {
             }
         }
 
-        if (game_level_main >= 3) { 
-            fill_nightsky_and_grass();
-        } else {
-            fill_sky_and_grass();
-        }
+        SkyMode mode = get_sky_mode(game_level);
+        fill_dynamic_sky_and_grass(mode);
+        update_sky_sprite_buffered(game_level, mode);
+
         draw_all_active_bars_to_back_buffer(barsA, barsB, BAR_ARRAY_SIZE);
         write_text((unsigned char *)"lives", 5, 1, hud_center_col - hud_offset); 
         write_number(lives, 1, hud_center_col - hud_offset + 6);
@@ -605,7 +617,7 @@ int main(void) {
         vga_present_frame();
         clearSprites_buffered(); 
         write_sprite_to_kernel_buffered(1, chicken.y, chicken.x, chicken.jumping ? CHICKEN_JUMP : CHICKEN_STAND, 0); 
-        update_sun_sprite_buffered(game_level_main); 
+        update_sky_sprite_buffered(game_level, mode); 
         draw_active_coins_buffered(barsA, barsB); 
         present_sprites(); 
         usleep(16666); 
@@ -613,11 +625,10 @@ int main(void) {
 
     // --- Game Over Sequence ---
     cleartiles(); 
-    if (game_level >= 3) { // Use game_level from when game ended for background
-        fill_nightsky_and_grass();
-    } else {
-        fill_sky_and_grass();
-    }
+    SkyMode mode = get_sky_mode(game_level);
+    fill_dynamic_sky_and_grass(mode);
+    update_sky_sprite_buffered(game_level, mode);
+
     clearSprites_buffered(); 
     write_text((unsigned char *)"game", 4, 13, 13); write_text((unsigned char *)"over", 4, 13, 18);
     write_text((unsigned char *)"score", 5, 15, 13); write_numbers(score, MAX_SCORE_DISPLAY_DIGITS, 15, 19);

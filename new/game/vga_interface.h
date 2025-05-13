@@ -31,6 +31,11 @@ typedef struct {
     unsigned char n;
 } SpriteHWState;
 
+typedef enum {
+    SKY_DAY,
+    SKY_EVENING,
+    SKY_NIGHT
+} SkyMode;
 
 void write_tile_to_kernel(unsigned char r, unsigned char c, unsigned char n);
 void write_sprite_to_kernel_buffered(unsigned char active, unsigned short r, unsigned short c, unsigned char n, unsigned short register_n);
@@ -48,7 +53,8 @@ void cleartiles();
 void clearSprites_buffered();
 
 
-#define SKY_TILE_IDX 37  
+#define SKY_TILE_IDX 37 
+#define EVE_SKY_TILE_IDX 43
 #define NIGHTSKY_TILE_IDX 0  
 #define STAR_TILE_IDX 44 
 #define GRASS_TILE_1_IDX 38 // User-defined 260 - grass plain
