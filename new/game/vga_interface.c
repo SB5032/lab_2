@@ -25,9 +25,7 @@ static bool vga_initialized = false;
 static SpriteHWState desired_sprite_states[MAX_HARDWARE_SPRITES];
 static SpriteHWState actual_hw_sprites[MAX_HARDWARE_SPRITES];   
 
-// MODIFICATION: Variables for scrolling grass effect
-static int grass_pixel_scroll_accumulator = 0;
-static int grass_current_tile_shift = 0; // How many full tiles the grass pattern has shifted
+
 
 
 static void vga_hardware_write_tile(unsigned char r, unsigned char c, unsigned char n) {
