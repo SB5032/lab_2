@@ -42,10 +42,11 @@ struct libusb_device_handle *opencontroller(uint8_t *endpoint_address) {
 
         // Gamepads often have bDeviceClass = 0 (defined at interface level) or LIBUSB_CLASS_PER_INTERFACE
         if (desc.bDeviceClass == 0 || desc.bDeviceClass == LIBUSB_CLASS_PER_INTERFACE) {
-            struct libusb_config_descriptor *config;
+            struct libusb_config_descriptor *config = NULL; // Initialize to NULL
             int r = libusb_get_config_descriptor(current_dev, 0, &config);
             if (r < 0) {
                 // fprintf(stderr, "Warning: Could not get config descriptor for device %zd: %s\n", d_idx, libusb_error_name(r));
+                if (config) libusb_free_config_descriptor(config); // Should be NULL if failed, but good practice
                 continue; // Skip this device
             }
 
@@ -59,7 +60,7 @@ struct libusb_device_handle *opencontroller(uint8_t *endpoint_address) {
 
                     // Check if this interface matches our criteria (HID class and specific protocol)
                     if (inter->bInterfaceClass == LIBUSB_CLASS_HID &&
-                        inter->bInterfaceProtocol == GAMEPAD_CONTROL_PROTOCOL) {
+                        inter->bInterfaceProtocol == GAMEPAD_CONTROL_PROTOCOL) { // THIS IS THE SELECTED LINE
                         
                         printf("DEBUG: Found potential HID Interface %d with Protocol %d on Device %zd (VID:0x%04x, PID:0x%04x)\n",
                                inter->bInterfaceNumber, inter->bInterfaceProtocol, d_idx, desc.idVendor, desc.idProduct);
@@ -71,16 +72,16 @@ struct libusb_device_handle *opencontroller(uint8_t *endpoint_address) {
 
                         // Attempt to open the device
                         if ((r = libusb_open(current_dev, &controller)) != 0) {
-                            fprintf(stderr, "Warning: libusb_open failed for matching device: %s. Trying next...\n", libusb_error_name(r));
+                            fprintf(stderr, "Warning: libusb_open failed for matching device (VID:0x%04x, PID:0x%04x): %s. Trying next...\n", 
+                                    desc.idVendor, desc.idProduct, libusb_error_name(r));
                             controller = NULL; 
-                            continue; // Try next compatible interface or device
+                            continue; 
                         }
                         printf("DEBUG: Device VID:0x%04x, PID:0x%04x opened successfully.\n", desc.idVendor, desc.idProduct);
 
                         // Enable auto-detaching of kernel driver for the whole device
-                        // This function operates on the device handle, not a specific interface index for the handle.
                         if (libusb_set_auto_detach_kernel_driver(controller, 1) != LIBUSB_SUCCESS) {
-                             fprintf(stderr, "Warning: Could not enable auto-detach kernel driver. Claiming might fail if driver is active.\n");
+                             fprintf(stderr, "Warning: Could not enable auto-detach kernel driver for controller. Claiming might fail if driver is active.\n");
                         }
                         
                         // Check if kernel driver is active on this specific interface and detach it
@@ -90,22 +91,29 @@ struct libusb_device_handle *opencontroller(uint8_t *endpoint_address) {
                                 printf("DEBUG: Kernel driver detached successfully from interface %d.\n", inter->bInterfaceNumber);
                             } else {
                                 fprintf(stderr, "Warning: Error detaching kernel driver from interface %d. Claim might fail.\n", inter->bInterfaceNumber);
+                                fprintf(stderr, "         This could be a permissions issue. Check udev rules or try with sudo (for testing only).\n");
                             }
                         }
 
                         // Claim the interface
                         if ((r = libusb_claim_interface(controller, inter->bInterfaceNumber)) != 0) {
-                            fprintf(stderr, "Warning: Claim interface %d failed: %s. Trying next...\n", inter->bInterfaceNumber, libusb_error_name(r));
+                            fprintf(stderr, "Error: Claim interface %d failed: %s.\n", inter->bInterfaceNumber, libusb_error_name(r));
+                            fprintf(stderr, "       This is often due to permissions or another process/kernel driver using the device.\n");
+                            fprintf(stderr, "       Ensure udev rules are set up correctly or try running with sudo (for testing only).\n");
                             libusb_close(controller); 
                             controller = NULL;        
-                            continue;                 
+                            // MODIFICATION: If claim fails, continue to the next altsetting/interface rather than next device immediately.
+                            // The outer loops will handle trying other interfaces/devices.
+                            // However, if we opened the device, we should continue within this device's interfaces first.
+                            // If this was the *only* matching interface on this device, the config will be freed below.
+                            continue; 
                         }
                         
-                        *endpoint_address = inter->endpoint[0].bEndpointAddress; // Assuming first endpoint is correct Interrupt IN
+                        *endpoint_address = inter->endpoint[0].bEndpointAddress; 
                         printf("SUCCESS: USB Controller interface %d claimed. Endpoint Address: 0x%02X\n", inter->bInterfaceNumber, *endpoint_address);
                         
-                        libusb_free_config_descriptor(config); // Free the configuration descriptor
-                        goto found_controller; // Successfully found and claimed
+                        libusb_free_config_descriptor(config); 
+                        goto found_controller; 
                     }
                 }
             }
@@ -118,6 +126,7 @@ found_controller:
 
     if (!controller) {
         fprintf(stderr, "Error: No USB game controller found or claimed after checking all devices/interfaces.\n");
+        fprintf(stderr, "       Please ensure the controller is connected and that you have permissions (udev rules on Linux).\n");
         libusb_exit(NULL); // Deinitialize libusb if no controller was successfully set up
     }
     return controller;
@@ -152,22 +161,6 @@ struct controller_output_packet *usb_to_output(struct controller_output_packet *
                                                    // Adjust if your controller maps these differently
 
     // Check face buttons (X, Y, A, B - typically in IND_XYAB)
-    // The mapping of bits to buttons can vary significantly between controllers.
-    // The original code used the upper nibble (>> 4).
-    unsigned char xyab_byte = output_array[IND_XYAB]; // Using the whole byte first for clarity
-                                                      // Or output_array[IND_XYAB] >> 4; if only upper nibble matters
-
-    // Example mapping (common but not universal):
-    // Bit 0: A
-    // Bit 1: B
-    // Bit 2: X (or sometimes C/Z on older controllers)
-    // Bit 3: Y (or sometimes C/Z on older controllers)
-    // Bit 4: L1 (if not in IND_SELSTARIB)
-    // Bit 5: R1 (if not in IND_SELSTARIB)
-    // Bit 6: L2
-    // Bit 7: R2
-
-    // Using the original code's interpretation (upper nibble for XYAB)
     unsigned char face_buttons_upper_nibble = output_array[IND_XYAB] >> 4;
 
     packet->x = (face_buttons_upper_nibble & 0x01) ? 1 : 0; // Original: X
