@@ -11,7 +11,7 @@
 // Hardcoded Y positions for levels 1 & 2. Increased platform lengths.
 // Ensured first randomized wave (L3+) starts at a predictable Y.
 // Added scrolling grass.
-// Added USB auto-detach kernel driver and interface claim logic.
+// Corrected USB handling in controller_input_thread.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,7 +31,7 @@
 // Screen and physics constants
 #define LENGTH            640   // VGA width (pixels)
 #define WIDTH             480   // VGA height (pixels)
-#define TILE_SIZE          16   // background tile size (pixels) (Now from vga_interface.h)
+// TILE_SIZE is now defined in vga_interface.h
 #define WALL               8   // User updated: top/bottom margin (pixels)
 #define GRAVITY            +1
 
@@ -96,8 +96,8 @@ int audio_fd;
 struct controller_output_packet controller_state; 
 bool towerEnabled = true; 
 int coins_collected_this_game = 0;
-bool restart_game_flag = true; // MODIFICATION: Used to signal controller thread to exit
-int game_level = 1; // MODIFICATION: Moved global as it's used in reset_for_level_attempt indirectly via fill_nightsky_and_grass
+bool restart_game_flag = true; 
+int game_level = 1; 
 
 // Structures
 typedef struct { int x, y, vy; bool jumping; int collecting_coin_idx; int on_bar_collect_timer_us; } Chicken;
@@ -118,8 +118,8 @@ void resetBarArray(MovingBar bars[], int array_size);
 void init_all_coins(void);
 void draw_active_coins_buffered(MovingBar bars_a[], MovingBar bars_b[]);
 void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *tEnabled, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_random_wave_flag);
-// User function, ensure it's declared if not in vga_interface.h
-void fill_nightsky_and_grass(void);
+// User function, ensure it's declared if not in vga_interface.h or this file
+void fill_nightsky_and_grass(void); 
 
 
 // --- Function Implementations ---
@@ -184,89 +184,66 @@ bool handleBarCollision(MovingBar bars[], int bar_group_id, int array_size, int 
                 *has_landed_this_jump = true; 
             }
             if (bars[b].has_coin && bars[b].coin_idx != -1 && active_coins[bars[b].coin_idx].active) {
-                // printf("DEBUG: Chicken landed on bar with COIN. Coin index: %d, Coin active: true\n", bars[b].coin_idx);
                 chicken->collecting_coin_idx = bars[b].coin_idx; chicken->on_bar_collect_timer_us = 0; 
-            } else {
-                // if (bars[b].has_coin && bars[b].coin_idx != -1) {
-                //      printf("DEBUG: Chicken landed on bar that HAD coin %d, but coin.active is now false.\n", bars[b].coin_idx);
-                // }
-                chicken->collecting_coin_idx = -1; 
-            }
+            } else { chicken->collecting_coin_idx = -1; }
             return true; 
         }
     }
     return false; 
 }
 
+// MODIFICATION: Removed redundant libusb_init, claim_interface, and set_auto_detach_kernel_driver.
+// Relies on opencontroller() from usbcontroller.c to handle these.
 void *controller_input_thread(void *arg) {
-    uint8_t endpoint_address; // This will be set by opencontroller
-    struct libusb_device_handle *controller_handle = NULL; // Initialize to NULL
+    uint8_t endpoint_address; 
+    struct libusb_device_handle *controller_handle = NULL; 
 
-    // Initialize libusb
-    if (libusb_init(NULL) < 0) {
-        fprintf(stderr, "Failed to initialize libusb\n");
-        pthread_exit(NULL);
-    }
-
-    controller_handle = opencontroller(&endpoint_address); // Assumed to open the device
+    // opencontroller() is expected to initialize libusb and return an opened & claimed handle
+    controller_handle = opencontroller(&endpoint_address); 
     if (!controller_handle) {
-        fprintf(stderr, "Failed to open USB controller device in thread.\n");
-        libusb_exit(NULL);
+        fprintf(stderr, "Failed to open and claim USB controller device in thread.\n");
+        // If opencontroller calls libusb_init, it should ideally also call libusb_exit on failure,
+        // or the main thread should handle it. For now, we just exit the thread.
         pthread_exit(NULL);
     }
-
-    // MODIFICATION: Enable auto-detaching of kernel driver for the interface
-    // This should be done AFTER opening the device and BEFORE claiming the interface.
-    // We assume interface 0 is the one we need. If your device uses a different one, adjust this.
-    if (libusb_set_auto_detach_kernel_driver(controller_handle, 1) != LIBUSB_SUCCESS) {
-        fprintf(stderr, "Warning: Failed to enable auto-detach of kernel driver. Claiming might fail if driver is active.\n");
-    }
-
-    // MODIFICATION: Claim the interface (typically interface 0 for HIDs)
-    int claim_result = libusb_claim_interface(controller_handle, 0); // Assuming interface 0
-    if (claim_result != LIBUSB_SUCCESS) {
-        fprintf(stderr, "Failed to claim USB interface 0: %s\n", libusb_error_name(claim_result));
-        libusb_close(controller_handle);
-        libusb_exit(NULL);
-        pthread_exit(NULL);
-    }
-    printf("DEBUG: USB Interface 0 claimed successfully.\n");
-
+    // If opencontroller doesn't print success, this can be useful:
+    // printf("DEBUG: USB Controller opened and interface claimed by opencontroller(). Endpoint: 0x%02X\n", endpoint_address);
 
     unsigned char buffer[GAMEPAD_READ_LENGTH]; 
     int actual_length_transferred;
 
-    while (restart_game_flag) { // MODIFICATION: Use flag to allow thread termination
+    while (restart_game_flag) { 
         int transfer_status = libusb_interrupt_transfer(
             controller_handle,
             endpoint_address,
             buffer,
             GAMEPAD_READ_LENGTH,
             &actual_length_transferred,
-            1000 // Timeout in ms, e.g., 1 second, to allow checking restart_game_flag
+            1000 
         );
 
         if (transfer_status == LIBUSB_SUCCESS && actual_length_transferred == GAMEPAD_READ_LENGTH) {
             usb_to_output(&controller_state, buffer); 
         } else if (transfer_status == LIBUSB_ERROR_TIMEOUT) {
-            // Timeout is normal, just continue to check restart_game_flag
             continue;
         } else if (transfer_status == LIBUSB_ERROR_INTERRUPTED) {
-             // Interrupted by libusb_cancel_transfer or similar, likely during shutdown
             break;
         }
         else {
             fprintf(stderr, "Controller read error: %s\n", libusb_error_name(transfer_status));
-            // Consider breaking the loop or attempting to re-initialize on persistent errors
             usleep(100000); 
         }
     }
 
     printf("DEBUG: Controller thread exiting...\n");
-    // MODIFICATION: Release the interface and close the device
-    libusb_release_interface(controller_handle, 0); // Release interface 0
+    // Release the interface (assuming interface 0 was claimed by opencontroller)
+    // It's good practice for opencontroller to also return which interface it claimed if not always 0.
+    libusb_release_interface(controller_handle, 0); 
     libusb_close(controller_handle);
-    libusb_exit(NULL); // Deinitialize libusb
+    // libusb_exit(NULL); // This should be called only once when the application is truly exiting.
+                       // If opencontroller() calls libusb_init(), the matching libusb_exit()
+                       // should ideally be managed carefully, perhaps in main() upon game termination.
+                       // For now, keeping it here assumes this thread is the primary libusb user after opencontroller.
     pthread_exit(NULL);
 }
 
@@ -340,7 +317,7 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     *last_y_B = LEVEL1_2_BAR_Y_B;
     *first_random_wave_flag = true; 
     cleartiles(); 
-    if (game_level >= 3) { // game_level is now global
+    if (game_level >= 3) { 
         fill_nightsky_and_grass();
     } else {
         fill_sky_and_grass();
@@ -348,21 +325,28 @@ void reset_for_level_attempt(Chicken *c, MovingBar bA[], MovingBar bB[], bool *t
     clearSprites_buffered(); 
 }
 
+// Placeholder for user's function if not in vga_interface.h
+void fill_nightsky_and_grass(void) {
+    // Assuming this is similar to fill_sky_and_grass but with different tile IDs for night
+    // For now, just call the day version. User should implement this.
+    fill_sky_and_grass(); 
+}
+
+
 int main(void) {
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open failed"); return -1; }
     if ((audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open failed"); close(vga_fd); return -1; }
     init_vga_interface(); 
     pthread_t controller_thread_id;
-    // MODIFICATION: Ensure restart_game_flag is true before creating thread
     restart_game_flag = true; 
     if (pthread_create(&controller_thread_id, NULL, controller_input_thread, NULL) != 0) {
         perror("Controller thread create failed"); close(vga_fd); close(audio_fd); return -1;
     }
     
     game_restart_point: ; 
-    int score = 0; 
-    game_level = 1; // Reset game_level for a new game
-    int lives = INITIAL_LIVES;
+    score = 0; 
+    game_level = 1; 
+    lives = INITIAL_LIVES;
     coins_collected_this_game = 0; 
     init_all_coins(); 
     static int last_actual_y_A = LEVEL1_2_BAR_Y_A; 
@@ -379,11 +363,9 @@ int main(void) {
     write_text((unsigned char *)"start", 5, 19, 29);
     vga_present_frame(); 
 	
-    // Wait for 'X' key from user's latest code for start screen
     while (!controller_state.x) { usleep(10000); }
-    // Add a small delay to debounce or wait for key release if necessary
     usleep(200000); 
-    while (controller_state.x) { usleep(10000); } // Wait for key release
+    while (controller_state.x) { usleep(10000); } 
 
     cleartiles(); clearSprites_buffered(); 
     if (game_level >= 3) { fill_nightsky_and_grass(); } else { fill_sky_and_grass(); }
@@ -568,14 +550,10 @@ int main(void) {
         if (chicken.collecting_coin_idx != -1 && !chicken.jumping) {
             chicken.on_bar_collect_timer_us += 16666; 
             if (chicken.on_bar_collect_timer_us >= COIN_COLLECT_DELAY_US) {
-                // printf("DEBUG: Coin collection timer met for coin_idx: %d. Chicken not jumping.\n", chicken.collecting_coin_idx);
                 Coin* coin_to_collect = &active_coins[chicken.collecting_coin_idx];
-                // printf("DEBUG: Coin to collect status: active = %s (bar_idx %d, group %d)\n",
-                //        coin_to_collect->active ? "true" : "false", coin_to_collect->bar_idx, coin_to_collect->bar_group_id);
                 if (coin_to_collect->active) { 
                     score += (COIN_POINTS - 1); 
                     coins_collected_this_game++; 
-                    // printf("DEBUG: Coin collected! Total coins_collected_this_game = %d\n", coins_collected_this_game); 
                     play_sfx(3); 
                     coin_to_collect->active = false; 
                     MovingBar* parent_bars = (coin_to_collect->bar_group_id == 0) ? barsA : barsB;
@@ -583,8 +561,6 @@ int main(void) {
                         parent_bars[coin_to_collect->bar_idx].has_coin = false;
                         parent_bars[coin_to_collect->bar_idx].coin_idx = -1;
                     }
-                } else {
-                    //  printf("DEBUG: Coin collection FAILED for coin_idx %d because coin_to_collect->active was false.\n", chicken.collecting_coin_idx);
                 }
                 chicken.collecting_coin_idx = -1; chicken.on_bar_collect_timer_us = 0;
             }
@@ -639,7 +615,6 @@ int main(void) {
     }
 
     // --- Game Over Sequence ---
-    // printf("DEBUG: Game Over! Final coins_collected_this_game = %d, Final score = %d\n", coins_collected_this_game, score); 
     cleartiles(); 
     if (game_level >= 3) {
         fill_nightsky_and_grass();
@@ -652,13 +627,13 @@ int main(void) {
 	write_text((unsigned char *)"coins", 5, 17, 8); write_text((unsigned char *)"collected", 9, 17, 14); write_numbers(coins_collected_this_game, MAX_COINS_DISPLAY_DIGITS, 17, 24);
 	write_text((unsigned char *)"press", 5, 19, 8); write_text((unsigned char *)"x", 1, 19, 14); 
     write_text((unsigned char *)"key", 3, 19, 20); write_text((unsigned char *)"to", 2, 19, 26); 
-    write_text((unsigned char *)"restart", 7, 19, 29); // Changed from "start" to "restart"
+    write_text((unsigned char *)"restart", 7, 19, 29); 
     vga_present_frame(); present_sprites();
 	
     memset(&controller_state, 0, sizeof(controller_state)); usleep(100000); 
 	
     while(1) {
-        if (controller_state.x) { // Changed from start to x
+        if (controller_state.x) { 
             last_actual_y_A = LEVEL1_2_BAR_Y_A; 
             last_actual_y_B = LEVEL1_2_BAR_Y_B; 
             first_random_wave_this_session = true; 
@@ -668,8 +643,8 @@ int main(void) {
     }
     // This part is effectively unreachable due to the infinite loop and goto.
     // For a very clean exit, the controller thread would need a way to be signaled to terminate.
-    // pthread_cancel(controller_thread_id);
-    // pthread_join(controller_thread_id, NULL);
+    // restart_game_flag = false; // Signal thread to exit
+    // pthread_join(controller_thread_id, NULL); // Wait for thread to finish
     close(vga_fd); close(audio_fd);
     return 0;
 }
