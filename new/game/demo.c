@@ -255,15 +255,75 @@ void move_ckn(Chicken *c) {
     c->vy += GRAVITY;
 }
 
+// void update_sun_moon_sprite(int current_level) {
+//     const int start_x = 32, end_x = 608, base_y = 64;
+//     double frac = (current_level > 1) ? (double)(current_level - 1) / (MAX_LVL - 1) : 0.0;
+//     if (current_level >= MAX_LVL) frac = 1.0;
+
+//     int sprite_x = start_x + (int)((end_x - start_x) * frac + 0.5);
+//     // Sprite reg 1 is for sun/moon
+//     write_sprite_to_kernel_buffered(1, base_y, sprite_x, (g_level >=3 ? MOON_TILE_IDX : SUN_TILE_IDX), 1);
+// }
+
+
 void update_sun_moon_sprite(int current_level) {
-    const int start_x = 32, end_x = 608, base_y = 64;
-    double frac = (current_level > 1) ? (double)(current_level - 1) / (MAX_LVL - 1) : 0.0;
+    const int START_X = 32;
+    const int END_X   = 608;
+    const int BASE_Y  = 64;
+    static bool seeded = false;
+    if (!seeded) {
+        srand(time(NULL));
+        seeded = true;
+    }
+
+    // 1) compute sun/moon position
+    double frac = (current_level > 1)
+                  ? (double)(current_level - 1) / (MAX_LVL - 1)
+                  : 0.0;
     if (current_level >= MAX_LVL) frac = 1.0;
 
-    int sprite_x = start_x + (int)((end_x - start_x) * frac + 0.5);
-    // Sprite reg 1 is for sun/moon
-    write_sprite_to_kernel_buffered(1, base_y, sprite_x, (g_level >=3 ? MOON_TILE_IDX : SUN_TILE_IDX), 1);
+    int sunX = START_X + (int)((END_X - START_X)*frac + 0.5);
+    int sunTile = (current_level >= 4 ? MOON_TILE_IDX : SUN_TILE_IDX);
+    write_sprite_to_kernel_buffered(
+        1,               // sprite reg
+        BASE_Y,          // y
+        sunX,            // x
+        sunTile,         // tile index
+        1                // visible
+    );
+
+    // 2) set up cloud registers & tile indices
+    const int cloud_regs[6]  = {7, 8, 9, 10, 11, 12};
+    const int cloud_tiles[2] = {23, 24};
+
+    // mirror sun’s motion to the opposite side
+    int cloudBaseX = END_X - (sunX - START_X);
+
+    // 3) spawn 6 clouds at 32px horizontal spacing
+    for (int i = 0; i < 6; i++) {
+        int reg = cloud_regs[i];
+        int x = cloudBaseX + i * 32;
+
+        // keep at least 32px away from sun
+        if (abs(x - sunX) < 32) {
+            x += (x < sunX) ? -32 : 32;
+        }
+
+        // first 3 at BASE_Y; last 3 randomly 32px above or below
+        int y;
+        if (i < 3) {
+            y = BASE_Y;
+        } else {
+            y = (rand() & 1)
+                ? BASE_Y + 32   // below
+                : BASE_Y - 32;  // above
+        }
+
+        int tile = cloud_tiles[rand() % 2];
+        write_sprite_to_kernel_buffered(reg, y, x, tile, 1);
+    }
 }
+
 
 void reset_bars(Bar bars[], int size) {
     for (int i = 0; i < size; i++) {
