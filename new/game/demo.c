@@ -1,6 +1,7 @@
 // screamjump.c
 // Main game logic for ScreamJump.
 // Handles player movement, level progression, obstacles, scoring, and VGA output.
+// Authored by: Ananya Mann Singh (am6542), Kamala Vennela Vasireddy (kv2446), Sharwari Bhosale (sb5032)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,6 @@
 
 #include "usbcontroller.h"
 #include "vga_interface.h"
-//#include "audio_interface.h"
 
 // Screen and physics
 #define SCR_W              640   // VGA width
@@ -122,11 +122,6 @@ void reset_bars(Bar bars[], int size);
 void init_coins(void);
 void draw_coins_buffered(Bar bars_a[], Bar bars_b[]);
 void reset_for_death(Chicken *c, Bar bA[], Bar bB[], bool *tower_on, bool *grpA_act, bool *needs_A, bool *needs_B, int *wA_idx, int *wB_idx, int *next_sA, int *next_sB, int *last_y_A, int *last_y_B, bool *first_rand_wave);
-// Assuming fill_sky_and_grass() and fill_nightsky_and_grass() are provided by vga_interface.h or similar
-// If fill_nightsky_and_grass is just fill_sky_and_grass with different palette, that logic is in vga_interface.
-// For this refactor, if fill_nightsky_and_grass just calls fill_sky_and_grass, we'll simplify:
-// The original had a commented out: void fill_nightsky_and_grass(void) { fill_sky_and_grass(); }
-// So, we'll replace calls to fill_nightsky_and_grass with fill_sky_and_grass.
 
 void draw_bars_buffered(Bar bars_a[], Bar bars_b[], int size) {
     Bar* cur_grp;
@@ -329,17 +324,12 @@ void reset_for_death(Chicken *c, Bar bA[], Bar bB[], bool *tower_on,
     *watch_idx_A = -1; *watch_idx_B = -1;
     *next_slot_A = 0; *next_slot_B = 0;
 
-    // Reset Y positions for first wave after death to predictable values
     *last_y_A = L12_BAR_Y_A;
     *last_y_B = L12_BAR_Y_B;
-    *first_rand_wave = true; // Next random wave (L3+) should use predictable Y first
+    *first_rand_wave = true; 
 
     cleartiles();
-    // Simplified: fill_sky_and_grass() handles day/night appearance based on g_level internally or use different functions.
-    // Assuming fill_sky_and_grass() is the general function. If night variant is different, use conditional.
-    // Based on original commented code, fill_nightsky_and_grass was just fill_sky_and_grass.
-    // If they are distinct: if (g_level >= 3) fill_nightsky_and_grass(); else fill_sky_and_grass();
-    fill_sky_and_grass(); // Or specific night/day versions if they differ
+    fill_sky_and_grass();
     clearSprites_buffered();
 }
 
@@ -353,7 +343,6 @@ int main(void) {
     int score, lives;
 
     if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open"); return -1; }
-    // if ((g_audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open"); close(g_vga_fd); return -1; }
     init_vga_interface();
 
     pthread_t ctrl_tid;
@@ -413,13 +402,6 @@ game_restart_point: // Label for full game restart
         g_level = 1 + (score / PTS_PER_LVL);
         if (g_level > MAX_LVL) g_level = MAX_LVL;
 
-        // If level changed, maybe update background (already handled by general draw)
-        // if (old_level != g_level) {
-        //    if (g_level >= 3 && old_level < 3) fill_nightsky_and_grass(); // Transition to night
-        //    else if (g_level < 3 && old_level >=3) fill_sky_and_grass(); // Transition to day
-        // }
-
-
         // Level-specific settings
         switch (g_level) {
             case 1:
@@ -452,7 +434,7 @@ game_restart_point: // Label for full game restart
         if (g_ctrl_state.b && !ckn.jumping) {
             ckn.vy = jump_vy; ckn.jumping = true;
             landed_jump = false; g_tower_on = false; // play_sfx(0);
-            if(ckn.coin_idx != -1) { // Jumped off a bar while collecting
+            if(ckn.coin_idx != -1) { 
                 ckn.coin_timer_us = 0; ckn.coin_idx = -1;
             }
             usleep(jump_delay);
@@ -522,7 +504,7 @@ game_restart_point: // Label for full game restart
 
             int spawned = 0, last_idx = -1;
             for (int i = 0; i < bar_count; i++) {
-                int slot = -1; // Find available slot in bars_b
+                int slot = -1;
                 for (int j = 0; j < MAX_BARS; j++) {
                     int cur = (next_slot_b + j) % MAX_BARS;
                     if (bars_b[cur].x == BAR_OFFSCREEN_X) { slot = cur; break; }
@@ -543,7 +525,7 @@ game_restart_point: // Label for full game restart
                         }
                     }
                     last_idx = slot; spawned++;
-                } else break; // No slot
+                } else break;
             }
             if (spawned > 0) { watch_idx_b = last_idx; next_slot_b = (last_idx + 1) % MAX_BARS; }
             spawn_b = false;
@@ -561,14 +543,13 @@ game_restart_point: // Label for full game restart
         }
 
         // Coin collection logic
-        if (ckn.coin_idx != -1 && !ckn.jumping) { // Chicken is on a bar with a potential coin
-            ckn.coin_timer_us += 16666; // Approx 1 frame time in us
+        if (ckn.coin_idx != -1 && !ckn.jumping) { 
+            ckn.coin_timer_us += 16666; 
             if (ckn.coin_timer_us >= COIN_COLLECT_DELAY) {
                 Coin* coin = &g_coins[ckn.coin_idx];
                 if (coin->active) {
-                    score += (COIN_POINTS -1); // Score already incremented once for landing
+                    score += (COIN_POINTS -1);
                     g_coins_total++;
-                    // play_sfx(3); // Coin collect sound
                     coin->active = false; // Deactivate coin itself
 
                     // Remove coin from bar
@@ -578,12 +559,11 @@ game_restart_point: // Label for full game restart
                         parent_bars[coin->bar_idx].coin_idx = -1;
                     }
                 }
-                ckn.coin_idx = -1; ckn.coin_timer_us = 0; // Reset collection state
+                ckn.coin_idx = -1; ckn.coin_timer_us = 0; 
             }
-        } else if (ckn.coin_idx != -1 && ckn.jumping) { // Jumped off before collecting
+        } else if (ckn.coin_idx != -1 && ckn.jumping) { 
             ckn.coin_timer_us = 0; ckn.coin_idx = -1;
         }
-
 
         // Check collision with bars
         if (ckn.vy > 0) { // Only check if falling
@@ -593,29 +573,22 @@ game_restart_point: // Label for full game restart
 
         // Boundary checks for chicken
         if (ckn.y < MARGIN && ckn.jumping) { ckn.y = MARGIN; if (ckn.vy < 0) ckn.vy = 0; } // Hit ceiling
-        if (ckn.y + CKN_H > SCR_H - MARGIN) { // Hit floor
+        if (ckn.y + CKN_H > SCR_H - MARGIN) { 
             lives--;
-            // play_sfx(1); // Death sound
             if (lives > 0) {
                 reset_for_death(&ckn, bars_a, bars_b, &g_tower_on,
                                 &grp_a_spawns, &spawn_a, &spawn_b,
                                 &watch_idx_a, &watch_idx_b, &next_slot_a, &next_slot_b,
                                 &s_last_y_a, &s_last_y_b, &s_first_rand_wave);
-                vga_present_frame(); present_sprites(); // Show reset state briefly
+                vga_present_frame(); present_sprites();
                 usleep(1000000); // Pause after death (1 sec)
-                continue; // Skip rest of loop, start next life
+                continue; 
             }
         }
 
-        // Drawing
-        // Use fill_sky_and_grass() and assume it handles day/night based on g_level or vga_interface specific logic
-        // If fill_nightsky_and_grass is a distinct function:
-        // if (g_level >= 3) fill_nightsky_and_grass(); else fill_sky_and_grass();
         fill_sky_and_grass();
-
         draw_bars_buffered(bars_a, bars_b, MAX_BARS);
 
-        // HUD
         write_text("lives", 5, 1, hud_col - hud_off);
         write_number(lives, 1, hud_col - hud_off + 6);
         write_text("score", 5, 1, hud_col - hud_off + 12);
@@ -634,17 +607,15 @@ game_restart_point: // Label for full game restart
         clearSprites_buffered(); // Prepare sprite buffer
         write_sprite_to_kernel_buffered(1, ckn.y, ckn.x, ckn.jumping ? CKN_JUMP_IDX : CKN_STAND_IDX, 0); // Chicken is sprite 0
         update_sun_moon_sprite(g_level); // Sun/Moon is sprite 1
-        draw_coins_buffered(bars_a, bars_b); // Coins use subsequent sprite registers
-        present_sprites(); // Push sprite buffer to screen
+        draw_coins_buffered(bars_a, bars_b); 
+        present_sprites(); 
 
         usleep(16666); // ~60 FPS
     }
 
-    // Game Over Sequence
-    // play_sfx(2); // Game over sound
+
     cleartiles();
-    // if (g_level >= 3) fill_nightsky_and_grass(); else fill_sky_and_grass(); // Use level at time of game over for BG
-    fill_sky_and_grass(); // Simplified as per above assumption
+    fill_sky_and_grass(); 
 
     clearSprites_buffered();
     write_text("game", 4, 13, 16); write_text("over", 4, 13, 21);
@@ -655,7 +626,7 @@ game_restart_point: // Label for full game restart
     write_text("restart", 7, 19, 24);
     vga_present_frame(); present_sprites();
 
-    memset(&g_ctrl_state, 0, sizeof(g_ctrl_state)); // Clear controller state before checking for restart
+    memset(&g_ctrl_state, 0, sizeof(g_ctrl_state));
     usleep(100000); // Debounce
 
     while(1) { // Wait for restart command
@@ -665,12 +636,7 @@ game_restart_point: // Label for full game restart
         usleep(50000);
     }
 
-    // Cleanly shutting down the controller thread would be ideal here,
-    // e.g. g_do_restart = false; pthread_join(ctrl_tid, NULL);
-    // but current structure relies on goto for restart.
-    // libusb_exit(NULL); // Should be called once when totally done with libusb.
 
     close(vga_fd);
-    // close(g_audio_fd);
     return 0;
 }
