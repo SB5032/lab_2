@@ -78,7 +78,7 @@
 #define FIRST_COIN_SPR_REG 2     // First sprite hardware register for coins
 
 // Global variables
-int g_vga_fd;
+int vga_fd;
 //int g_audio_fd;
 struct controller_output_packet g_ctrl_state;
 bool g_tower_on = true;
@@ -352,14 +352,14 @@ int main(void) {
 
     int score, lives;
 
-    if ((g_vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open"); return -1; }
+    if ((vga_fd = open("/dev/vga_top", O_RDWR)) < 0) { perror("VGA open"); return -1; }
     // if ((g_audio_fd = open("/dev/fpga_audio", O_RDWR)) < 0) { perror("Audio open"); close(g_vga_fd); return -1; }
     init_vga_interface();
 
     pthread_t ctrl_tid;
     g_do_restart = true; // Controller thread runs as long as game can restart
     if (pthread_create(&ctrl_tid, NULL, ctrl_thread, NULL) != 0) {
-        perror("Ctrl thread create"); close(g_vga_fd); return -1;
+        perror("Ctrl thread create"); close(vga_fd); return -1;
     }
 
 game_restart_point: // Label for full game restart
@@ -670,7 +670,7 @@ game_restart_point: // Label for full game restart
     // but current structure relies on goto for restart.
     // libusb_exit(NULL); // Should be called once when totally done with libusb.
 
-    close(g_vga_fd);
+    close(vga_fd);
     // close(g_audio_fd);
     return 0;
 }
