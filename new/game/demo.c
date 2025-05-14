@@ -255,88 +255,88 @@ void move_ckn(Chicken *c) {
     c->vy += GRAVITY;
 }
 
-// void update_sun_moon_sprite(int current_level) {
-//     const int start_x = 32, end_x = 608, base_y = 64;
-//     double frac = (current_level > 1) ? (double)(current_level - 1) / (MAX_LVL - 1) : 0.0;
-//     if (current_level >= MAX_LVL) frac = 1.0;
-
-//     int sprite_x = start_x + (int)((end_x - start_x) * frac + 0.5);
-//     // Sprite reg 1 is for sun/moon
-//     write_sprite_to_kernel_buffered(1, base_y, sprite_x, (g_level >=3 ? MOON_TILE_IDX : SUN_TILE_IDX), 1);
-// }
-
-#include <stdlib.h>
-#include <time.h>
-#include <stdbool.h>
-
-// … your other includes …
-
-#include <stdlib.h>
-#include <time.h>
-#include <stdbool.h>
-
-// … your other includes …
-
 void update_sun_moon_sprite(int current_level) {
-    const int start_x = 32;
-    const int end_x   = 608;
-    const int base_y  = 64;
-    const int GAP     = 32;               // minimum gap / vertical offset
-    static bool seeded = false;
+    const int start_x = 32, end_x = 608, base_y = 64;
+    double frac = (current_level > 1) ? (double)(current_level - 1) / (MAX_LVL - 1) : 0.0;
+    if (current_level >= MAX_LVL) frac = 1.0;
 
-    // 1) one‐time seed
-    if (!seeded) {
-        srand((unsigned)time(NULL));
-        seeded = true;
-    }
-
-    // 2) compute sun fraction & X
-    double frac = 0.0;
-    if (current_level > 1)
-        frac = (double)(current_level - 1) / (MAX_LVL - 1);
-    if (current_level >= MAX_LVL)
-        frac = 1.0;
-    int sunX = start_x + (int)((end_x - start_x) * frac + 0.5);
-
-    // 3) draw 6 clouds randomly on opposite side
-    const int cloud_regs[6]  = {7, 8, 9, 10, 11, 12};
-    const int cloud_tiles[2] = {23, 24};
-
-    for (int i = 0; i < 6; i++) {
-        // decide left or right of sun
-        bool placeLeft = (rand() & 1) == 0;
-        int minX, maxX;
-        if (placeLeft) {
-            minX = start_x;
-            maxX = sunX - GAP;
-        } else {
-            minX = sunX + GAP;
-            maxX = end_x;
-        }
-        if (minX > maxX) {
-            // fallback if there's no room: just span full
-            minX = start_x;
-            maxX = end_x;
-        }
-
-        int x = minX + rand() % (maxX - minX + 1);
-
-        // vertical: first 3 at base_y, last 3 ±GAP
-        int y;
-        if (i < 3) {
-            y = base_y;
-        } else {
-            y = base_y + ((rand() & 1) ? +GAP : -GAP);
-        }
-
-        int tile = cloud_tiles[rand() % 2];
-        write_sprite_to_kernel_buffered(cloud_regs[i], y, x, tile, 1);
-    }
-
-    // 4) finally draw sun/moon on top
-    int sunTile = (current_level >= 3 ? MOON_TILE_IDX : SUN_TILE_IDX);
-    write_sprite_to_kernel_buffered(1, base_y, sunX, sunTile, 1);
+    int sprite_x = start_x + (int)((end_x - start_x) * frac + 0.5);
+    // Sprite reg 1 is for sun/moon
+    write_sprite_to_kernel_buffered(1, base_y, sprite_x, (g_level >=4 ? MOON_TILE_IDX : SUN_TILE_IDX), 1);
 }
+
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+
+// … your other includes …
+
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+
+// … your other includes …
+
+// void update_sun_moon_sprite(int current_level) {
+//     const int start_x = 32;
+//     const int end_x   = 608;
+//     const int base_y  = 64;
+//     const int GAP     = 32;               // minimum gap / vertical offset
+//     static bool seeded = false;
+
+//     // 1) one‐time seed
+//     if (!seeded) {
+//         srand((unsigned)time(NULL));
+//         seeded = true;
+//     }
+
+//     // 2) compute sun fraction & X
+//     double frac = 0.0;
+//     if (current_level > 1)
+//         frac = (double)(current_level - 1) / (MAX_LVL - 1);
+//     if (current_level >= MAX_LVL)
+//         frac = 1.0;
+//     int sunX = start_x + (int)((end_x - start_x) * frac + 0.5);
+
+//     // 3) draw 6 clouds randomly on opposite side
+//     const int cloud_regs[6]  = {7, 8, 9, 10, 11, 12};
+//     const int cloud_tiles[2] = {23, 24};
+
+//     for (int i = 0; i < 6; i++) {
+//         // decide left or right of sun
+//         bool placeLeft = (rand() & 1) == 0;
+//         int minX, maxX;
+//         if (placeLeft) {
+//             minX = start_x;
+//             maxX = sunX - GAP;
+//         } else {
+//             minX = sunX + GAP;
+//             maxX = end_x;
+//         }
+//         if (minX > maxX) {
+//             // fallback if there's no room: just span full
+//             minX = start_x;
+//             maxX = end_x;
+//         }
+
+//         int x = minX + rand() % (maxX - minX + 1);
+
+//         // vertical: first 3 at base_y, last 3 ±GAP
+//         int y;
+//         if (i < 3) {
+//             y = base_y;
+//         } else {
+//             y = base_y + ((rand() & 1) ? +GAP : -GAP);
+//         }
+
+//         int tile = cloud_tiles[rand() % 2];
+//         write_sprite_to_kernel_buffered(cloud_regs[i], y, x, tile, 1);
+//     }
+
+//     // 4) finally draw sun/moon on top
+//     int sunTile = (current_level >= 3 ? MOON_TILE_IDX : SUN_TILE_IDX);
+//     write_sprite_to_kernel_buffered(1, base_y, sunX, sunTile, 1);
+// }
 
 
 
@@ -498,15 +498,15 @@ game_restart_point: // Label for full game restart
                 jump_delay = LONG_JUMP_DELAY;
                 break;
             case 3:
-                min_bar_len = 6; max_bar_len = 8; bar_count = 3; bar_speed = 3;
+                min_bar_len = 5; max_bar_len = 7; bar_count = 3; bar_speed = 4;
                 bar_spacing_px = 160; /* Y is random */ jump_delay = LONG_JUMP_DELAY;
                 break;
             case 4:
-                min_bar_len = 5; max_bar_len = 7; bar_count = 3; bar_speed = 4;
+                min_bar_len = 5; max_bar_len = 6; bar_count = 2; bar_speed = 4;
                 bar_spacing_px = 190; /* Y is random */ jump_delay = BASE_JUMP_DELAY;
                 break;
             case 5: default:
-                min_bar_len = 5; max_bar_len = 6; bar_count = 2; bar_speed = 4;
+                min_bar_len = 5; max_bar_len = 6; bar_count = 2; bar_speed = 5;
                 bar_spacing_px = 190; /* Y is random */ jump_delay = BASE_JUMP_DELAY;
                 break;
         }
