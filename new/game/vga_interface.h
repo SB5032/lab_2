@@ -63,6 +63,8 @@ void clearSprites_buffered();
 void fill_sky_and_grass(void);
 
 void fill_nightsky_and_grass(void); 
+
+void fill_evesky_and_grass(void); 
 // NEW: Declaration for updating grass scroll offset
 void update_grass_scroll(int scroll_speed_px);
 
