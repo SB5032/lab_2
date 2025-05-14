@@ -284,8 +284,8 @@ module soc_system_top(
     //  .audio_0_external_interface_DACLRCK               (AUD_DACLRCK),
     //  .audio_pll_0_audio_clk_clk                        (AUD_XCK),***
       // connect the audio/video config
-     .audio_and_video_config_0_external_interface_SDAT (FPGA_I2C_SDAT),
-     .audio_and_video_config_0_external_interface_SCLK (FPGA_I2C_SCLK)  
+     .video_config_0_external_interface_SDAT (FPGA_I2C_SDAT),
+     .video_config_0_external_interface_SCLK (FPGA_I2C_SCLK)  
   );
 
    // The following quiet the "no driver" warnings for output
