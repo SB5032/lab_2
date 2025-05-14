@@ -271,65 +271,73 @@ void move_ckn(Chicken *c) {
 
 // … your other includes …
 
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+
+// … your other includes …
+
 void update_sun_moon_sprite(int current_level) {
     const int start_x = 32;
     const int end_x   = 608;
     const int base_y  = 64;
-    const int GAP     = 32;
+    const int GAP     = 32;               // minimum gap / vertical offset
     static bool seeded = false;
+
+    // 1) one‐time seed
     if (!seeded) {
-        srand(time(NULL));
+        srand((unsigned)time(NULL));
         seeded = true;
     }
 
-    // 1) compute fraction along [0..1]
-    double frac = (current_level > 1)
-                  ? (double)(current_level - 1) / (MAX_LVL - 1)
-                  : 0.0;
-    if (current_level >= MAX_LVL) frac = 1.0;
-
-    // 2) compute sun X
+    // 2) compute sun fraction & X
+    double frac = 0.0;
+    if (current_level > 1)
+        frac = (double)(current_level - 1) / (MAX_LVL - 1);
+    if (current_level >= MAX_LVL)
+        frac = 1.0;
     int sunX = start_x + (int)((end_x - start_x) * frac + 0.5);
-    int sunTile = (g_level >= 3 ? MOON_TILE_IDX : SUN_TILE_IDX);
 
-    // 3) compute mirrored base for cloud group
-    int cloudBaseX = end_x - (sunX - start_x);
-
-    // 4) draw 6 clouds (regs 7–12), centered around cloudBaseX
-    const int cloud_regs[6] = {7, 8, 9, 10, 11, 12};
+    // 3) draw 6 clouds randomly on opposite side
+    const int cloud_regs[6]  = {7, 8, 9, 10, 11, 12};
     const int cloud_tiles[2] = {23, 24};
-    int num_clouds = 6;
-    int half_span = GAP * (num_clouds - 1) / 2;  // (5 * 32) / 2 = 80
 
-    for (int i = 0; i < num_clouds; i++) {
-        // position within group
-        int x = cloudBaseX + i * GAP - half_span;
-
-        // clamp to screen
-        if (x < start_x) x = start_x;
-        if (x > end_x)   x = end_x;
-
-        // ensure ≥32px from sun
-        if (abs(x - sunX) < GAP) {
-            x = (x < sunX) ? (sunX - GAP) : (sunX + GAP);
+    for (int i = 0; i < 6; i++) {
+        // decide left or right of sun
+        bool placeLeft = (rand() & 1) == 0;
+        int minX, maxX;
+        if (placeLeft) {
+            minX = start_x;
+            maxX = sunX - GAP;
+        } else {
+            minX = sunX + GAP;
+            maxX = end_x;
+        }
+        if (minX > maxX) {
+            // fallback if there's no room: just span full
+            minX = start_x;
+            maxX = end_x;
         }
 
-        // vertical: first 3 at base_y, last 3 randomly ±32px
+        int x = minX + rand() % (maxX - minX + 1);
+
+        // vertical: first 3 at base_y, last 3 ±GAP
         int y;
         if (i < 3) {
             y = base_y;
         } else {
-            y = (rand() & 1) ? (base_y + GAP) : (base_y - GAP);
+            y = base_y + ((rand() & 1) ? +GAP : -GAP);
         }
 
-        // pick tile and draw
         int tile = cloud_tiles[rand() % 2];
         write_sprite_to_kernel_buffered(cloud_regs[i], y, x, tile, 1);
     }
 
-    // 5) draw sun on top so it never gets occluded
+    // 4) finally draw sun/moon on top
+    int sunTile = (current_level >= 3 ? MOON_TILE_IDX : SUN_TILE_IDX);
     write_sprite_to_kernel_buffered(1, base_y, sunX, sunTile, 1);
 }
+
 
 
 
