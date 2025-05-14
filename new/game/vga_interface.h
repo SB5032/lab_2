@@ -58,6 +58,7 @@ void clearSprites_buffered();
 #define GRASS_TILE_2_IDX 42 // User-defined 2a0 - flowers on grass
 #define GRASS_TILE_3_IDX 41 // User-defined 290 - grass with dark green thingy
 #define GRASS_ROW_START 25 
+#define EVE_TILE_IDX 43
 
 void fill_sky_and_grass(void);
 
