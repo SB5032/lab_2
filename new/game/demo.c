@@ -404,8 +404,9 @@ game_restart_point: // Label for full game restart
 
                 // If level changed, maybe update background (already handled by general draw)
         if (old_level != g_level) {
-           if (g_level >= 3 && old_level < 3) fill_nightsky_and_grass(); // Transition to night
-           else if (g_level < 3 && old_level >=3) fill_sky_and_grass(); // Transition to day
+           if (g_level > 3 && old_level < 3) fill_nightsky_and_grass(); // Transition to night
+               else if (g_level == 3 ) fill_evesky_and_grass(); //transition to eve
+           else if (g_level < 3 && old_level >3) fill_sky_and_grass(); // Transition to day
         }
 
         // Level-specific settings
