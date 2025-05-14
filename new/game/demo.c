@@ -288,7 +288,7 @@ void update_sun_moon_sprite(int current_level) {
 
     // 3) spawn 6 clouds (regs 7–12), 32px apart
     const int cloud_regs[6]  = {7, 8, 9, 10, 11, 12};
-    const int cloud_tiles[2] = {35, 45};
+    const int cloud_tiles[2] = {23, 24};
     for (int i = 0; i < 6; i++) {
         int reg = cloud_regs[i];
         int x   = cloudBaseX + i * GAP;
