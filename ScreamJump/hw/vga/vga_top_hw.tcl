@@ -49,8 +49,8 @@ add_fileset_file sprite_loader.sv SYSTEM_VERILOG PATH sprite_loader.sv
 add_fileset_file sprite_draw.sv SYSTEM_VERILOG PATH sprite_draw.sv
 add_fileset_file sprite_active.sv SYSTEM_VERILOG PATH sprite_active.sv
 add_fileset_file sprite_rom.v VERILOG PATH sprite_rom.v
-add_fileset_file sprites.mif MIF PATH sprites.mif
-add_fileset_file tiles.mif MIF PATH tiles.mif
+add_fileset_file combined_sprite.mif MIF PATH combined_sprite.mif
+add_fileset_file combined_tile.mif MIF PATH combined_tile.mif
 
 
 # 
