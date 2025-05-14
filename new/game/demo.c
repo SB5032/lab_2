@@ -592,7 +592,9 @@ game_restart_point: // Label for full game restart
                 continue; 
             }
         }
-        if (g_level >= 3) fill_nightsky_and_grass(); else fill_sky_and_grass();
+        if (g_level > 3) fill_nightsky_and_grass();
+            else if (g_level == 3) fill_evesky_and_grass();
+        else fill_sky_and_grass();
         //fill_sky_and_grass();
         draw_bars_buffered(bars_a, bars_b, MAX_BARS);
 
