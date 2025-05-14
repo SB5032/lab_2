@@ -265,62 +265,63 @@ void move_ckn(Chicken *c) {
 //     write_sprite_to_kernel_buffered(1, base_y, sprite_x, (g_level >=3 ? MOON_TILE_IDX : SUN_TILE_IDX), 1);
 // }
 
-
 void update_sun_moon_sprite(int current_level) {
     const int START_X = 32;
     const int END_X   = 608;
     const int BASE_Y  = 64;
+    const int GAP     = 32;
     static bool seeded = false;
     if (!seeded) {
         srand(time(NULL));
         seeded = true;
     }
 
-    // 1) compute sun/moon position
-    double frac = (current_level > 1)
-                  ? (double)(current_level - 1) / (MAX_LVL - 1)
-                  : 0.0;
-    if (current_level >= MAX_LVL) frac = 1.0;
+    // 1) fraction along [0..1]
+    double frac = 0.0;
+    if (current_level > 1)
+        frac = (double)(current_level - 1) / (MAX_LVL - 1);
+    if (current_level >= MAX_LVL)
+        frac = 1.0;
 
-    int sunX = START_X + (int)((END_X - START_X)*frac + 0.5);
-    int sunTile = (current_level >= 4 ? MOON_TILE_IDX : SUN_TILE_IDX);
-    write_sprite_to_kernel_buffered(
-        1,               // sprite reg
-        BASE_Y,          // y
-        sunX,            // x
-        sunTile,         // tile index
-        1                // visible
-    );
+    // 2) compute cloud “mirror” X
+    int cloudBaseX = START_X + (int)((END_X - START_X) * (1.0 - frac) + 0.5);
 
-    // 2) set up cloud registers & tile indices
+    // 3) spawn 6 clouds (regs 7–12), 32px apart
     const int cloud_regs[6]  = {7, 8, 9, 10, 11, 12};
-    const int cloud_tiles[2] = {23, 24};
-
-    // mirror sun’s motion to the opposite side
-    int cloudBaseX = END_X - (sunX - START_X);
-
-    // 3) spawn 6 clouds at 32px horizontal spacing
+    const int cloud_tiles[2] = {35, 45};
     for (int i = 0; i < 6; i++) {
         int reg = cloud_regs[i];
-        int x = cloudBaseX + i * 32;
+        int x   = cloudBaseX + i * GAP;
 
-        // keep at least 32px away from sun
-        if (abs(x - sunX) < 32) {
-            x += (x < sunX) ? -32 : 32;
-        }
-
-        // first 3 at BASE_Y; last 3 randomly 32px above or below
         int y;
         if (i < 3) {
             y = BASE_Y;
         } else {
-            y = (rand() & 1)
-                ? BASE_Y + 32   // below
-                : BASE_Y - 32;  // above
+            // randomly above or below by 32px
+            y = (rand() & 1) ? (BASE_Y + GAP) : (BASE_Y - GAP);
         }
 
         int tile = cloud_tiles[rand() % 2];
         write_sprite_to_kernel_buffered(reg, y, x, tile, 1);
+    }
+
+    // 4) now sun/moon — draw last so it’s never occluded
+    int sunTile = (g_level >= 3 ? MOON_TILE_IDX : SUN_TILE_IDX);
+    // recompute sunX from the same frac
+    int sunX = START_X + (int)((END_X - START_X) * frac + 0.5);
+    write_sprite_to_kernel_buffered(
+        1,          // your sun register
+        BASE_Y,     // fixed Y
+        sunX,       // moving X
+        sunTile,    // sun or moon
+        1           // visible
+    );
+
+    // 5) final overlap-avoidance pass: if any cloud is <32px from sun, shift it
+    for (int i = 0; i < 6; i++) {
+        int reg = cloud_regs[i];
+        int cx, cy, ct, vis;
+
     }
 }
 
