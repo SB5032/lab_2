@@ -402,6 +402,12 @@ game_restart_point: // Label for full game restart
         g_level = 1 + (score / PTS_PER_LVL);
         if (g_level > MAX_LVL) g_level = MAX_LVL;
 
+                // If level changed, maybe update background (already handled by general draw)
+        if (old_level != g_level) {
+           if (g_level >= 3 && old_level < 3) fill_nightsky_and_grass(); // Transition to night
+           else if (g_level < 3 && old_level >=3) fill_sky_and_grass(); // Transition to day
+        }
+
         // Level-specific settings
         switch (g_level) {
             case 1:
@@ -585,8 +591,8 @@ game_restart_point: // Label for full game restart
                 continue; 
             }
         }
-
-        fill_sky_and_grass();
+        if (g_level >= 3) fill_nightsky_and_grass(); else fill_sky_and_grass();
+        //fill_sky_and_grass();
         draw_bars_buffered(bars_a, bars_b, MAX_BARS);
 
         write_text("lives", 5, 1, hud_col - hud_off);
